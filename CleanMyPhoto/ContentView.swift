@@ -141,14 +141,15 @@ struct ContentView: View {
     private var photoListView: some View {
         PhotoListView(
             photoManager: photoManager,
+            onPhotoSelect: { photo in
+                currentPhotoID = photo.id
+                scrollToPhotoID = nil  // 重置，因为不是从返回操作触发的
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isFullscreenMode = true
+                }
+            },
             scrollToPhotoID: scrollToPhotoID
-        ) { photo in
-            currentPhotoID = photo.id
-            scrollToPhotoID = nil  // 重置，因为不是从返回操作触发的
-            withAnimation(.easeInOut(duration: 0.3)) {
-                isFullscreenMode = true
-            }
-        }
+        )
     }
 
     // MARK: - Photo Browser

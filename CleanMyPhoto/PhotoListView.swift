@@ -77,8 +77,7 @@ struct PhotoCell: View {
                 .scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .aspectRatio(contentMode: .fill)
-                
-                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous)) // 3. 裁剪并倒角
             }
         }
         .aspectRatio(1, contentMode: .fit)
