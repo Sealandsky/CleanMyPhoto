@@ -20,21 +20,35 @@ struct PhotoListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 2) {
-                    ForEach(photoManager.displayedPhotos) { photo in
-                        PhotoCell(photo: photo)
-                            .id(photo.id)
-                            .onTapGesture {
-                                onPhotoSelect(photo)
-                            }
-                            .onAppear {
-                                // 当最后一张图片出现时，加载更多
-                                if photo.id == photoManager.displayedPhotos.last?.id {
-                                    Task {
-                                        await photoManager.fetchMorePhotos()
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(photoManager.displayedSections) { section in
+                        // Month Section Header
+                        Text(section.displayTitle)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 0)
+                            .padding(.vertical, 12)
+                            .background(Color.black)
+                            .fontDesign(.rounded)
+
+                        // Photos Grid for this section
+                        LazyVGrid(columns: columns, spacing: 2) {
+                            ForEach(section.photos) { photo in
+                                PhotoCell(photo: photo)
+                                    .id(photo.id)
+                                    .onTapGesture {
+                                        onPhotoSelect(photo)
                                     }
-                                }
+                                    .onAppear {
+                                        // 当最后一张图片出现时，加载更多
+                                        if photo.id == photoManager.displayedPhotos.last?.id {
+                                            Task {
+                                                await photoManager.fetchMorePhotos()
+                                            }
+                                        }
+                                    }
                             }
+                        }
                     }
 
                     // Loading indicator at bottom
