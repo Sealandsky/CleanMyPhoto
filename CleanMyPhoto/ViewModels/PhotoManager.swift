@@ -9,33 +9,6 @@ import SwiftUI
 import Photos
 import Combine
 
-// MARK: - Photo Asset Model
-struct PhotoAsset: Identifiable, Equatable {
-    let id: String
-    let asset: PHAsset
-
-    init(asset: PHAsset) {
-        self.id = asset.localIdentifier
-        self.asset = asset
-    }
-
-    static func == (lhs: PhotoAsset, rhs: PhotoAsset) -> Bool {
-        lhs.id == rhs.id
-    }
-}
-
-// MARK: - Photo Section Model
-struct PhotoSection: Identifiable {
-    let id = UUID()
-    let month: String
-    let year: Int
-    let photos: [PhotoAsset]
-
-    var displayTitle: String {
-        return month + " " + String(year)
-    }
-}
-
 // MARK: - Photo Manager ViewModel
 @MainActor
 class PhotoManager: ObservableObject {

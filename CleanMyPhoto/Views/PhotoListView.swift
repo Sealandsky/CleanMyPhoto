@@ -75,29 +75,6 @@ struct PhotoListView: View {
     }
 }
 
-// MARK: - Photo Cell
-struct PhotoCell: View {
-    let photo: PhotoAsset
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Photo
-                AssetImage(
-                    asset: photo.asset,
-                    targetSize: CGSize(width: 150, height: 150),
-                    contentMode: .fill
-                )
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .aspectRatio(contentMode: .fill)
-                .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous)) // 3. 裁剪并倒角
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-    }
-}
-
 // MARK: - Preview
 #Preview {
     PhotoListView(photoManager: PhotoManager()) { _ in }
