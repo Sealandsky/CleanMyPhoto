@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var currentPhotoID: String? = nil
     @State private var navigationDirection: NavigationDirection = .forward
     @State private var isFullscreenMode = false
+    @State private var scrollToPhotoID: String? = nil
 
     enum NavigationDirection {
         case forward, backward
@@ -138,8 +139,12 @@ struct ContentView: View {
 
     // MARK: - Photo List View
     private var photoListView: some View {
-        PhotoListView(photoManager: photoManager) { photo in
+        PhotoListView(
+            photoManager: photoManager,
+            scrollToPhotoID: scrollToPhotoID
+        ) { photo in
             currentPhotoID = photo.id
+            scrollToPhotoID = nil  // 重置，因为不是从返回操作触发的
             withAnimation(.easeInOut(duration: 0.3)) {
                 isFullscreenMode = true
             }
@@ -187,10 +192,11 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
 
-            // Back button overlay (in safe area)
+            // Back button and trash button overlay (in safe area)
             VStack {
                 HStack {
                     Button {
+                        scrollToPhotoID = currentPhotoID  // 设置需要滚动到的照片 ID
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isFullscreenMode = false
                         }
@@ -202,10 +208,13 @@ struct ContentView: View {
                             .background(Color.black.opacity(0.6))
                             .clipShape(Circle())
                     }
-                    .padding()
 
                     Spacer()
+
+                    // Trash button
+                    trashButton
                 }
+                .padding()
 
                 Spacer()
             }

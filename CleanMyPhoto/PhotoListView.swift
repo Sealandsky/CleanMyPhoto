@@ -11,38 +11,53 @@ import Photos
 struct PhotoListView: View {
     @ObservedObject var photoManager: PhotoManager
     let onPhotoSelect: (PhotoAsset) -> Void
+    var scrollToPhotoID: String? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
     ]
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 2) {
-                ForEach(photoManager.displayedPhotos) { photo in
-                    PhotoCell(photo: photo)
-                        .onTapGesture {
-                            onPhotoSelect(photo)
-                        }
-                        .onAppear {
-                            // 当最后一张图片出现时，加载更多
-                            if photo.id == photoManager.displayedPhotos.last?.id {
-                                Task {
-                                    await photoManager.fetchMorePhotos()
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(photoManager.displayedPhotos) { photo in
+                        PhotoCell(photo: photo)
+                            .id(photo.id)
+                            .onTapGesture {
+                                onPhotoSelect(photo)
+                            }
+                            .onAppear {
+                                // 当最后一张图片出现时，加载更多
+                                if photo.id == photoManager.displayedPhotos.last?.id {
+                                    Task {
+                                        await photoManager.fetchMorePhotos()
+                                    }
                                 }
                             }
-                        }
-                }
+                    }
 
-                // Loading indicator at bottom
-                if photoManager.isLoadingMore {
-                    ProgressView()
-                        .foregroundColor(.white)
-                        .padding()
+                    // Loading indicator at bottom
+                    if photoManager.isLoadingMore {
+                        ProgressView()
+                            .foregroundColor(.white)
+                            .padding()
+                    }
+                }
+            }
+            .background(Color.black)
+            .onAppear {
+                // 只在视图出现时滚动到指定位置，用户不会看到滚动动画
+                if let photoID = scrollToPhotoID {
+                    scrollToPhoto(proxy: proxy, photoID: photoID)
                 }
             }
         }
-        .background(Color.black)
+    }
+
+    private func scrollToPhoto(proxy: ScrollViewProxy, photoID: String) {
+        // 不使用动画，直接定位，用户不会看到滚动过程
+        proxy.scrollTo(photoID, anchor: .center)
     }
 }
 
