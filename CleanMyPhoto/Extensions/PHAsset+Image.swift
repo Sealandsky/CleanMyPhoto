@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Photos
+import UIKit
 
 // MARK: - SwiftUI Image View for PHAsset
 struct AssetImage: View {
@@ -60,10 +61,10 @@ struct AssetImage: View {
             }
         }
 
-        // 使用 PHImageManagerMaximumSize 获取原图尺寸
+        // 使用调用者指定的 targetSize，支持不同场景的图片尺寸需求
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: PHImageManagerMaximumSize,
+            targetSize: self.targetSize,
             contentMode: .aspectFit,
             options: options
         ) { [self] resultImage, info in

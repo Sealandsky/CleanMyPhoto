@@ -8,6 +8,7 @@
 import SwiftUI
 import Photos
 import Combine
+import UIKit
 
 // MARK: - Photo Manager ViewModel
 @MainActor
@@ -136,7 +137,7 @@ class PhotoManager: ObservableObject {
         options.isSynchronous = false
 
         for asset in assetsToPreload {
-            imageManager.startCachingImages(for: [asset], targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: options)
+            imageManager.startCachingImages(for: [asset], targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .aspectFit, options: options)
         }
 
         print("✅ Started caching \(assetsToPreload.count) images")
@@ -151,7 +152,7 @@ class PhotoManager: ObservableObject {
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        imageManager.startCachingImages(for: excluding, targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: options)
+        imageManager.startCachingImages(for: excluding, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .aspectFit, options: options)
     }
 
     // MARK: - Update Displayed Photos

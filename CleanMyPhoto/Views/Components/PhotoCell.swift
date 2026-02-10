@@ -18,7 +18,7 @@ struct PhotoCell: View {
                 // Photo
                 AssetImage(
                     asset: photo.asset,
-                    targetSize: CGSize(width: 150, height: 150),
+                    targetSize: CGSize(width: 400, height: 400),
                     contentMode: .fill
                 )
                 .scaledToFill()

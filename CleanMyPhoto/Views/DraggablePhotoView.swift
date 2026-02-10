@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Photos
+import UIKit
 
 struct DraggablePhotoView: View {
     let photo: PhotoAsset
@@ -31,12 +32,12 @@ struct DraggablePhotoView: View {
                     .contentShape(Rectangle())
 
                 // Photo
-                AssetImage(asset: photo.asset, targetSize: geometry.size, contentMode: .fit)
+                AssetImage(asset: photo.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit)
                     .scaleEffect(scale)
                     .offset(offset)
                     .opacity(opacity)
                     .onAppear {
-                        print("📐 DraggablePhotoView - geometry.size: \(geometry.size)")
+                        print("📐 DraggablePhotoView - geometry.size: \(geometry.size), physicalSize: \(ScreenSizeHelper.screenPhysicalSize)")
                     }
 
                 // Instructions overlay

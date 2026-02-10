@@ -81,7 +81,7 @@ struct TrashView: View {
                 GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
             ], spacing: 2) {
                 ForEach(photoManager.getTrashedAssets()) { photo in
-                    TrashPhotoCell(photo: photo)
+                    PhotoCell(photo: photo)
                         .contextMenu {
                             Button(role: .destructive) {
                                 withAnimation {
@@ -93,50 +93,7 @@ struct TrashView: View {
                         }
                 }
             }
-            .padding()
         }
-    }
-}
-
-// MARK: - Trash Photo Cell
-struct TrashPhotoCell: View {
-    let photo: PhotoAsset
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .topLeading) {
-                // Photo
-                AssetImage(asset: photo.asset, targetSize: geometry.size)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .aspectRatio(contentMode: .fill)
-                    .clipped()
-
-                // Trash indicator
-                Image(systemName: "trash.fill")
-                    .font(.caption)
-                    .foregroundColor(.white)
-                    .padding(6)
-                    .background(Color.red.opacity(0.8))
-                    .cornerRadius(8)
-                    .padding(4)
-
-                // Restore hint
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.black.opacity(0.6))
-                            .cornerRadius(20)
-                            .padding(8)
-                    }
-                }
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
     }
 }
 
