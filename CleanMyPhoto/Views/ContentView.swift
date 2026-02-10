@@ -206,7 +206,7 @@ struct ContentView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .padding(12)
-                            .background(.regularMaterial)
+                            .background(Color.black.opacity(0.8))
                             .clipShape(Circle())
                     }
 
@@ -303,7 +303,7 @@ struct ContentView: View {
                     .font(.title2)
                     .foregroundColor(.white)
                     .padding(12)
-                    .background(.regularMaterial)
+                    .background(.black.opacity(0.8))
                     .clipShape(Circle())
 
                 if photoManager.trashCount > 0 {
