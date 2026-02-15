@@ -213,6 +213,11 @@ class PhotoManager: ObservableObject {
         updateDisplayedPhotos()
     }
 
+    func restoreAllFromTrash() {
+        pendingDeletionIDs.removeAll()
+        updateDisplayedPhotos()
+    }
+
     func isInTrash(_ photoID: String) -> Bool {
         pendingDeletionIDs.contains(photoID)
     }

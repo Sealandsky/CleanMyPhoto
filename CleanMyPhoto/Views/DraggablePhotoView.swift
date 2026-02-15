@@ -112,13 +112,13 @@ struct DraggablePhotoView: View {
         VStack {
             HStack(spacing: 8) {
                 Image(systemName: "trash.fill")
-                    .font(.title)
+                    .font(.headline)
                 Text("Release to Delete")
                     .font(.headline)
             }
-            .foregroundColor(.red)
+            .foregroundColor(.white)
             .padding()
-            .background(Color.black.opacity(0.8))
+            .background(Color.red.opacity(1))
             .cornerRadius(15)
             .padding(.top, 60)
 

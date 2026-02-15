@@ -26,7 +26,7 @@ struct PhotoListView: View {
                         Text(section.displayTitle)
                             .font(.headline)
                             .foregroundColor(.white)
-                            .padding(.horizontal, 0)
+                            .padding(.horizontal, 4)
                             .padding(.vertical, 12)
                             .fontDesign(.rounded)
 
@@ -46,8 +46,10 @@ struct PhotoListView: View {
                                             }
                                         }
                                     }
+                                
                             }
                         }
+                        .padding(.horizontal, 0)
                     }
 
                     // Loading indicator at bottom

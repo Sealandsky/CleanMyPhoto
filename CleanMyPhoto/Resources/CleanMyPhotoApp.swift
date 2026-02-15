@@ -9,9 +9,15 @@ import SwiftUI
 
 @main
 struct CleanMyPhotoApp: App {
+    @AppStorage("hasShownWelcome") private var hasShownWelcome: Bool = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if hasShownWelcome {
+                ContentView()
+            } else {
+                WelcomePage()
+            }
         }
     }
 }
