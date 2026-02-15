@@ -13,6 +13,7 @@ struct TrashView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingDeleteConfirmation = false
+    @State private var showingRestoreConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -33,6 +34,12 @@ struct TrashView: View {
                 }
 
                 if photoManager.trashCount > 0 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Restore All") {
+                            showingRestoreConfirmation = true
+                        }
+                    }
+
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Empty All") {
                             showingDeleteConfirmation = true
@@ -40,6 +47,17 @@ struct TrashView: View {
                         .foregroundColor(.red)
                     }
                 }
+            }
+            .confirmationDialog("Restore All Photos", isPresented: $showingRestoreConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Restore All") {
+                    withAnimation {
+                        photoManager.restoreAllFromTrash()
+                        dismiss()
+                    }
+                }
+            } message: {
+                Text("Restore \(photoManager.trashCount) photo(s) to the main list?")
             }
             .alert("Delete All Photos", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }

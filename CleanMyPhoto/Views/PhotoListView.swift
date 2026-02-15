@@ -28,7 +28,6 @@ struct PhotoListView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 0)
                             .padding(.vertical, 12)
-                            .background(Color.black)
                             .fontDesign(.rounded)
 
                         // Photos Grid for this section
@@ -59,7 +58,8 @@ struct PhotoListView: View {
                     }
                 }
             }
-            .background(Color.black)
+//            .background(Color.black)
+            .background(Color("AccentBg"))
             .onAppear {
                 // 只在视图出现时滚动到指定位置，用户不会看到滚动动画
                 if let photoID = scrollToPhotoID {

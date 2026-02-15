@@ -27,7 +27,7 @@ struct DraggablePhotoView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background
-                Color.black
+                Color.accentBg
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .contentShape(Rectangle())
 
