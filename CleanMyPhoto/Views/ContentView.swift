@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var navigationDirection: NavigationDirection = .forward
     @State private var isFullscreenMode = false
     @State private var scrollToPhotoID: String? = nil
+    @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
+    @State private var showGestureInstructions: Bool = false
 
     enum NavigationDirection {
         case forward, backward
@@ -37,6 +39,11 @@ struct ContentView: View {
         .task {
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
+            } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
+                // 如果已经有权限，直接加载照片
+                if photoManager.displayedPhotos.isEmpty {
+                    await photoManager.fetchAllPhotos()
+                }
             }
         }
         .sheet(isPresented: $showTrash) {
@@ -112,10 +119,13 @@ struct ContentView: View {
         ZStack {
             if photoManager.isLoading {
                 loadingView
-            } else if photoManager.displayedPhotos.isEmpty {
+            } else if photoManager.displayedPhotos.isEmpty && photoManager.hasLoadedOnce {
                 emptyLibraryView
             } else if isFullscreenMode {
                 photoBrowserView
+            } else if photoManager.displayedPhotos.isEmpty {
+                // 还没加载完，显示 loadingView
+                loadingView
             } else {
                 photoListView
             }
@@ -171,6 +181,12 @@ struct ContentView: View {
                             navigationDirection = .backward
                             goToPreviousPhoto()
                         },
+                        onDismiss: {
+                            scrollToPhotoID = currentPhotoID
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isFullscreenMode = false
+                            }
+                        },
                         screenSize: UIScreen.main.bounds.size
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -182,6 +198,8 @@ struct ContentView: View {
                         if let currentIndex = photoManager.displayedPhotos.firstIndex(where: { $0.id == currentPhoto.id }) {
                             photoManager.preloadAssets(photoIndex: currentIndex)
                         }
+                        // 显示手势提示（如果还没显示过）
+                        showGestureInstructionsIfNeeded()
                     }
                 } else if photoManager.displayedPhotos.isEmpty {
                     emptyLibraryView
@@ -192,6 +210,11 @@ struct ContentView: View {
                 }
             }
             .ignoresSafeArea()
+
+            // Gesture instructions overlay
+            if showGestureInstructions {
+                gestureInstructionsOverlay
+            }
 
             // Back button and trash button overlay (in safe area)
             VStack {
@@ -330,6 +353,83 @@ struct ContentView: View {
             Text("Loading photos...")
                 .font(.headline)
                 .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black)
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Gesture Instructions Overlay
+    private var gestureInstructionsOverlay: some View {
+        VStack {
+            Spacer()
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up")
+                    Text("Swipe up to delete")
+                }
+                .font(.caption)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.6))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.left")
+                    Text("Left for older")
+                }
+                .font(.caption)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.6))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right")
+                    Text("Right for newer")
+                }
+                .font(.caption)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.6))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down")
+                    Text("Swipe down to close")
+                }
+                .font(.caption)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.6))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+            }
+            .padding(.bottom, 60)
+        }
+        .allowsHitTesting(false)
+        .transition(.opacity)
+        .onAppear {
+            // 3秒后自动隐藏提示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    showGestureInstructions = false
+                    hasShownGestureInstructions = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Show Gesture Instructions If Needed
+    private func showGestureInstructionsIfNeeded() {
+        // 如果还没显示过提示，则显示
+        if !hasShownGestureInstructions && !showGestureInstructions {
+            withAnimation(.easeIn(duration: 0.3)) {
+                showGestureInstructions = true
+            }
         }
     }
 

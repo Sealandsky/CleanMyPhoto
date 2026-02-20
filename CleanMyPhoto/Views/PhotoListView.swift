@@ -45,7 +45,7 @@ struct PhotoListView: View {
                         .padding()
                 }
             }
-            .background(Color("AccentBg"))
+            .background(Color.black)
             .onAppear {
                 // 只在视图出现时滚动到指定位置
                 if let photoID = scrollToPhotoID {

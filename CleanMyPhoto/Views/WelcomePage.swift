@@ -68,7 +68,7 @@ struct WelcomePage: View {
                 .padding(.horizontal, 32)
             }
         }
-        .background(Color("AccentBg"))
+        .background(Color.black)
     }
 }
 

@@ -14,6 +14,7 @@ struct DraggablePhotoView: View {
     let onDelete: () -> Void
     let onNext: () -> Void
     let onPrevious: () -> Void
+    let onDismiss: () -> Void
     let screenSize: CGSize
 
     @State private var offset: CGSize = .zero
@@ -27,7 +28,7 @@ struct DraggablePhotoView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background
-                Color.accentBg
+                Color.black
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .contentShape(Rectangle())
 
@@ -40,14 +41,14 @@ struct DraggablePhotoView: View {
                         print("📐 DraggablePhotoView - geometry.size: \(geometry.size), physicalSize: \(ScreenSizeHelper.screenPhysicalSize)")
                     }
 
-                // Instructions overlay
-                if !isDragging && offset == .zero {
-                    instructionsOverlay
-                }
-
                 // Delete indicator
                 if offset.height < -swipeThreshold {
                     deleteIndicator
+                }
+
+                // Dismiss indicator
+                if offset.height > swipeThreshold {
+                    dismissIndicator
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -61,50 +62,6 @@ struct DraggablePhotoView: View {
                     }
             )
         }
-    }
-
-    // MARK: - Instructions Overlay
-    private var instructionsOverlay: some View {
-        VStack {
-            Spacer()
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up")
-                    Text("Swipe up to delete")
-                }
-                .font(.caption)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.left")
-                    Image(systemName: "arrow.down")
-                    Text("Left/Down for older")
-                }
-                .font(.caption)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.right")
-                    Text("Right for newer")
-                }
-                .font(.caption)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-            }
-            .padding(.bottom, 60)
-        }
-        .allowsHitTesting(false)
     }
 
     // MARK: - Delete Indicator
@@ -128,17 +85,38 @@ struct DraggablePhotoView: View {
         .allowsHitTesting(false)
     }
 
+    // MARK: - Dismiss Indicator
+    private var dismissIndicator: some View {
+        VStack {
+            Spacer()
+
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.down")
+                    .font(.headline)
+                Text("Release to Close")
+                    .font(.headline)
+            }
+            .foregroundColor(.white)
+            .padding()
+            .background(Color.blue.opacity(0.8))
+            .cornerRadius(15)
+            .padding(.bottom, 60)
+        }
+        .transition(.opacity)
+        .allowsHitTesting(false)
+    }
+
     // MARK: - Gesture Handlers
     private func handleDragChanged(_ value: DragGesture.Value) {
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.8)) {
             isDragging = true
             offset = value.translation
 
-            // 只在向上滑动时添加缩放效果（删除手势）
-            if value.translation.height < 0 && abs(value.translation.height) > abs(value.translation.width) {
+            // 向上或向下滑动时添加缩放效果
+            if abs(value.translation.height) > abs(value.translation.width) {
                 let progress = abs(value.translation.height) / screenSize.height
-                scale = 1.0 - (progress * 0.3)
-                opacity = 1.0 - (progress * 0.5)
+                scale = 1.0 - (progress * 0.2)
+                opacity = 1.0 - (progress * 0.3)
             } else {
                 scale = 1.0
                 opacity = 1.0
@@ -155,19 +133,18 @@ struct DraggablePhotoView: View {
             performDeleteAnimation()
         }
         // 向右滑动 → 看更新的照片
-        else if horizontal > swipeThreshold {
+        else if horizontal > swipeThreshold && abs(horizontal) > abs(vertical) {
             resetPosition()
             onPrevious()
         }
         // 向左滑动 → 看更旧的照片
-        else if horizontal < -swipeThreshold {
+        else if horizontal < -swipeThreshold && abs(horizontal) > abs(vertical) {
             resetPosition()
             onNext()
         }
-        // 向下滑动 → 看更旧的照片
+        // 向下滑动 → 退出全屏
         else if vertical > swipeThreshold && abs(vertical) > abs(horizontal) {
-            resetPosition()
-            onNext()
+            performDismissAnimation()
         }
         // 未达到阈值 → 复位
         else {
@@ -185,6 +162,20 @@ struct DraggablePhotoView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             onDelete()
+            resetPosition()
+        }
+    }
+
+    // MARK: - Dismiss Animation
+    private func performDismissAnimation() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            offset = CGSize(width: 0, height: screenSize.height)
+            scale = 0.8
+            opacity = 0
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            onDismiss()
             resetPosition()
         }
     }
@@ -207,6 +198,7 @@ struct DraggablePhotoView: View {
         onDelete: {},
         onNext: {},
         onPrevious: {},
+        onDismiss: {},
         screenSize: CGSize(width: 393, height: 852)
     )
 }

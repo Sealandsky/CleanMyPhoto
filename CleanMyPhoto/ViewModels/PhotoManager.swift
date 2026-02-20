@@ -20,6 +20,7 @@ class PhotoManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
     @Published var hasMorePhotos: Bool = true
+    @Published var hasLoadedOnce: Bool = false
     @Published var errorMessage: String?
 
     private let imageManager = PHCachingImageManager()
@@ -28,6 +29,11 @@ class PhotoManager: ObservableObject {
 
     var trashCount: Int {
         pendingDeletionIDs.count
+    }
+
+    init() {
+        // 初始化时检查当前的权限状态
+        authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
 
     // MARK: - Authorization
@@ -46,7 +52,10 @@ class PhotoManager: ObservableObject {
     // MARK: - Fetch Photos
     func fetchAllPhotos() async {
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
 
         // Reset state
         currentFetchOffset = 0
