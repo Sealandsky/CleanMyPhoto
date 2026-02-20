@@ -20,59 +20,60 @@ struct PhotoListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(photoManager.displayedSections) { section in
-                        // Month Section Header
-                        Text(section.displayTitle)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 12)
-                            .fontDesign(.rounded)
-
-                        // Photos Grid for this section
-                        LazyVGrid(columns: columns, spacing: 2) {
-                            ForEach(section.photos) { photo in
-                                PhotoCell(photo: photo)
-                                    .id(photo.id)
-                                    .onTapGesture {
-                                        onPhotoSelect(photo)
-                                    }
-                                    .onAppear {
-                                        // 当最后一张图片出现时，加载更多
-                                        if photo.id == photoManager.displayedPhotos.last?.id {
-                                            Task {
-                                                await photoManager.fetchMorePhotos()
-                                            }
-                                        }
-                                    }
-                                
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(photoManager.displayedPhotos) { photo in
+                        PhotoCell(photo: photo)
+                            .id(photo.id)
+                            .onTapGesture {
+                                onPhotoSelect(photo)
                             }
-                        }
-                        .padding(.horizontal, 0)
-                    }
-
-                    // Loading indicator at bottom
-                    if photoManager.isLoadingMore {
-                        ProgressView()
-                            .foregroundColor(.white)
-                            .padding()
+                            .onAppear {
+                                // 当最后一张图片出现时，加载更多
+                                if photo.id == photoManager.displayedPhotos.last?.id {
+                                    Task {
+                                        await photoManager.fetchMorePhotos()
+                                    }
+                                }
+                            }
                     }
                 }
+
+                // Loading indicator at bottom
+                if photoManager.isLoadingMore {
+                    ProgressView()
+                        .foregroundColor(.white)
+                        .padding()
+                }
             }
-//            .background(Color.black)
             .background(Color("AccentBg"))
             .onAppear {
-                // 只在视图出现时滚动到指定位置，用户不会看到滚动动画
+                // 只在视图出现时滚动到指定位置
                 if let photoID = scrollToPhotoID {
                     scrollToPhoto(proxy: proxy, photoID: photoID)
+                }
+            }
+            .onChange(of: scrollToPhotoID) { oldValue, newValue in
+                guard let photoID = newValue else { return }
+
+                // 验证照片是否仍然存在
+                let photoExists = photoManager.displayedPhotos.contains(where: { $0.id == photoID })
+
+                if photoExists {
+                    // 延迟滚动，确保 LazyVGrid 已经渲染完成
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
+                        }
+                    }
+                } else {
+                    print("⚠️ Photo \(photoID) no longer exists, skipping scroll")
                 }
             }
         }
     }
 
     private func scrollToPhoto(proxy: ScrollViewProxy, photoID: String) {
-        // 不使用动画，直接定位，用户不会看到滚动过程
+        // 直接滚动到照片位置
         proxy.scrollTo(photoID, anchor: .center)
     }
 }

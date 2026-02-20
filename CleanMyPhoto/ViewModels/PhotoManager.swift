@@ -15,7 +15,6 @@ import UIKit
 class PhotoManager: ObservableObject {
     @Published var allPhotos: [PhotoAsset] = []
     @Published var displayedPhotos: [PhotoAsset] = []
-    @Published var displayedSections: [PhotoSection] = []
     @Published var pendingDeletionIDs: Set<String> = []
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     @Published var isLoading: Bool = false
@@ -158,48 +157,6 @@ class PhotoManager: ObservableObject {
     // MARK: - Update Displayed Photos
     private func updateDisplayedPhotos() {
         displayedPhotos = allPhotos.filter { !pendingDeletionIDs.contains($0.id) }
-        updateDisplayedSections()
-    }
-
-    // MARK: - Update Displayed Sections
-    private func updateDisplayedSections() {
-        let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM"
-
-        var groupedPhotos: [String: (year: Int, month: String, photos: [PhotoAsset])] = [:]
-
-        for photo in displayedPhotos {
-            if let creationDate = photo.asset.creationDate {
-                let month = formatter.string(from: creationDate)
-                let year = calendar.component(.year, from: creationDate)
-                let key = "\(year)-\(month)"
-
-                if groupedPhotos[key] == nil {
-                    groupedPhotos[key] = (year: year, month: month, photos: [])
-                }
-                groupedPhotos[key]?.photos.append(photo)
-            }
-        }
-
-        // Convert to sections and sort by year and month (most recent first)
-        let sections = groupedPhotos.map { (_, value) in
-            PhotoSection(month: value.month, year: value.year, photos: value.photos)
-        }
-
-        // Sort sections by year and month (descending) using month numbers
-        displayedSections = sections.sorted { section1, section2 in
-            if section1.year != section2.year {
-                return section1.year > section2.year
-            }
-            // Same year, compare months by converting month names to numbers
-            let monthOrder = ["January": 1, "February": 2, "March": 3, "April": 4,
-                              "May": 5, "June": 6, "July": 7, "August": 8,
-                              "September": 9, "October": 10, "November": 11, "December": 12]
-            let month1 = monthOrder[section1.month] ?? 0
-            let month2 = monthOrder[section2.month] ?? 0
-            return month1 > month2
-        }
     }
 
     // MARK: - Trash Management
