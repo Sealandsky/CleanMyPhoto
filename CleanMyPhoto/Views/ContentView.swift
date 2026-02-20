@@ -10,11 +10,13 @@ import Photos
 
 struct ContentView: View {
     @StateObject private var photoManager = PhotoManager()
+    @StateObject private var membershipManager = MembershipManager()
     @State private var showTrash = false
     @State private var currentPhotoID: String? = nil
     @State private var navigationDirection: NavigationDirection = .forward
     @State private var isFullscreenMode = false
     @State private var scrollToPhotoID: String? = nil
+    @State private var showMembershipPaywall = false
     @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
     @State private var showGestureInstructions: Bool = false
 
@@ -37,6 +39,11 @@ struct ContentView: View {
             }
         }
         .task {
+            // 检查试用期
+            if membershipManager.isTrialExpired {
+                showMembershipPaywall = true
+            }
+
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
             } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
@@ -48,6 +55,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showTrash) {
             TrashView(photoManager: photoManager)
+        }
+        .sheet(isPresented: $showMembershipPaywall) {
+            MembershipView(isMandatory: true)
         }
         .alert("Error", isPresented: .constant(photoManager.errorMessage != nil)) {
             Button("OK") {
@@ -134,6 +144,11 @@ struct ContentView: View {
             if !photoManager.displayedPhotos.isEmpty && !isFullscreenMode {
                 VStack {
                     HStack {
+                        // 会员升级按钮
+                        if !membershipManager.isPremiumMember {
+                            membershipButton
+                        }
+
                         Spacer()
 
                         trashButton
@@ -142,6 +157,13 @@ struct ContentView: View {
 
                     Spacer()
                 }
+            }
+
+            // Trial warning banner (仅在试用期≤1天且非会员时显示)
+            if !membershipManager.isPremiumMember &&
+               membershipManager.membershipStatus.isTrialActive &&
+               membershipManager.remainingTrialDays <= 1 {
+                trialWarningBanner
             }
         }
         .background(Color.black)
@@ -340,6 +362,49 @@ struct ContentView: View {
                         .offset(x: 5, y: -5)
                 }
             }
+        }
+    }
+
+    // MARK: - Membership Button
+    private var membershipButton: some View {
+        Button {
+            showMembershipPaywall = true
+        } label: {
+            Image(systemName: "crown.fill")
+                .font(.title2)
+                .foregroundColor(.yellow)
+                .padding(12)
+                .background(.black.opacity(0.8))
+                .clipShape(Circle())
+        }
+    }
+
+    // MARK: - Trial Warning Banner
+    private var trialWarningBanner: some View {
+        VStack {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+
+                Text("试用期还剩 \(membershipManager.remainingTrialDays) 天")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button("升级") {
+                    showMembershipPaywall = true
+                }
+                .font(.system(size: 13))
+                .foregroundColor(.blue)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.orange.opacity(0.2))
+            .cornerRadius(12)
+            .padding(.horizontal, 16)
+
+            Spacer()
         }
     }
 

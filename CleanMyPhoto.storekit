@@ -1,0 +1,182 @@
+{
+  "identifier" : "B2A4B3C2D1E0F9A8B7C6D5E4F3A2B1C0",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "12.00",
+      "familyShareable" : false,
+      "internalID" : "6A5B4C3D2E1F0A9B8C7D6E5F4A3B2C1",
+      "localizations" : [
+        {
+          "description" : "以月度订阅的方式使用 CleanMyPhoto 专业版功能",
+          "displayName" : "月度订阅",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "Monthly subscription to CleanMyPhoto Pro features",
+          "displayName" : "Monthly Subscription",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.cleanmyphoto.subscription.monthly",
+      "referenceName" : "Monthly Subscription",
+      "type" : "RecurringSubscription",
+      "versions" : [
+        {
+          "features" : [
+            {
+              "amount" : 1,
+              "period" : "MONTH"
+            }
+          ],
+          "offerTags" : [
+
+          ],
+          "versionNumber" : 1
+        }
+      ]
+    },
+    {
+      "displayPrice" : "68.00",
+      "familyShareable" : false,
+      "internalID" : "7B6C5D4E3F2A1B0C9D8E7F6A5B4C3D2",
+          "description" : "以年度订阅的方式使用 CleanMyPhoto 专业版功能，节省53%",
+          "displayName" : "年度订阅",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "Yearly subscription to CleanMyPhoto Pro features, save 53%",
+          "displayName" : "Yearly Subscription",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.cleanmyphoto.subscription.yearly",
+      "referenceName" : "Yearly Subscription",
+      "type" : "RecurringSubscription",
+      "versions" : [
+        {
+          "features" : [
+            {
+              "amount" : 1,
+              "period" : "YEAR"
+            }
+          ],
+          "offerTags" : [
+
+          ],
+          "versionNumber" : 1
+        }
+      ]
+    },
+    {
+      "displayPrice" : "128.00",
+      "familyShareable" : false,
+      "internalID" : "8C7D6E5F4A3B2C1D0E9F8A7B6C5D4E3",
+      "localizations" : [
+        {
+          "description" : "一次性购买，终身使用 CleanMyPhoto 专业版功能",
+          "displayName" : "终身会员",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "One-time purchase for lifetime access to CleanMyPhoto Pro features",
+          "displayName" : "Lifetime Membership",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.cleanmyphoto.purchase.lifetime",
+      "referenceName" : "Lifetime Membership",
+      "type" : "NonConsumable",
+      "versions" : [
+        {
+          "features" : [
+
+          ],
+          "offerTags" : [
+
+          ],
+          "versionNumber" : 1
+        }
+      ]
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6784321890",
+    "_developerTeamID" : "NotApplicable",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 762739200.0,
+    "_locale" : "zh_CN",
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_storeKitErrorsEnabled" : false,
+    "_transactionRateLimiting" : 60
+  },
+  "subscriptionGroups" : [
+    {
+      "internalID" : "9D8E7F6A5B4C3D2E1F0A9B8C7D6E5F4",
+      "localizations" : [
+        {
+          "displayName" : "CleanMyPhoto 订阅",
+          "locale" : "zh_CN"
+        },
+        {
+          "displayName" : "CleanMyPhoto Subscriptions",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "CleanMyPhoto Subscriptions",
+      "subscriptions" : [
+        "com.cleanmyphoto.subscription.monthly",
+        "com.cleanmyphoto.subscription.yearly"
+      ]
+    }
+  ]
+}
