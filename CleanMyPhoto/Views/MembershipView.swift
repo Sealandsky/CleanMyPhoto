@@ -28,6 +28,27 @@ struct MembershipView: View {
                 .padding(.vertical, 40)
             }
 
+            // 关闭按钮
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        hasShownMembership = true
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(22)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.top, 10)
+                }
+                Spacer()
+            }
+
             if membershipManager.isLoadingPurchase {
                 loadingOverlay
             }

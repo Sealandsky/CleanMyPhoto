@@ -25,7 +25,7 @@ enum SubscriptionType: String, CaseIterable {
     // 价格显示文本
     var priceText: String {
         switch self {
-        case .monthly: return "¥12"
+        case .monthly: return "¥6"
         case .yearly: return "¥68"
         case .lifetime: return "¥128"
         }

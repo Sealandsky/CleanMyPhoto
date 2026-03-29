@@ -8,9 +8,15 @@
 import SwiftUI
 import Photos
 
+enum MainTab: String, CaseIterable {
+    case allPhotos = "所有照片"
+    case albums = "相簿"
+}
+
 struct ContentView: View {
-    @StateObject private var photoManager = PhotoManager()
-    @StateObject private var membershipManager = MembershipManager()
+    @EnvironmentObject var photoManager: PhotoManager
+    @EnvironmentObject var membershipManager: MembershipManager
+
     @State private var showTrash = false
     @State private var currentPhotoID: String? = nil
     @State private var navigationDirection: NavigationDirection = .forward
@@ -19,6 +25,11 @@ struct ContentView: View {
     @State private var showMembershipPaywall = false
     @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
     @State private var showGestureInstructions: Bool = false
+
+    // 相簿相关状态
+    @State private var selectedTab: MainTab = .allPhotos
+    @State private var selectedAlbum: AlbumModel? = nil
+    @State private var albumManager: AlbumManager?
 
     enum NavigationDirection {
         case forward, backward
@@ -51,6 +62,11 @@ struct ContentView: View {
                 if photoManager.displayedPhotos.isEmpty {
                     await photoManager.fetchAllPhotos()
                 }
+            }
+
+            // 初始化 AlbumManager
+            if albumManager == nil {
+                albumManager = AlbumManager(photoManager: photoManager)
             }
         }
         .sheet(isPresented: $showTrash) {
@@ -127,36 +143,11 @@ struct ContentView: View {
     // MARK: - Main View
     private var mainView: some View {
         ZStack {
-            if photoManager.isLoading {
-                loadingView
-            } else if photoManager.displayedPhotos.isEmpty && photoManager.hasLoadedOnce {
-                emptyLibraryView
-            } else if isFullscreenMode {
-                photoBrowserView
-            } else if photoManager.displayedPhotos.isEmpty {
-                // 还没加载完，显示 loadingView
-                loadingView
-            } else {
-                photoListView
-            }
+            contentViews
 
-            // Trash button overlay (only in list mode)
+            // 顶部按钮 overlay (only in list mode)
             if !photoManager.displayedPhotos.isEmpty && !isFullscreenMode {
-                VStack {
-                    HStack {
-                        // 会员升级按钮
-                        if !membershipManager.isPremiumMember {
-                            membershipButton
-                        }
-
-                        Spacer()
-
-                        trashButton
-                    }
-                    .padding()
-
-                    Spacer()
-                }
+                topButtonOverlay
             }
 
             // Trial warning banner (仅在试用期≤1天且非会员时显示)
@@ -167,6 +158,112 @@ struct ContentView: View {
             }
         }
         .background(Color.black)
+    }
+
+    // MARK: - Content Views
+    private var contentViews: some View {
+        VStack(spacing: 0) {
+            // 分段控制器（仅在非全屏模式下显示）
+            if !isFullscreenMode {
+                topSegmentedControl
+            }
+
+            // 内容视图
+            if isFullscreenMode {
+                photoBrowserView
+            } else if let album = selectedAlbum, let albumMgr = albumManager {
+                // 相簿照片视图
+                AlbumPhotoListView(
+                    albumManager: albumMgr,
+                    photoManager: photoManager,
+                    album: album,
+                    onPhotoSelect: { photo in
+                        currentPhotoID = photo.id
+                        scrollToPhotoID = nil
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isFullscreenMode = true
+                        }
+                    },
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            selectedAlbum = nil
+                        }
+                    },
+                    scrollToPhotoID: scrollToPhotoID
+                )
+            } else {
+                // 根据 tab 显示不同视图
+                switch selectedTab {
+                case .allPhotos:
+                    if photoManager.isLoading {
+                        loadingView
+                    } else if photoManager.displayedPhotos.isEmpty && photoManager.hasLoadedOnce {
+                        emptyLibraryView
+                    } else {
+                        photoListView
+                    }
+                case .albums:
+                    if let albumMgr = albumManager {
+                        AlbumListView(albumManager: albumMgr) { album in
+                            selectedAlbum = album
+                            Task {
+                                await albumMgr.fetchPhotos(in: album)
+                            }
+                        }
+                    } else {
+                        loadingView
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Top Segmented Control
+    private var topSegmentedControl: some View {
+        Picker("View Mode", selection: $selectedTab) {
+            ForEach(MainTab.allCases, id: \.self) { tab in
+                Text(tab.rawValue).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(Color.black.opacity(0.95))
+        .onChange(of: selectedTab) { oldValue, newValue in
+            // 切换 tab 时清除相簿选择
+            if newValue != .albums {
+                withAnimation {
+                    selectedAlbum = nil
+                }
+            }
+
+            // 切换到相簿 tab 时加载相簿列表
+            if newValue == .albums, let albumMgr = albumManager {
+                Task {
+                    await albumMgr.fetchUserAlbums()
+                }
+            }
+        }
+    }
+
+    // MARK: - Top Button Overlay
+    private var topButtonOverlay: some View {
+        VStack {
+            HStack {
+                // 会员升级按钮
+                if !membershipManager.isPremiumMember {
+                    membershipButton
+                }
+
+                Spacer()
+
+                // 回收站按钮
+                trashButton
+            }
+            .padding()
+
+            Spacer()
+        }
     }
 
     // MARK: - Photo List View
@@ -189,7 +286,16 @@ struct ContentView: View {
         ZStack {
             // Full-screen content
             Group {
-                if let currentPhoto = photoManager.displayedPhotos.first(where: { $0.id == currentPhotoID }) {
+                // 根据是否在相簿模式选择不同的照片列表
+                let currentPhotos: [PhotoAsset] = {
+                    if let albumMgr = albumManager, selectedAlbum != nil {
+                        return albumMgr.displayedAlbumPhotos
+                    } else {
+                        return photoManager.displayedPhotos
+                    }
+                }()
+
+                if let currentPhoto = currentPhotos.first(where: { $0.id == currentPhotoID }) {
                     DraggablePhotoView(
                         photo: currentPhoto,
                         onDelete: {
@@ -197,11 +303,11 @@ struct ContentView: View {
                         },
                         onNext: {
                             navigationDirection = .forward
-                            goToNextPhoto()
+                            goToNextPhotoInCurrentAlbum()
                         },
                         onPrevious: {
                             navigationDirection = .backward
-                            goToPreviousPhoto()
+                            goToPreviousPhotoInCurrentAlbum()
                         },
                         onDismiss: {
                             scrollToPhotoID = currentPhotoID
@@ -217,13 +323,15 @@ struct ContentView: View {
                     .onAppear {
                         print("🖼️ Displaying photo: \(currentPhoto.id)")
                         // 预加载当前照片前后的图片
-                        if let currentIndex = photoManager.displayedPhotos.firstIndex(where: { $0.id == currentPhoto.id }) {
-                            photoManager.preloadAssets(photoIndex: currentIndex)
+                        if let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhoto.id }) {
+                            if selectedAlbum == nil {
+                                photoManager.preloadAssets(photoIndex: currentIndex)
+                            }
                         }
                         // 显示手势提示（如果还没显示过）
                         showGestureInstructionsIfNeeded()
                     }
-                } else if photoManager.displayedPhotos.isEmpty {
+                } else if currentPhotos.isEmpty {
                     emptyLibraryView
                 } else {
                     // Fallback: should not happen
@@ -266,9 +374,12 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            initializeCurrentPhoto()
+            if currentPhotoID == nil {
+                initializeCurrentPhoto()
+            }
+            let currentPhotos = selectedAlbum != nil ? albumManager?.displayedAlbumPhotos ?? [] : photoManager.displayedPhotos
             print("🔍 CurrentPhotoID: \(currentPhotoID?.description ?? "nil")")
-            print("🔍 Displayed photos count: \(photoManager.displayedPhotos.count)")
+            print("🔍 Displayed photos count: \(currentPhotos.count)")
         }
     }
 
@@ -309,24 +420,90 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Navigation for Album Photos
+    private func goToNextPhotoInCurrentAlbum() {
+        let currentPhotos: [PhotoAsset] = {
+            if let albumMgr = albumManager, selectedAlbum != nil {
+                return albumMgr.displayedAlbumPhotos
+            } else {
+                return photoManager.displayedPhotos
+            }
+        }()
+
+        guard let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
+            return
+        }
+
+        let nextIndex = currentIndex + 1
+        if nextIndex < currentPhotos.count {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentPhotoID = currentPhotos[nextIndex].id
+            }
+        }
+    }
+
+    private func goToPreviousPhotoInCurrentAlbum() {
+        let currentPhotos: [PhotoAsset] = {
+            if let albumMgr = albumManager, selectedAlbum != nil {
+                return albumMgr.displayedAlbumPhotos
+            } else {
+                return photoManager.displayedPhotos
+            }
+        }()
+
+        guard let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
+            return
+        }
+
+        let previousIndex = currentIndex - 1
+        if previousIndex >= 0 {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentPhotoID = currentPhotos[previousIndex].id
+            }
+        }
+    }
+
     // MARK: - Photo Deletion Handler
     private func handlePhotoDeletion(_ photo: PhotoAsset) {
+        // 确定当前照片列表
+        let currentPhotos: [PhotoAsset] = {
+            if let albumMgr = albumManager, selectedAlbum != nil {
+                return albumMgr.displayedAlbumPhotos
+            } else {
+                return photoManager.displayedPhotos
+            }
+        }()
+
         // 存储删除前的索引位置
-        let deletedIndex = photoManager.displayedPhotos.firstIndex(where: { $0.id == photo.id }) ?? 0
+        guard let deletedIndex = currentPhotos.firstIndex(where: { $0.id == photo.id }) else {
+            return
+        }
+
+        // 在删除前确定下一张要显示的照片ID
+        let nextPhotoID: String?
+        if currentPhotos.count <= 1 {
+            // 只有这一张照片，删除后退出全屏
+            nextPhotoID = nil
+        } else if deletedIndex < currentPhotos.count - 1 {
+            // 不是最后一张，显示下一张
+            nextPhotoID = currentPhotos[deletedIndex + 1].id
+        } else {
+            // 是最后一张，显示前一张
+            nextPhotoID = currentPhotos[deletedIndex - 1].id
+        }
 
         // 执行删除（在动画前）
         photoManager.addToTrash(photo)
 
         // 使用动画平滑过渡
         withAnimation(.easeInOut(duration: 0.3)) {
-            // 根据 new 数组状态更新 currentPhotoID
-            if photoManager.displayedPhotos.isEmpty {
+            if let nextID = nextPhotoID {
+                // 显示下一张照片
+                currentPhotoID = nextID
+            } else {
+                // 没有照片了，退出全屏
                 currentPhotoID = nil
                 isFullscreenMode = false
-            } else {
-                // 智能选择：尝试保持视觉位置
-                let nextIndex = min(deletedIndex, photoManager.displayedPhotos.count - 1)
-                currentPhotoID = photoManager.displayedPhotos[nextIndex].id
             }
         }
     }

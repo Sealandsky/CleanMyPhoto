@@ -16,6 +16,7 @@ class PhotoManager: ObservableObject {
     @Published var allPhotos: [PhotoAsset] = []
     @Published var displayedPhotos: [PhotoAsset] = []
     @Published var pendingDeletionIDs: Set<String> = []
+    @Published var trashedAssets: [PhotoAsset] = []  // 存储被删除的照片对象
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
@@ -171,16 +172,23 @@ class PhotoManager: ObservableObject {
     // MARK: - Trash Management
     func addToTrash(_ photo: PhotoAsset) {
         pendingDeletionIDs.insert(photo.id)
+        // 添加到 trashedAssets（如果还不存在）
+        if !trashedAssets.contains(where: { $0.id == photo.id }) {
+            trashedAssets.append(photo)
+        }
         updateDisplayedPhotos()
     }
 
     func restoreFromTrash(_ photoID: String) {
         pendingDeletionIDs.remove(photoID)
+        // 从 trashedAssets 中移除
+        trashedAssets.removeAll { $0.id == photoID }
         updateDisplayedPhotos()
     }
 
     func restoreAllFromTrash() {
         pendingDeletionIDs.removeAll()
+        trashedAssets.removeAll()
         updateDisplayedPhotos()
     }
 
@@ -190,14 +198,14 @@ class PhotoManager: ObservableObject {
 
     // MARK: - Get Trashed Assets
     func getTrashedAssets() -> [PhotoAsset] {
-        allPhotos.filter { pendingDeletionIDs.contains($0.id) }
+        // 优先返回 trashedAssets，这样可以显示从相簿删除的照片
+        return trashedAssets
     }
 
     // MARK: - Empty Trash
     func emptyTrash() async {
         guard !pendingDeletionIDs.isEmpty else { return }
 
-        let trashedAssets = getTrashedAssets()
         let assetsToDelete = trashedAssets.map { $0.asset }
 
         do {
@@ -208,6 +216,7 @@ class PhotoManager: ObservableObject {
             // Remove from all photos and clear pending deletions
             allPhotos.removeAll { trashedAssets.contains($0) }
             pendingDeletionIDs.removeAll()
+            trashedAssets.removeAll()  // 清空 trashedAssets
             updateDisplayedPhotos()
         } catch {
             errorMessage = "Failed to delete photos: \(error.localizedDescription)"

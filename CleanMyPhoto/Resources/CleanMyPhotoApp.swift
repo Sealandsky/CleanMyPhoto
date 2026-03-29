@@ -12,6 +12,9 @@ struct CleanMyPhotoApp: App {
     @AppStorage("hasShownWelcome") private var hasShownWelcome: Bool = false
     @AppStorage("hasShownMembership") private var hasShownMembership: Bool = false
 
+    @StateObject private var photoManager = PhotoManager()
+    @StateObject private var membershipManager = MembershipManager()
+
     var body: some Scene {
         WindowGroup {
             if !hasShownWelcome {
@@ -20,6 +23,8 @@ struct CleanMyPhotoApp: App {
                 MembershipView(isMandatory: false)
             } else {
                 ContentView()
+                    .environmentObject(photoManager)
+                    .environmentObject(membershipManager)
             }
         }
     }
