@@ -18,7 +18,7 @@ struct AlbumModel: Identifiable, Equatable {
     init(collection: PHAssetCollection) {
         self.id = collection.localIdentifier
         self.collection = collection
-        self.title = collection.localizedTitle ?? "Unnamed Album"
+        self.title = collection.localizedTitle ?? String(localized: "Unnamed Album")
 
         // 获取相册内的资源数量
         let fetchOptions = PHFetchOptions()

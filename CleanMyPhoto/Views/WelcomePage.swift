@@ -35,11 +35,11 @@ struct WelcomePage: View {
 
                 // 欢迎文字
                 VStack(spacing: 8) {
-                    Text("欢迎使用 CleanMyPhotos")
+                    Text(String(localized: "欢迎使用 CleanMyPhotos"))
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
 
-                    Text("最大程度节省手机图片空间")
+                    Text(String(localized: "最大程度节省手机图片空间"))
                         .font(.system(size: 30, weight: .semibold))
                         .frame(width: 260)
                         .foregroundColor(.white)
@@ -58,7 +58,7 @@ struct WelcomePage: View {
                     // 保持 hasShownMembership = false，显示会员页
                 }) {
                     HStack {
-                        Text("开始使用")
+                        Text(String(localized: "开始使用"))
                             .font(.system(size: 20, weight: .semibold))
                     }
                     .foregroundColor(.white)
@@ -75,7 +75,7 @@ struct WelcomePage: View {
                     hasShownMembership = true // 跳过会员页
                 }) {
                     HStack {
-                        Text("试用 3 天")
+                        Text(String(localized: "试用 3 天"))
                             .font(.system(size: 20, weight: .semibold))
                     }
                     .foregroundColor(.white)

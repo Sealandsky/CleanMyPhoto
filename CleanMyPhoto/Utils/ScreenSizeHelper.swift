@@ -7,6 +7,8 @@
 
 import UIKit
 
+// TODO: UIScreen.main is deprecated in iOS 26.0. Replace with view.window.windowScene.screen
+
 /// 屏幕尺寸辅助工具
 struct ScreenSizeHelper {
 

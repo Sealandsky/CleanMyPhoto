@@ -24,51 +24,51 @@ struct TrashView: View {
                     trashGridView
                 }
             }
-            .navigationTitle("Trash Bin")
+            .navigationTitle(String(localized: "Trash Bin"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    Button(String(localized: "Close")) {
                         dismiss()
                     }
                 }
 
                 if photoManager.trashCount > 0 {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Restore All") {
+                        Button(String(localized: "Restore All")) {
                             showingRestoreConfirmation = true
                         }
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Empty All") {
+                        Button(String(localized: "Empty All")) {
                             showingDeleteConfirmation = true
                         }
                         .foregroundColor(.red)
                     }
                 }
             }
-            .confirmationDialog("Restore All Photos", isPresented: $showingRestoreConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Restore All") {
+            .confirmationDialog(String(localized: "Restore All Photos"), isPresented: $showingRestoreConfirmation) {
+                Button(String(localized: "Cancel"), role: .cancel) { }
+                Button(String(localized: "Restore All")) {
                     withAnimation {
                         photoManager.restoreAllFromTrash()
                         dismiss()
                     }
                 }
             } message: {
-                Text("Restore \(photoManager.trashCount) photo(s) to the main list?")
+                Text(String(localized: "Restore \(photoManager.trashCount) photo(s) to the main list?"))
             }
-            .alert("Delete All Photos", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
+            .alert(String(localized: "Delete All Photos"), isPresented: $showingDeleteConfirmation) {
+                Button(String(localized: "Cancel"), role: .cancel) { }
+                Button(String(localized: "Delete"), role: .destructive) {
                     Task {
                         await photoManager.emptyTrash()
                         dismiss()
                     }
                 }
             } message: {
-                Text("Are you sure you want to permanently delete \(photoManager.trashCount) photo(s)? This action cannot be undone.")
+                Text(String(localized: "Are you sure you want to permanently delete \(photoManager.trashCount) photo(s)? This action cannot be undone."))
             }
         }
     }
@@ -80,11 +80,11 @@ struct TrashView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
 
-            Text("Trash is Empty")
+            Text(String(localized: "Trash is Empty"))
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Photos you swipe up to delete will appear here.")
+            Text(String(localized: "Photos you swipe up to delete will appear here."))
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -106,7 +106,7 @@ struct TrashView: View {
                                     photoManager.restoreFromTrash(photo.id)
                                 }
                             } label: {
-                                Label("Restore", systemImage: "arrow.uturn.backward")
+                                Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
                             }
                         }
                 }

@@ -32,7 +32,7 @@ struct AlbumPhotoListView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
 
-                        Text("\(albumManager.displayedAlbumPhotos.count) photos")
+                        Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .padding(.horizontal)

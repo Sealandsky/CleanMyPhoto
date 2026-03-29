@@ -13,15 +13,14 @@ struct AlbumCell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 封面图
+            // 封面图（使用缓存）
             ZStack {
                 if let coverAsset = album.coverAsset {
-                    AssetImage(
-                        asset: coverAsset,
-                        targetSize: CGSize(width: 400, height: 400),
-                        contentMode: .fill
+                    CachedAlbumCoverView(
+                        albumID: album.id,
+                        coverAsset: coverAsset,
+                        targetSize: CGSize(width: 400, height: 400)
                     )
-                    .scaledToFill()
                     .frame(height: 150)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
@@ -44,7 +43,7 @@ struct AlbumCell: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
 
-                Text("\(album.assetCount) photos")
+                Text("\(album.assetCount) \(String(localized: "photos"))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

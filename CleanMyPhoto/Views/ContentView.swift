@@ -8,9 +8,23 @@
 import SwiftUI
 import Photos
 
+// TODO: UIScreen.main is deprecated in iOS 26.0. Replace with view.window.windowScene.screen
+
 enum MainTab: String, CaseIterable {
-    case allPhotos = "所有照片"
-    case albums = "相簿"
+    case allPhotos
+    case albums
+    case timeline
+
+    var localizedText: String {
+        switch self {
+        case .allPhotos:
+            return String(localized: "所有照片")
+        case .albums:
+            return String(localized: "相簿")
+        case .timeline:
+            return String(localized: "日期")
+        }
+    }
 }
 
 struct ContentView: View {
@@ -30,6 +44,7 @@ struct ContentView: View {
     @State private var selectedTab: MainTab = .allPhotos
     @State private var selectedAlbum: AlbumModel? = nil
     @State private var albumManager: AlbumManager?
+    @State private var systemAlbumManager: SystemAlbumManager?
 
     enum NavigationDirection {
         case forward, backward
@@ -68,6 +83,11 @@ struct ContentView: View {
             if albumManager == nil {
                 albumManager = AlbumManager(photoManager: photoManager)
             }
+
+            // 初始化 SystemAlbumManager
+            if systemAlbumManager == nil {
+                systemAlbumManager = SystemAlbumManager()
+            }
         }
         .sheet(isPresented: $showTrash) {
             TrashView(photoManager: photoManager)
@@ -75,8 +95,8 @@ struct ContentView: View {
         .sheet(isPresented: $showMembershipPaywall) {
             MembershipView(isMandatory: true)
         }
-        .alert("Error", isPresented: .constant(photoManager.errorMessage != nil)) {
-            Button("OK") {
+        .alert(String(localized: "Error"), isPresented: .constant(photoManager.errorMessage != nil)) {
+            Button(String(localized: "OK")) {
                 photoManager.errorMessage = nil
             }
         } message: {
@@ -94,11 +114,11 @@ struct ContentView: View {
                 .foregroundColor(.blue)
 
             VStack(spacing: 12) {
-                Text("Photo Access Required")
+                Text(String(localized: "Photo Access Required"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text("CleanMyPhoto needs access to your photo library to help you organize and delete unwanted photos.")
+                Text(String(localized: "CleanMyPhoto needs access to your photo library to help you organize and delete unwanted photos."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -119,18 +139,18 @@ struct ContentView: View {
                 .foregroundColor(.orange)
 
             VStack(spacing: 12) {
-                Text("Access Denied")
+                Text(String(localized: "Access Denied"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text("To use CleanMyPhoto, please enable photo library access in Settings.")
+                Text(String(localized: "To use CleanMyPhoto, please enable photo library access in Settings."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
 
-            Button("Open Settings") {
+            Button(String(localized: "Open Settings")) {
                 if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsUrl)
                 }
@@ -213,6 +233,22 @@ struct ContentView: View {
                     } else {
                         loadingView
                     }
+                case .timeline:
+                    if let systemAlbumMgr = systemAlbumManager {
+                        PhotoGroupView(
+                            albumManager: systemAlbumMgr,
+                            photoManager: photoManager,
+                            onPhotoSelect: { photo in
+                                currentPhotoID = photo.id
+                                scrollToPhotoID = nil
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    isFullscreenMode = true
+                                }
+                            }
+                        )
+                    } else {
+                        loadingView
+                    }
                 }
             }
         }
@@ -222,7 +258,7 @@ struct ContentView: View {
     private var topSegmentedControl: some View {
         Picker("View Mode", selection: $selectedTab) {
             ForEach(MainTab.allCases, id: \.self) { tab in
-                Text(tab.rawValue).tag(tab)
+                Text(tab.localizedText).tag(tab)
             }
         }
         .pickerStyle(.segmented)
@@ -315,7 +351,12 @@ struct ContentView: View {
                                 isFullscreenMode = false
                             }
                         },
-                        screenSize: UIScreen.main.bounds.size
+                        screenSize: {
+                            #if compiler(>=6.0)
+                            // TODO: Replace with view.window.windowScene.screen (iOS 26.0+)
+                            #endif
+                            return UIScreen.main.bounds.size
+                        }()
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(currentPhoto.id)
@@ -563,13 +604,13 @@ struct ContentView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
 
-                Text("试用期还剩 \(membershipManager.remainingTrialDays) 天")
+                Text(String(localized: "试用期还剩 \(membershipManager.remainingTrialDays) 天"))
                     .font(.system(size: 13))
                     .foregroundColor(.white)
 
                 Spacer()
 
-                Button("升级") {
+                Button(String(localized: "升级")) {
                     showMembershipPaywall = true
                 }
                 .font(.system(size: 13))
@@ -592,7 +633,7 @@ struct ContentView: View {
                 .scaleEffect(1.5)
                 .tint(.white)
 
-            Text("Loading photos...")
+            Text(String(localized: "Loading photos..."))
                 .font(.headline)
                 .foregroundColor(.white)
         }
@@ -608,7 +649,7 @@ struct ContentView: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.up")
-                    Text("Swipe up to delete")
+                    Text(String(localized: "Swipe up to delete"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
@@ -619,7 +660,7 @@ struct ContentView: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.left")
-                    Text("Left for older")
+                    Text(String(localized: "Left for older"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
@@ -630,7 +671,7 @@ struct ContentView: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.right")
-                    Text("Right for newer")
+                    Text(String(localized: "Right for newer"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
@@ -641,7 +682,7 @@ struct ContentView: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down")
-                    Text("Swipe down to close")
+                    Text(String(localized: "Swipe down to close"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
@@ -682,12 +723,12 @@ struct ContentView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
 
-            Text("No Photos Found")
+            Text(String(localized: "No Photos Found"))
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
 
-            Text("Your photo library appears to be empty.")
+            Text(String(localized: "Your photo library appears to be empty."))
                 .font(.body)
                 .foregroundColor(.secondary)
         }
