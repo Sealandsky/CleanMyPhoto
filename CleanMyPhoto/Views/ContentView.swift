@@ -45,6 +45,7 @@ struct ContentView: View {
     @State private var selectedAlbum: AlbumModel? = nil
     @State private var albumManager: AlbumManager?
     @State private var systemAlbumManager: SystemAlbumManager?
+    @State private var selectedMonthAlbum: MonthAlbum? = nil
 
     enum NavigationDirection {
         case forward, backward
@@ -234,15 +235,32 @@ struct ContentView: View {
                         loadingView
                     }
                 case .timeline:
-                    if let systemAlbumMgr = systemAlbumManager {
-                        PhotoGroupView(
-                            albumManager: systemAlbumMgr,
+                    if let monthAlbum = selectedMonthAlbum {
+                        // 显示月份照片列表
+                        SystemMonthPhotosView(
+                            monthAlbum: monthAlbum,
                             photoManager: photoManager,
                             onPhotoSelect: { photo in
                                 currentPhotoID = photo.id
                                 scrollToPhotoID = nil
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     isFullscreenMode = true
+                                }
+                            },
+                            onBack: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    selectedMonthAlbum = nil
+                                }
+                            },
+                            scrollToPhotoID: scrollToPhotoID
+                        )
+                    } else if let systemAlbumMgr = systemAlbumManager {
+                        PhotoGroupView(
+                            albumManager: systemAlbumMgr,
+                            photoManager: photoManager,
+                            onMonthSelect: { monthAlbum in
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    selectedMonthAlbum = monthAlbum
                                 }
                             }
                         )
@@ -322,9 +340,20 @@ struct ContentView: View {
         ZStack {
             // Full-screen content
             Group {
-                // 根据是否在相簿模式选择不同的照片列表
+                // 根据当前模式选择不同的照片列表
                 let currentPhotos: [PhotoAsset] = {
-                    if let albumMgr = albumManager, selectedAlbum != nil {
+                    if let monthAlbum = selectedMonthAlbum {
+                        // 月份照片列表
+                        if let fetchResult = monthAlbum.fetchResult {
+                            return (0..<fetchResult.count).compactMap { index in
+                                guard index < fetchResult.count else { return nil }
+                                let asset = fetchResult.object(at: index)
+                                return PhotoAsset(asset: asset)
+                            }
+                        } else {
+                            return monthAlbum.assets.map { PhotoAsset(asset: $0) }
+                        }
+                    } else if let albumMgr = albumManager, selectedAlbum != nil {
                         return albumMgr.displayedAlbumPhotos
                     } else {
                         return photoManager.displayedPhotos
@@ -464,7 +493,18 @@ struct ContentView: View {
     // MARK: - Navigation for Album Photos
     private func goToNextPhotoInCurrentAlbum() {
         let currentPhotos: [PhotoAsset] = {
-            if let albumMgr = albumManager, selectedAlbum != nil {
+            if let monthAlbum = selectedMonthAlbum {
+                // 月份照片列表
+                if let fetchResult = monthAlbum.fetchResult {
+                    return (0..<fetchResult.count).compactMap { index in
+                        guard index < fetchResult.count else { return nil }
+                        let asset = fetchResult.object(at: index)
+                        return PhotoAsset(asset: asset)
+                    }
+                } else {
+                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
+                }
+            } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
                 return photoManager.displayedPhotos
@@ -485,7 +525,18 @@ struct ContentView: View {
 
     private func goToPreviousPhotoInCurrentAlbum() {
         let currentPhotos: [PhotoAsset] = {
-            if let albumMgr = albumManager, selectedAlbum != nil {
+            if let monthAlbum = selectedMonthAlbum {
+                // 月份照片列表
+                if let fetchResult = monthAlbum.fetchResult {
+                    return (0..<fetchResult.count).compactMap { index in
+                        guard index < fetchResult.count else { return nil }
+                        let asset = fetchResult.object(at: index)
+                        return PhotoAsset(asset: asset)
+                    }
+                } else {
+                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
+                }
+            } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
                 return photoManager.displayedPhotos
@@ -508,7 +559,18 @@ struct ContentView: View {
     private func handlePhotoDeletion(_ photo: PhotoAsset) {
         // 确定当前照片列表
         let currentPhotos: [PhotoAsset] = {
-            if let albumMgr = albumManager, selectedAlbum != nil {
+            if let monthAlbum = selectedMonthAlbum {
+                // 月份照片列表
+                if let fetchResult = monthAlbum.fetchResult {
+                    return (0..<fetchResult.count).compactMap { index in
+                        guard index < fetchResult.count else { return nil }
+                        let asset = fetchResult.object(at: index)
+                        return PhotoAsset(asset: asset)
+                    }
+                } else {
+                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
+                }
+            } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
                 return photoManager.displayedPhotos

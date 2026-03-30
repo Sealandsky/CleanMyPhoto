@@ -11,65 +11,46 @@ import Photos
 struct PhotoGroupView: View {
     @ObservedObject var albumManager: SystemAlbumManager
     @ObservedObject var photoManager: PhotoManager
-    let onPhotoSelect: (PhotoAsset) -> Void
-
-    @State private var selectedMonth: MonthAlbum? = nil
+    let onMonthSelect: (MonthAlbum) -> Void
 
     var body: some View {
-        GeometryReader { _ in
-            if let month = selectedMonth {
-                // 显示月份照片视图
-                SystemMonthPhotosView(
-                    monthAlbum: month,
-                    photoManager: photoManager,
-                    onPhotoSelect: onPhotoSelect,
-                    onDismiss: {
+        HStack(spacing: 0) {
+            // 左侧年份列表
+            YearListView(
+                yearAlbums: albumManager.yearAlbums,
+                selectedYear: albumManager.selectedYear,
+                onYearSelect: { year in
+                    albumManager.selectedYear = year
+                    Task {
+                        await albumManager.loadMonthAlbumsForYear(year)
+                    }
+                }
+            )
+            .frame(width: 120)
+            .background(Color.black.opacity(0.3))
+
+            // 右侧月份列表
+            if albumManager.isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.white)
+                    Text(String(localized: "加载中..."))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                MonthListView(
+                    monthAlbums: albumManager.monthAlbums,
+                    onMonthSelect: { monthAlbum in
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedMonth = nil
+                            onMonthSelect(monthAlbum)
                         }
                     }
                 )
-            } else {
-                // 显示月份列表
-                HStack(spacing: 0) {
-                    // 左侧年份列表
-                    YearListView(
-                        yearAlbums: albumManager.yearAlbums,
-                        selectedYear: albumManager.selectedYear,
-                        onYearSelect: { year in
-                            albumManager.selectedYear = year
-                            Task {
-                                await albumManager.loadMonthAlbumsForYear(year)
-                            }
-                        }
-                    )
-                    .frame(width: 120)
-                    .background(Color.black.opacity(0.3))
-
-                    // 右侧月份列表
-                    if albumManager.isLoading {
-                        VStack {
-                            Spacer()
-                            ProgressView()
-                                .tint(.white)
-                            Text(String(localized: "加载中..."))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 8)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
-                    } else {
-                        MonthListView(
-                            monthAlbums: albumManager.monthAlbums,
-                            onMonthSelect: { monthAlbum in
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    selectedMonth = monthAlbum
-                                }
-                            }
-                        )
-                    }
-                }
             }
         }
         .background(Color.black)
@@ -159,34 +140,37 @@ struct MonthCardView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 系统封面（大图）
-            Group {
-                if let thumbnail = monthAlbum.thumbnail {
-                    // 优先使用缓存的缩略图
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
-                    // 如果没有缓存，使用 AssetImage 加载
-                    AssetImage(
-                        asset: asset,
-                        targetSize: CGSize(width: 400, height: 400),
-                        contentMode: .fill
-                    )
-                    .scaledToFill()
-
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.system(size: 40))
-                                .foregroundColor(.gray)
+            GeometryReader { geometry in
+                ZStack {
+                    if let thumbnail = monthAlbum.thumbnail {
+                        // 优先使用缓存的缩略图
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .scaledToFill()
+                    } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
+                        // 如果没有缓存，使用 AssetImage 加载
+                        AssetImage(
+                            asset: asset,
+                            targetSize: CGSize(width: 400, height: 400),
+                            contentMode: .fill
                         )
+                        .scaledToFill()
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                            )
+                    }
                 }
+                .frame(width: geometry.size.width, height: 150)
+                .contentShape(Rectangle())
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipped()
             }
-            .frame(maxWidth: .infinity)
             .frame(height: 150)
-            .clipped()
 
             // 月份信息
             VStack(spacing: 4) {
@@ -214,7 +198,8 @@ struct SystemMonthPhotosView: View {
     let monthAlbum: MonthAlbum
     @ObservedObject var photoManager: PhotoManager
     let onPhotoSelect: (PhotoAsset) -> Void
-    let onDismiss: () -> Void
+    let onBack: () -> Void
+    var scrollToPhotoID: String? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
@@ -269,13 +254,18 @@ struct SystemMonthPhotosView: View {
                     }
                 }
                 .background(Color.black)
+                .onAppear {
+                    if let scrollToID = scrollToPhotoID {
+                        proxy.scrollTo(scrollToID, anchor: .center)
+                    }
+                }
             }
 
             // 浮动返回按钮
             VStack {
                 HStack {
                     Button {
-                        onDismiss()
+                        onBack()
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.title2)
@@ -299,7 +289,23 @@ struct SystemMonthPhotosView: View {
     PhotoGroupView(
         albumManager: SystemAlbumManager(),
         photoManager: PhotoManager(),
-        onPhotoSelect: { _ in }
+        onMonthSelect: { _ in }
+    )
+})
+
+#Preview("SystemMonthPhotosView", body: {
+    SystemMonthPhotosView(
+        monthAlbum: MonthAlbum(
+            collection: nil,
+            fetchResult: nil,
+            assets: [],
+            year: 2025,
+            month: 3,
+            thumbnail: nil
+        ),
+        photoManager: PhotoManager(),
+        onPhotoSelect: { _ in },
+        onBack: {}
     )
 })
 
@@ -368,7 +374,7 @@ struct SystemMonthPhotosView: View {
 // MARK: - Preview Helper Views
 /// 用于预览的完整视图，包含示例数据
 struct PhotoGroupViewWithSampleData: View {
-    @State private var selectedMonth: MonthAlbum? = nil
+    @State private var selectedYear: Int? = 2025
 
     private let sampleYears = [
         YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2026, thumbnail: nil),
@@ -376,8 +382,6 @@ struct PhotoGroupViewWithSampleData: View {
         YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2024, thumbnail: nil),
         YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2023, thumbnail: nil),
     ]
-
-    @State private var selectedYear: Int? = 2025
 
     private let sampleMonths = [
         MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 12, thumbnail: nil),
@@ -389,64 +393,24 @@ struct PhotoGroupViewWithSampleData: View {
     ]
 
     var body: some View {
-        if let month = selectedMonth {
-            // 显示月份照片视图（模拟）
-            VStack {
-                HStack {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedMonth = nil
-                        }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(Color.black.opacity(0.8))
-                            .clipShape(Circle())
-                    }
-                    Spacer()
+        // 显示年月列表（有数据）
+        HStack(spacing: 0) {
+            // 左侧年份列表
+            YearListView(
+                yearAlbums: sampleYears,
+                selectedYear: selectedYear,
+                onYearSelect: { year in
+                    selectedYear = year
                 }
-                .padding()
+            )
+            .frame(width: 120)
+            .background(Color.black.opacity(0.3))
 
-                Spacer()
-
-                Text(month.fullTitle)
-                    .font(.title)
-                    .foregroundColor(.white)
-
-                Text("\(month.photoCount) 张照片")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
-        } else {
-            // 显示年月列表（有数据）
-            HStack(spacing: 0) {
-                // 左侧年份列表
-                YearListView(
-                    yearAlbums: sampleYears,
-                    selectedYear: selectedYear,
-                    onYearSelect: { year in
-                        selectedYear = year
-                    }
-                )
-                .frame(width: 120)
-                .background(Color.black.opacity(0.3))
-
-                // 右侧月份列表
-                MonthListView(
-                    monthAlbums: sampleMonths,
-                    onMonthSelect: { monthAlbum in
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedMonth = monthAlbum
-                        }
-                    }
-                )
-            }
+            // 右侧月份列表
+            MonthListView(
+                monthAlbums: sampleMonths,
+                onMonthSelect: { _ in }
+            )
         }
     }
 }

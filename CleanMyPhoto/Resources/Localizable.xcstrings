@@ -14,9 +14,6 @@
         }
       }
     },
-    "%lld 张照片" : {
-
-    },
     "%lld%@" : {
       "localizations" : {
         "en" : {

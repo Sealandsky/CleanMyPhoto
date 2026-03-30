@@ -128,9 +128,21 @@ class PhotoManager: ObservableObject {
 
     // MARK: - Preload Assets
     func preloadAssets(photoIndex: Int? = nil, count: Int = 3) {
+        // 确保数组不为空
+        guard !displayedPhotos.isEmpty else {
+            print("⚠️ No photos to preload")
+            return
+        }
+
         let index = photoIndex ?? 0
         let startIndex = max(0, index - count)
         let endIndex = min(displayedPhotos.count - 1, index + count)
+
+        // 确保 startIndex <= endIndex
+        guard startIndex <= endIndex else {
+            print("⚠️ Invalid range: startIndex (\(startIndex)) > endIndex (\(endIndex))")
+            return
+        }
 
         print("🔄 Preloading photos from \(startIndex) to \(endIndex)")
 
