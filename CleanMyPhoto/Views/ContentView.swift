@@ -18,7 +18,7 @@ enum MainTab: String, CaseIterable {
     var localizedText: String {
         switch self {
         case .allPhotos:
-            return String(localized: "所有照片")
+            return String(localized: "图库")
         case .albums:
             return String(localized: "相簿")
         case .timeline:
@@ -46,6 +46,9 @@ struct ContentView: View {
     @State private var albumManager: AlbumManager?
     @State private var systemAlbumManager: SystemAlbumManager?
     @State private var selectedMonthAlbum: MonthAlbum? = nil
+
+    // 滚动偏移状态
+    @State private var scrollOffset: CGFloat = 0
 
     enum NavigationDirection {
         case forward, backward
@@ -115,11 +118,11 @@ struct ContentView: View {
                 .foregroundColor(.blue)
 
             VStack(spacing: 12) {
-                Text(String(localized: "Photo Access Required"))
+                Text(String(localized: "需要相册访问权限"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "CleanMyPhoto needs access to your photo library to help you organize and delete unwanted photos."))
+                Text(String(localized: "CleanMyPhoto 需要获取你的相册权限，以便帮你整理并清理无用照片。"))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -140,18 +143,18 @@ struct ContentView: View {
                 .foregroundColor(.orange)
 
             VStack(spacing: 12) {
-                Text(String(localized: "Access Denied"))
+                Text(String(localized: "权限已被拒绝"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "To use CleanMyPhoto, please enable photo library access in Settings."))
+                Text(String(localized: "如需使用 CleanMyPhoto，请前往设置开启相册访问权限。"))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
 
-            Button(String(localized: "Open Settings")) {
+            Button(String(localized: "打开设置")) {
                 if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsUrl)
                 }
@@ -166,11 +169,6 @@ struct ContentView: View {
         ZStack {
             contentViews
 
-            // 顶部按钮 overlay (only in list mode)
-            if !photoManager.displayedPhotos.isEmpty && !isFullscreenMode {
-                topButtonOverlay
-            }
-
             // Trial warning banner (仅在试用期≤1天且非会员时显示)
             if !membershipManager.isPremiumMember &&
                membershipManager.membershipStatus.isTrialActive &&
@@ -184,6 +182,11 @@ struct ContentView: View {
     // MARK: - Content Views
     private var contentViews: some View {
         VStack(spacing: 0) {
+            // 顶部标题栏（仅在非全屏模式下显示）
+            if !isFullscreenMode {
+                navigationTitleBar
+            }
+
             // 分段控制器（仅在非全屏模式下显示）
             if !isFullscreenMode {
                 topSegmentedControl
@@ -194,24 +197,28 @@ struct ContentView: View {
                 photoBrowserView
             } else if let album = selectedAlbum, let albumMgr = albumManager {
                 // 相簿照片视图
-                AlbumPhotoListView(
-                    albumManager: albumMgr,
-                    photoManager: photoManager,
-                    album: album,
-                    onPhotoSelect: { photo in
-                        currentPhotoID = photo.id
-                        scrollToPhotoID = nil
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isFullscreenMode = true
-                        }
-                    },
-                    onBack: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedAlbum = nil
-                        }
-                    },
-                    scrollToPhotoID: scrollToPhotoID
-                )
+                if albumMgr.isLoadingPhotos {
+                    loadingView
+                } else {
+                    AlbumPhotoListView(
+                        albumManager: albumMgr,
+                        photoManager: photoManager,
+                        album: album,
+                        onPhotoSelect: { photo in
+                            currentPhotoID = photo.id
+                            scrollToPhotoID = nil
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isFullscreenMode = true
+                            }
+                        },
+                        onBack: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                selectedAlbum = nil
+                            }
+                        },
+                        scrollToPhotoID: scrollToPhotoID
+                    )
+                }
             } else {
                 // 根据 tab 显示不同视图
                 switch selectedTab {
@@ -272,18 +279,69 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Navigation Title Bar
+    private var navigationTitleBar: some View {
+        HStack {
+            Text(appTitle)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+            Spacer()
+            if !membershipManager.isPremiumMember {
+                membershipButton
+            }
+            trashButton
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(backgroundMaterial)
+    }
+
+    // 根据滚动偏移返回背景材质
+    private var backgroundMaterial: some View {
+        Group {
+            if scrollOffset > 20 {
+                // 滚动超过20点时显示模糊背景
+                Color.black.opacity(0.8)
+                    .background(.ultraThinMaterial)
+            } else {
+                // 未滚动时透明背景
+                Color.clear
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
+    }
+
+    // 根据当前 tab 返回不同的标题
+    private var appTitle: String {
+        switch selectedTab {
+        case .allPhotos:
+            return String(localized: "图库")
+        case .albums:
+            return String(localized: "相簿")
+        case .timeline:
+            return String(localized: "日期")
+        }
+    }
+
     // MARK: - Top Segmented Control
     private var topSegmentedControl: some View {
         Picker("View Mode", selection: $selectedTab) {
             ForEach(MainTab.allCases, id: \.self) { tab in
-                Text(tab.localizedText).tag(tab)
+                Text(tab.localizedText)
+                    .font(.callout)
+                    .tag(tab)
             }
         }
         .pickerStyle(.segmented)
-        .padding(.horizontal)
-        .padding(.vertical, 12)
+        .controlSize(.large)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .background(Color.black.opacity(0.95))
         .onChange(of: selectedTab) { oldValue, newValue in
+            // 切换 tab 时重置滚动偏移
+            scrollOffset = 0
+
             // 切换 tab 时清除相簿选择
             if newValue != .albums {
                 withAnimation {
@@ -291,32 +349,13 @@ struct ContentView: View {
                 }
             }
 
-            // 切换到相簿 tab 时加载相簿列表
-            if newValue == .albums, let albumMgr = albumManager {
+            // 切换到相簿 tab 时加载相簿列表（仅首次）
+            if newValue == .albums, let albumMgr = albumManager, albumMgr.albums.isEmpty {
+                albumMgr.isLoadingAlbums = true
                 Task {
                     await albumMgr.fetchUserAlbums()
                 }
             }
-        }
-    }
-
-    // MARK: - Top Button Overlay
-    private var topButtonOverlay: some View {
-        VStack {
-            HStack {
-                // 会员升级按钮
-                if !membershipManager.isPremiumMember {
-                    membershipButton
-                }
-
-                Spacer()
-
-                // 回收站按钮
-                trashButton
-            }
-            .padding()
-
-            Spacer()
         }
     }
 
@@ -331,7 +370,10 @@ struct ContentView: View {
                     isFullscreenMode = true
                 }
             },
-            scrollToPhotoID: scrollToPhotoID
+            scrollToPhotoID: scrollToPhotoID,
+            onScrollOffsetChanged: { offset in
+                scrollOffset = offset
+            }
         )
     }
 
@@ -416,29 +458,29 @@ struct ContentView: View {
                 gestureInstructionsOverlay
             }
 
-            // Back button and trash button overlay (in safe area)
+            // 全屏页导航栏（无标题，返回 + 垃圾桶）
             VStack {
                 HStack {
                     Button {
-                        scrollToPhotoID = currentPhotoID  // 设置需要滚动到的照片 ID
+                        scrollToPhotoID = currentPhotoID
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isFullscreenMode = false
                         }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.title2)
+                            .font(.body)
                             .foregroundColor(.white)
-                            .padding(12)
-                            .background(Color.black.opacity(0.8))
+                            .frame(width: 40, height: 40)
                             .clipShape(Circle())
                     }
+                    .buttonStyle(.glass)
 
                     Spacer()
 
-                    // Trash button
                     trashButton
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.vertical, 8)
 
                 Spacer()
             }
@@ -625,11 +667,8 @@ struct ContentView: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "trash.fill")
-                    .font(.title2)
+                    .font(.body)
                     .foregroundColor(.white)
-                    .padding(12)
-                    .background(.black.opacity(0.8))
-                    .clipShape(Circle())
 
                 if photoManager.trashCount > 0 {
                     Text("\(photoManager.trashCount)")
@@ -642,7 +681,10 @@ struct ContentView: View {
                         .offset(x: 5, y: -5)
                 }
             }
+            .frame(width: 36, height: 40)
+            .clipShape(Circle())
         }
+        .buttonStyle(.glass)
     }
 
     // MARK: - Membership Button
@@ -651,12 +693,11 @@ struct ContentView: View {
             showMembershipPaywall = true
         } label: {
             Image(systemName: "crown.fill")
-                .font(.title2)
+                .font(.body)
                 .foregroundColor(.yellow)
-                .padding(12)
-                .background(.black.opacity(0.8))
-                .clipShape(Circle())
+                .frame(width: 40, height: 40)
         }
+        .buttonStyle(.glass)
     }
 
     // MARK: - Trial Warning Banner

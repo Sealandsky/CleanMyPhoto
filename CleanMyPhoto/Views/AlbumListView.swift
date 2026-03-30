@@ -18,8 +18,7 @@ struct AlbumListView: View {
     var body: some View {
         ScrollView {
             if albumManager.isLoadingAlbums {
-                ProgressView("Loading albums...")
-                    .foregroundColor(.white)
+                skeletonGrid
             } else if albumManager.albums.isEmpty {
                 emptyAlbumsView
             } else {
@@ -37,6 +36,16 @@ struct AlbumListView: View {
         .background(Color.black)
     }
 
+    // MARK: - Skeleton Grid
+    private var skeletonGrid: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(0..<6, id: \.self) { _ in
+                AlbumCellSkeleton()
+            }
+        }
+        .padding()
+    }
+
     private var emptyAlbumsView: some View {
         VStack(spacing: 20) {
             Image(systemName: "photo.on.rectangle.angled")
@@ -52,6 +61,33 @@ struct AlbumListView: View {
                 .font(.body)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Album Cell Skeleton
+struct AlbumCellSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 16)
+                    .frame(maxWidth: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 12)
+                    .frame(maxWidth: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+        }
+        .shimmering()
     }
 }
 

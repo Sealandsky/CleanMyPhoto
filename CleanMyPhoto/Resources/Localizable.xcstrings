@@ -34,6 +34,7 @@
 
     },
     "Access Denied" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -86,6 +87,7 @@
       }
     },
     "CleanMyPhoto needs access to your photo library to help you organize and delete unwanted photos." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -100,6 +102,9 @@
           }
         }
       }
+    },
+    "CleanMyPhoto 需要获取你的相册权限，以便帮你整理并清理无用照片。" : {
+
     },
     "Close" : {
       "localizations" : {
@@ -197,9 +202,6 @@
         }
       }
     },
-    "Loading albums..." : {
-
-    },
     "Loading photos..." : {
       "localizations" : {
         "en" : {
@@ -255,6 +257,7 @@
       }
     },
     "Open Settings" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -271,6 +274,7 @@
       }
     },
     "Photo Access Required" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -441,6 +445,7 @@
       }
     },
     "To use CleanMyPhoto, please enable photo library access in Settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -690,6 +695,9 @@
         }
       }
     },
+    "图库" : {
+
+    },
     "处理中..." : {
       "localizations" : {
         "en" : {
@@ -705,6 +713,9 @@
           }
         }
       }
+    },
+    "如需使用 CleanMyPhoto，请前往设置开启相册访问权限。" : {
+
     },
     "年" : {
       "localizations" : {
@@ -805,20 +816,24 @@
       }
     },
     "所有照片" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All Photos"
+            "value" : "Library"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有照片"
+            "value" : "图库"
           }
         }
       }
+    },
+    "打开设置" : {
+
     },
     "提示" : {
       "localizations" : {
@@ -906,6 +921,9 @@
           }
         }
       }
+    },
+    "权限已被拒绝" : {
+
     },
     "欢迎使用 CleanMyPhotos" : {
       "localizations" : {
@@ -1154,6 +1172,9 @@
           }
         }
       }
+    },
+    "需要相册访问权限" : {
+
     }
   },
   "version" : "1.0"

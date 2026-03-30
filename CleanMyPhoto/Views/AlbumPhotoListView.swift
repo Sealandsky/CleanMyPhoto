@@ -15,6 +15,8 @@ struct AlbumPhotoListView: View {
     let onBack: () -> Void
     var scrollToPhotoID: String? = nil
 
+    @State private var scrollOffset: CGFloat = 0
+
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
     ]
@@ -23,32 +25,45 @@ struct AlbumPhotoListView: View {
         ZStack {
             ScrollViewReader { proxy in
                 ScrollView {
-                    // 相簿标题
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(album.title)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
+                    ZStack(alignment: .top) {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .preference(key: ScrollOffsetPreferenceKey.self,
+                                          value: -geometry.frame(in: .named("scrollView")).minY)
+                        }
+                        .frame(height: 0)
 
-                        Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                    }
+                        VStack(alignment: .leading, spacing: 12) {
+                            // 相簿标题
+                            Text(album.title)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal)
+                                .padding(.top, 8)
 
-                    LazyVGrid(columns: columns, spacing: 2) {
-                        ForEach(albumManager.displayedAlbumPhotos) { photo in
-                            PhotoCell(photo: photo)
-                                .id(photo.id)
-                                .onTapGesture {
-                                    onPhotoSelect(photo)
+                            Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+
+                            LazyVGrid(columns: columns, spacing: 2) {
+                                ForEach(albumManager.displayedAlbumPhotos) { photo in
+                                    PhotoCell(photo: photo)
+                                        .id(photo.id)
+                                        .onTapGesture {
+                                            onPhotoSelect(photo)
+                                        }
                                 }
+                            }
                         }
                     }
                 }
                 .background(Color.black)
+                .coordinateSpace(name: "scrollView")
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                    scrollOffset = offset
+                }
                 .onChange(of: scrollToPhotoID) { oldValue, newValue in
                     guard let photoID = newValue else { return }
                     let photoExists = albumManager.displayedAlbumPhotos.contains(where: { $0.id == photoID })
@@ -73,7 +88,7 @@ struct AlbumPhotoListView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .padding(12)
-                            .background(Color.black.opacity(0.8))
+                            .background(backButtonBackground)
                             .clipShape(Circle())
                     }
 
@@ -84,5 +99,18 @@ struct AlbumPhotoListView: View {
                 Spacer()
             }
         }
+    }
+
+    // 根据滚动偏移返回背景材质
+    private var backButtonBackground: some View {
+        Group {
+            if scrollOffset > 20 {
+                Color.black.opacity(0.8)
+                    .background(.ultraThinMaterial)
+            } else {
+                Color.black.opacity(0.8)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
     }
 }

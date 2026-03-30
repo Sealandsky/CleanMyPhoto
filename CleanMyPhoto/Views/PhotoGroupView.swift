@@ -201,6 +201,8 @@ struct SystemMonthPhotosView: View {
     let onBack: () -> Void
     var scrollToPhotoID: String? = nil
 
+    @State private var scrollOffset: CGFloat = 0
+
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
     ]
@@ -224,36 +226,49 @@ struct SystemMonthPhotosView: View {
             // 主要内容区域
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        // 标题区域
+                    ZStack(alignment: .top) {
+                        GeometryReader { geometry in
+                            Color.clear
+                                .preference(key: ScrollOffsetPreferenceKey.self,
+                                          value: -geometry.frame(in: .named("scrollView")).minY)
+                        }
+                        .frame(height: 0)
+
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(monthAlbum.fullTitle)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
+                            // 标题区域
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(monthAlbum.fullTitle)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
 
-                            Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                        }
-
-                        // 照片网格
-                        LazyVGrid(columns: columns, spacing: 2) {
-                            ForEach(photos) { photo in
-                                PhotoCell(photo: photo)
-                                    .id(photo.id)
-                                    .onTapGesture {
-                                        onPhotoSelect(photo)
-                                    }
+                                Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
                             }
+
+                            // 照片网格
+                            LazyVGrid(columns: columns, spacing: 2) {
+                                ForEach(photos) { photo in
+                                    PhotoCell(photo: photo)
+                                        .id(photo.id)
+                                        .onTapGesture {
+                                            onPhotoSelect(photo)
+                                        }
+                                }
+                            }
+                            .padding(.horizontal, 2)
                         }
-                        .padding(.horizontal, 2)
                     }
                 }
                 .background(Color.black)
+                .coordinateSpace(name: "scrollView")
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                    scrollOffset = offset
+                }
                 .onAppear {
                     if let scrollToID = scrollToPhotoID {
                         proxy.scrollTo(scrollToID, anchor: .center)
@@ -271,7 +286,7 @@ struct SystemMonthPhotosView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .padding(12)
-                            .background(Color.black.opacity(0.8))
+                            .background(backButtonBackground)
                             .clipShape(Circle())
                     }
                     Spacer()
@@ -281,6 +296,19 @@ struct SystemMonthPhotosView: View {
                 Spacer()
             }
         }
+    }
+
+    // 根据滚动偏移返回背景材质
+    private var backButtonBackground: some View {
+        Group {
+            if scrollOffset > 20 {
+                Color.black.opacity(0.8)
+                    .background(.ultraThinMaterial)
+            } else {
+                Color.black.opacity(0.8)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
     }
 }
 

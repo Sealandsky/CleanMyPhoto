@@ -12,6 +12,9 @@ struct PhotoListView: View {
     @ObservedObject var photoManager: PhotoManager
     let onPhotoSelect: (PhotoAsset) -> Void
     var scrollToPhotoID: String? = nil
+    var onScrollOffsetChanged: ((CGFloat) -> Void)? = nil
+
+    @State private var scrollOffset: CGFloat = 0
 
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
@@ -20,32 +23,46 @@ struct PhotoListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 2) {
-                    ForEach(photoManager.displayedPhotos) { photo in
-                        PhotoCell(photo: photo)
-                            .id(photo.id)
-                            .onTapGesture {
-                                onPhotoSelect(photo)
-                            }
-                            .onAppear {
-                                // 当最后一张图片出现时，加载更多
-                                if photo.id == photoManager.displayedPhotos.last?.id {
-                                    Task {
-                                        await photoManager.fetchMorePhotos()
+                ZStack(alignment: .top) {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: ScrollOffsetPreferenceKey.self,
+                                      value: -geometry.frame(in: .named("scrollView")).minY)
+                    }
+                    .frame(height: 0)
+
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(photoManager.displayedPhotos) { photo in
+                            PhotoCell(photo: photo)
+                                .id(photo.id)
+                                .onTapGesture {
+                                    onPhotoSelect(photo)
+                                }
+                                .onAppear {
+                                    // 当最后一张图片出现时，加载更多
+                                    if photo.id == photoManager.displayedPhotos.last?.id {
+                                        Task {
+                                            await photoManager.fetchMorePhotos()
+                                        }
                                     }
                                 }
-                            }
+                        }
                     }
-                }
 
-                // Loading indicator at bottom
-                if photoManager.isLoadingMore {
-                    ProgressView()
-                        .foregroundColor(.white)
-                        .padding()
+                    // Loading indicator at bottom
+                    if photoManager.isLoadingMore {
+                        ProgressView()
+                            .foregroundColor(.white)
+                            .padding()
+                    }
                 }
             }
             .background(Color.black)
+            .coordinateSpace(name: "scrollView")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                scrollOffset = offset
+                onScrollOffsetChanged?(offset)
+            }
             .onAppear {
                 // 只在视图出现时滚动到指定位置
                 if let photoID = scrollToPhotoID {
