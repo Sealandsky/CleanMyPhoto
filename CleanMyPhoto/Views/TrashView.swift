@@ -10,10 +10,12 @@ import SwiftUI
 // MARK: - Trash View
 struct TrashView: View {
     @ObservedObject var photoManager: PhotoManager
+    @EnvironmentObject var membershipManager: MembershipManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingDeleteConfirmation = false
     @State private var showingRestoreConfirmation = false
+    @State private var showMembershipPaywall = false
 
     var body: some View {
         NavigationView {
@@ -42,6 +44,10 @@ struct TrashView: View {
 
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(String(localized: "Empty All")) {
+                            guard !membershipManager.isTrialExpired || membershipManager.isPremiumMember else {
+                                showMembershipPaywall = true
+                                return
+                            }
                             showingDeleteConfirmation = true
                         }
                         .foregroundColor(.red)
@@ -69,6 +75,9 @@ struct TrashView: View {
                 }
             } message: {
                 Text(String(localized: "Are you sure you want to permanently delete \(photoManager.trashCount) photo(s)? This action cannot be undone."))
+            }
+            .sheet(isPresented: $showMembershipPaywall) {
+                MembershipView(isMandatory: true)
             }
         }
     }

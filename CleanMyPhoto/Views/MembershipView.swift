@@ -53,7 +53,7 @@ struct MembershipView: View {
                 loadingOverlay
             }
         }
-        .background(Color.black)
+        .background(Color(white: 0.12))
         .navigationBarHidden(true)
         .alert(String(localized: "Purchase Successful"), isPresented: $membershipManager.showSuccessAlert) {
             Button(String(localized: "OK")) {

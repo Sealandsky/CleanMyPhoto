@@ -67,11 +67,6 @@ struct ContentView: View {
             }
         }
         .task {
-            // 检查试用期
-            if membershipManager.isTrialExpired {
-                showMembershipPaywall = true
-            }
-
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
             } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
@@ -564,6 +559,11 @@ struct ContentView: View {
 
     // MARK: - Photo Deletion Handler
     private func handlePhotoDeletion(_ photo: PhotoAsset) {
+        guard !membershipManager.isTrialExpired || membershipManager.isPremiumMember else {
+            showMembershipPaywall = true
+            return
+        }
+
         let currentPhotos: [PhotoAsset] = {
             if let monthAlbum = selectedMonthAlbum {
                 return monthAlbum.photoAssets

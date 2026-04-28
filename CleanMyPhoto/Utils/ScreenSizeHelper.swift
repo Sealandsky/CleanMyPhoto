@@ -11,15 +11,15 @@ import UIKit
 struct ScreenSizeHelper {
 
     /// 获取当前活跃的 UIScreen
+    @available(iOS, deprecated: 26, message: "Use view environment traits or GeometryReader instead")
     private static var activeScreen: UIScreen {
         if #available(iOS 26, *) {
             let windowScene = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .first { $0.activationState == .foregroundActive }
             return windowScene?.screen ?? UIScreen.main
-        } else {
-            return UIScreen.main
         }
+        return UIScreen.main
     }
 
     /// 获取屏幕逻辑尺寸
