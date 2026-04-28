@@ -16,9 +16,9 @@ enum SubscriptionType: String, CaseIterable {
     // 显示名称
     var displayName: String {
         switch self {
-        case .monthly: return "月度订阅"
-        case .yearly: return "年度订阅"
-        case .lifetime: return "终身会员"
+        case .monthly: return String(localized: "Monthly")
+        case .yearly: return String(localized: "Yearly")
+        case .lifetime: return String(localized: "Lifetime")
         }
     }
 
@@ -34,8 +34,8 @@ enum SubscriptionType: String, CaseIterable {
     // 周期显示文本
     var durationText: String {
         switch self {
-        case .monthly: return "/月"
-        case .yearly: return "/年"
+        case .monthly: return String(localized: "/month")
+        case .yearly: return String(localized: "/year")
         case .lifetime: return ""
         }
     }
@@ -49,7 +49,7 @@ enum SubscriptionType: String, CaseIterable {
     var savingsText: String? {
         switch self {
         case .monthly: return nil
-        case .yearly: return "省53%"
+        case .yearly: return String(localized: "Save 53%")
         case .lifetime: return nil
         }
     }
@@ -58,8 +58,8 @@ enum SubscriptionType: String, CaseIterable {
     var subtitleText: String? {
         switch self {
         case .monthly: return nil
-        case .yearly: return "最受欢迎"
-        case .lifetime: return "一次性购买"
+        case .yearly: return String(localized: "Most Popular")
+        case .lifetime: return String(localized: "One-time Purchase")
         }
     }
 }

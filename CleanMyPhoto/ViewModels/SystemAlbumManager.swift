@@ -9,8 +9,6 @@ import Photos
 import SwiftUI
 import Combine
 
-// TODO: UIScreen.main is deprecated in iOS 26.0. Replace with view.window.windowScene.screen
-
 @MainActor
 class SystemAlbumManager: NSObject, ObservableObject {
     @Published var yearAlbums: [YearAlbum] = []
@@ -23,14 +21,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        // 设置缩略图尺寸（根据设备屏幕）
-        if let screen = UIScreen.main.currentMode {
-            let scale = UIScreen.main.scale
-            thumbnailSize = CGSize(width: 150 * scale, height: 150 * scale)
-        } else {
-            // 降级方案：使用默认尺寸
-            thumbnailSize = CGSize(width: 300, height: 300)
-        }
+        thumbnailSize = CGSize(width: 150 * ScreenSizeHelper.screenScale, height: 150 * ScreenSizeHelper.screenScale)
     }
 
     /// 加载所有年份相册

@@ -59,7 +59,7 @@ struct DateGroup: Identifiable {
     var dayText: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: Locale.current.identifier)
-        formatter.dateFormat = "d日"
+        formatter.dateFormat = "d"
         return formatter.string(from: date)
     }
 

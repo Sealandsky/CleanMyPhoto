@@ -49,7 +49,7 @@ struct ProductCard: View {
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
 
-                    Text(productType.durationText.isEmpty ? "一次性" : productType.durationText)
+                    Text(productType.durationText.isEmpty ? String(localized: "One-time") : productType.durationText)
                         .font(.system(size: 13))
                         .foregroundColor(.white.opacity(0.5))
                 }
@@ -86,7 +86,7 @@ struct ProductCard: View {
 
     // MARK: - Popular Badge
     private var popularBadge: some View {
-        Text("最受欢迎")
+        Text(String(localized: "Most Popular"))
             .font(.system(size: 11))
             .fontWeight(.medium)
             .foregroundColor(.blue)

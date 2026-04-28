@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MembershipView: View {
-    @StateObject private var membershipManager = MembershipManager()
+    @EnvironmentObject private var membershipManager: MembershipManager
     @AppStorage("hasShownMembership") private var hasShownMembership: Bool = false
     @Environment(\.dismiss) private var dismiss
 
@@ -55,16 +55,16 @@ struct MembershipView: View {
         }
         .background(Color.black)
         .navigationBarHidden(true)
-        .alert("购买成功", isPresented: $membershipManager.showSuccessAlert) {
-            Button("确定") {
+        .alert(String(localized: "Purchase Successful"), isPresented: $membershipManager.showSuccessAlert) {
+            Button(String(localized: "OK")) {
                 hasShownMembership = true
                 dismiss()
             }
         } message: {
-            Text("感谢您的支持！")
+            Text(String(localized: "Thank you for your support!"))
         }
-        .alert("提示", isPresented: .constant(membershipManager.purchaseError != nil)) {
-            Button("确定") {
+        .alert(String(localized: "Notice"), isPresented: .constant(membershipManager.purchaseError != nil)) {
+            Button(String(localized: "OK")) {
                 membershipManager.purchaseError = nil
             }
         } message: {
@@ -83,11 +83,11 @@ struct MembershipView: View {
                 .cornerRadius(22)
 
             VStack(spacing: 8) {
-                Text("升级到专业版")
+                Text(String(localized: "Upgrade to Pro"))
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("解锁所有功能")
+                Text(String(localized: "Unlock All Features"))
                     .font(.system(size: 17))
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -114,14 +114,14 @@ struct MembershipView: View {
     // MARK: - Benefits
     private var benefitsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("会员权益")
+            Text(String(localized: "Membership Benefits"))
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
 
             VStack(alignment: .leading, spacing: 12) {
-                benefitRow(icon: "checkmark.circle.fill", text: "无限制使用")
-                benefitRow(icon: "checkmark.circle.fill", text: "未来功能升级")
-                benefitRow(icon: "checkmark.circle.fill", text: "优先支持")
+                benefitRow(icon: "checkmark.circle.fill", text: String(localized: "Unlimited Usage"))
+                benefitRow(icon: "checkmark.circle.fill", text: String(localized: "Future Upgrades"))
+                benefitRow(icon: "checkmark.circle.fill", text: String(localized: "Priority Support"))
             }
         }
         .padding(.horizontal, 4)
@@ -144,14 +144,14 @@ struct MembershipView: View {
     // MARK: - Terms
     private var termsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("订阅说明")
+            Text(String(localized: "Subscription Terms"))
                 .font(.system(size: 13))
                 .foregroundColor(.white.opacity(0.5))
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("• 订阅将自动续订，除非在当前期间结束前至少 24 小时关闭自动续订")
-                Text("• 账户将在当前期间结束前 24 小时内收取续订费用")
-                Text("• 用户可以管理订阅，购买后可以关闭自动续订")
+                Text(String(localized: "• Subscription will auto-renew unless turned off at least 24 hours before the current period ends."))
+                Text(String(localized: "• Your account will be charged for renewal within 24 hours before the current period ends."))
+                Text(String(localized: "• You can manage your subscription and turn off auto-renewal after purchase."))
             }
             .font(.system(size: 11))
             .foregroundColor(.white.opacity(0.4))
@@ -171,7 +171,7 @@ struct MembershipView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text("继续")
+                        Text(String(localized: "Continue"))
                             .font(.system(size: 20, weight: .semibold))
                     }
                 }
@@ -188,7 +188,7 @@ struct MembershipView: View {
                     await membershipManager.restorePurchases()
                 }
             } label: {
-                Text("恢复购买")
+                Text(String(localized: "Restore Purchases"))
                     .font(.system(size: 15))
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -199,7 +199,7 @@ struct MembershipView: View {
                     hasShownMembership = true
                     dismiss()
                 } label: {
-                    Text("稍后升级")
+                    Text(String(localized: "Later"))
                         .font(.system(size: 15))
                         .foregroundColor(.white.opacity(0.4))
                 }
@@ -217,7 +217,7 @@ struct MembershipView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(1.5)
 
-                    Text("处理中...")
+                    Text(String(localized: "Processing..."))
                         .font(.system(size: 15))
                         .foregroundColor(.white)
                 }

@@ -21,8 +21,9 @@ struct CleanMyPhotoApp: App {
                 WelcomePage()
             } else if !hasShownMembership {
                 MembershipView(isMandatory: false)
+                    .environmentObject(membershipManager)
             } else {
-                ContentView()
+                MainTabView()
                     .environmentObject(photoManager)
                     .environmentObject(membershipManager)
             }

@@ -8,8 +8,6 @@
 import SwiftUI
 import Photos
 
-// TODO: UIScreen.main is deprecated in iOS 26.0. Replace with view.window.windowScene.screen
-
 enum MainTab: String, CaseIterable {
     case allPhotos
     case albums
@@ -18,11 +16,11 @@ enum MainTab: String, CaseIterable {
     var localizedText: String {
         switch self {
         case .allPhotos:
-            return String(localized: "图库")
+            return String(localized: "Library")
         case .albums:
-            return String(localized: "相簿")
+            return String(localized: "Albums")
         case .timeline:
-            return String(localized: "日期")
+            return String(localized: "Timeline")
         }
     }
 }
@@ -118,11 +116,11 @@ struct ContentView: View {
                 .foregroundColor(.blue)
 
             VStack(spacing: 12) {
-                Text(String(localized: "需要相册访问权限"))
+                Text(String(localized: "Photo Access Required"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "CleanMyPhoto 需要获取你的相册权限，以便帮你整理并清理无用照片。"))
+                Text(String(localized: "CleanMyPhoto needs access to your photo library to help you organize and clean up unwanted photos."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -143,18 +141,18 @@ struct ContentView: View {
                 .foregroundColor(.orange)
 
             VStack(spacing: 12) {
-                Text(String(localized: "权限已被拒绝"))
+                Text(String(localized: "Access Denied"))
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "如需使用 CleanMyPhoto，请前往设置开启相册访问权限。"))
+                Text(String(localized: "To use CleanMyPhoto, please enable photo library access in Settings."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
 
-            Button(String(localized: "打开设置")) {
+            Button(String(localized: "Open Settings")) {
                 if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsUrl)
                 }
@@ -316,11 +314,11 @@ struct ContentView: View {
     private var appTitle: String {
         switch selectedTab {
         case .allPhotos:
-            return String(localized: "图库")
+            return String(localized: "Library")
         case .albums:
-            return String(localized: "相簿")
+            return String(localized: "Albums")
         case .timeline:
-            return String(localized: "日期")
+            return String(localized: "Timeline")
         }
     }
 
@@ -329,7 +327,6 @@ struct ContentView: View {
         Picker("View Mode", selection: $selectedTab) {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 Text(tab.localizedText)
-                    .font(.callout)
                     .tag(tab)
             }
         }
@@ -385,16 +382,7 @@ struct ContentView: View {
                 // 根据当前模式选择不同的照片列表
                 let currentPhotos: [PhotoAsset] = {
                     if let monthAlbum = selectedMonthAlbum {
-                        // 月份照片列表
-                        if let fetchResult = monthAlbum.fetchResult {
-                            return (0..<fetchResult.count).compactMap { index in
-                                guard index < fetchResult.count else { return nil }
-                                let asset = fetchResult.object(at: index)
-                                return PhotoAsset(asset: asset)
-                            }
-                        } else {
-                            return monthAlbum.assets.map { PhotoAsset(asset: $0) }
-                        }
+                        return monthAlbum.photoAssets
                     } else if let albumMgr = albumManager, selectedAlbum != nil {
                         return albumMgr.displayedAlbumPhotos
                     } else {
@@ -422,12 +410,7 @@ struct ContentView: View {
                                 isFullscreenMode = false
                             }
                         },
-                        screenSize: {
-                            #if compiler(>=6.0)
-                            // TODO: Replace with view.window.windowScene.screen (iOS 26.0+)
-                            #endif
-                            return UIScreen.main.bounds.size
-                        }()
+                        screenSize: ScreenSizeHelper.screenSize
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(currentPhoto.id)
@@ -536,16 +519,7 @@ struct ContentView: View {
     private func goToNextPhotoInCurrentAlbum() {
         let currentPhotos: [PhotoAsset] = {
             if let monthAlbum = selectedMonthAlbum {
-                // 月份照片列表
-                if let fetchResult = monthAlbum.fetchResult {
-                    return (0..<fetchResult.count).compactMap { index in
-                        guard index < fetchResult.count else { return nil }
-                        let asset = fetchResult.object(at: index)
-                        return PhotoAsset(asset: asset)
-                    }
-                } else {
-                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
-                }
+                return monthAlbum.photoAssets
             } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
@@ -568,16 +542,7 @@ struct ContentView: View {
     private func goToPreviousPhotoInCurrentAlbum() {
         let currentPhotos: [PhotoAsset] = {
             if let monthAlbum = selectedMonthAlbum {
-                // 月份照片列表
-                if let fetchResult = monthAlbum.fetchResult {
-                    return (0..<fetchResult.count).compactMap { index in
-                        guard index < fetchResult.count else { return nil }
-                        let asset = fetchResult.object(at: index)
-                        return PhotoAsset(asset: asset)
-                    }
-                } else {
-                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
-                }
+                return monthAlbum.photoAssets
             } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
@@ -599,19 +564,9 @@ struct ContentView: View {
 
     // MARK: - Photo Deletion Handler
     private func handlePhotoDeletion(_ photo: PhotoAsset) {
-        // 确定当前照片列表
         let currentPhotos: [PhotoAsset] = {
             if let monthAlbum = selectedMonthAlbum {
-                // 月份照片列表
-                if let fetchResult = monthAlbum.fetchResult {
-                    return (0..<fetchResult.count).compactMap { index in
-                        guard index < fetchResult.count else { return nil }
-                        let asset = fetchResult.object(at: index)
-                        return PhotoAsset(asset: asset)
-                    }
-                } else {
-                    return monthAlbum.assets.map { PhotoAsset(asset: $0) }
-                }
+                return monthAlbum.photoAssets
             } else if let albumMgr = albumManager, selectedAlbum != nil {
                 return albumMgr.displayedAlbumPhotos
             } else {
@@ -707,13 +662,13 @@ struct ContentView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
 
-                Text(String(localized: "试用期还剩 \(membershipManager.remainingTrialDays) 天"))
+                Text(String(localized: "Trial expires in \(membershipManager.remainingTrialDays) days"))
                     .font(.system(size: 13))
                     .foregroundColor(.white)
 
                 Spacer()
 
-                Button(String(localized: "升级")) {
+                Button(String(localized: "Upgrade")) {
                     showMembershipPaywall = true
                 }
                 .font(.system(size: 13))

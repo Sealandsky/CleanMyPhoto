@@ -88,7 +88,7 @@ class MembershipManager: ObservableObject {
             print("✅ Loaded \(products.count) products")
         } catch {
             print("❌ Failed to load products: \(error.localizedDescription)")
-            self.purchaseError = "加载产品失败: \(error.localizedDescription)"
+            self.purchaseError = String(localized: "Failed to load products: \(error.localizedDescription)")
         }
     }
 
@@ -125,7 +125,7 @@ class MembershipManager: ObservableObject {
 
     func purchase(_ productType: SubscriptionType) async {
         guard let product = products.first(where: { $0.id == productType.rawValue }) else {
-            self.purchaseError = "产品未找到"
+            self.purchaseError = String(localized: "Product not found")
             return
         }
 
@@ -149,14 +149,14 @@ class MembershipManager: ObservableObject {
 
             case .pending:
                 print("⏳ Purchase pending")
-                purchaseError = "购买等待确认"
+                purchaseError = String(localized: "Purchase pending confirmation")
 
             @unknown default:
                 break
             }
         } catch {
             print("❌ Purchase failed: \(error.localizedDescription)")
-            purchaseError = "购买失败: \(error.localizedDescription)"
+            purchaseError = String(localized: "Purchase failed: \(error.localizedDescription)")
         }
 
         isLoadingPurchase = false
@@ -172,7 +172,7 @@ class MembershipManager: ObservableObject {
             purchaseError = nil
         } catch {
             print("❌ Restore failed: \(error.localizedDescription)")
-            purchaseError = "恢复购买失败: \(error.localizedDescription)"
+            purchaseError = String(localized: "Restore failed: \(error.localizedDescription)")
         }
 
         isLoadingPurchase = false

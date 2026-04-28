@@ -25,7 +25,7 @@ struct YearSectionView: View {
                         .foregroundColor(.secondary)
                         .animation(.easeInOut(duration: 0.2), value: yearGroup.isExpanded)
 
-                    Text("\(yearGroup.year)\(String(localized: "年"))")
+                    Text("\(yearGroup.year)")
                         .font(.headline)
                         .foregroundColor(.white)
 

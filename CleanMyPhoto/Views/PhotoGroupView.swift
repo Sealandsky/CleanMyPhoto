@@ -35,7 +35,7 @@ struct PhotoGroupView: View {
                     Spacer()
                     ProgressView()
                         .tint(.white)
-                    Text(String(localized: "加载中..."))
+                    Text(String(localized: "Loading..."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.top, 8)
@@ -106,7 +106,7 @@ struct MonthListView: View {
             if monthAlbums.isEmpty {
                 VStack {
                     Spacer()
-                    Text(String(localized: "请选择年份"))
+                    Text(String(localized: "Select a year"))
                         .foregroundColor(.secondary)
                     Spacer()
                 }
@@ -207,18 +207,8 @@ struct SystemMonthPhotosView: View {
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
     ]
 
-    // 将 PHAsset 转换为 PhotoAsset
     private var photos: [PhotoAsset] {
-        // 优先从 fetchResult 获取，否则从 assets 获取
-        if let fetchResult = monthAlbum.fetchResult {
-            return (0..<fetchResult.count).compactMap { index in
-                guard index < fetchResult.count else { return nil }
-                let asset = fetchResult.object(at: index)
-                return PhotoAsset(asset: asset)
-            }
-        } else {
-            return monthAlbum.assets.map { PhotoAsset(asset: $0) }
-        }
+        monthAlbum.photoAssets
     }
 
     var body: some View {

@@ -33,7 +33,7 @@ struct YearAlbum: Identifiable {
     }
 
     var yearName: String {
-        "\(year)" + String(localized: "年")
+        "\(year)"
     }
 }
 
@@ -70,6 +70,16 @@ struct MonthAlbum: Identifiable {
     }
 
     var fullTitle: String {
-        "\(year)" + String(localized: "年") + " " + monthName
+        "\(year) " + monthName
+    }
+
+    var photoAssets: [PhotoAsset] {
+        if let fetchResult {
+            return (0..<fetchResult.count).compactMap { index in
+                guard index < fetchResult.count else { return nil }
+                return PhotoAsset(asset: fetchResult.object(at: index))
+            }
+        }
+        return assets.map { PhotoAsset(asset: $0) }
     }
 }
