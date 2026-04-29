@@ -260,6 +260,9 @@
         }
       }
     },
+    "Debug" : {
+
+    },
     "Delete" : {
       "localizations" : {
         "en" : {
@@ -757,6 +760,9 @@
       }
     },
     "Photos you swipe up to delete will appear here." : {
+
+    },
+    "Premium Member" : {
 
     },
     "Priority Support" : {

@@ -46,6 +46,16 @@ class MembershipManager: ObservableObject {
         membershipStatus.isPremiumMember
     }
 
+    // MARK: - Debug Override
+    func setPremiumMember(_ isPremium: Bool) {
+        membershipStatus.currentTier = isPremium ? .yearly : .free
+        membershipStatus.saveToStorage()
+    }
+
+    var isDebugPremium: Bool {
+        membershipStatus.currentTier != .free
+    }
+
     // MARK: - Init
     init() {
         // 从 UserDefaults 加载状态

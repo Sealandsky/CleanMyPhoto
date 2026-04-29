@@ -45,15 +45,15 @@ struct ContentView: View {
     @State private var systemAlbumManager: SystemAlbumManager?
     @State private var selectedMonthAlbum: MonthAlbum? = nil
 
+    // 导航路径
+    @State private var albumsPath = NavigationPath()
+    @State private var timelinePath = NavigationPath()
+
     // 滚动偏移状态
     @State private var scrollOffset: CGFloat = 0
 
     enum NavigationDirection {
         case forward, backward
-    }
-
-    enum ViewMode {
-        case list, fullscreen
     }
 
     var body: some View {
@@ -70,18 +70,15 @@ struct ContentView: View {
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
             } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
-                // 如果已经有权限，直接加载照片
                 if photoManager.displayedPhotos.isEmpty {
                     await photoManager.fetchAllPhotos()
                 }
             }
 
-            // 初始化 AlbumManager
             if albumManager == nil {
                 albumManager = AlbumManager(photoManager: photoManager)
             }
 
-            // 初始化 SystemAlbumManager
             if systemAlbumManager == nil {
                 systemAlbumManager = SystemAlbumManager()
             }
@@ -162,7 +159,6 @@ struct ContentView: View {
         ZStack {
             contentViews
 
-            // Trial warning banner (仅在试用期≤1天且非会员时显示)
             if !membershipManager.isPremiumMember &&
                membershipManager.membershipStatus.isTrialActive &&
                membershipManager.remainingTrialDays <= 1 {
@@ -174,69 +170,176 @@ struct ContentView: View {
 
     // MARK: - Content Views
     private var contentViews: some View {
-        VStack(spacing: 0) {
-            // 顶部标题栏（仅在非全屏模式下显示）
-            if !isFullscreenMode {
-                navigationTitleBar
-            }
-
-            // 分段控制器（仅在非全屏模式下显示）
-            if !isFullscreenMode {
-                topSegmentedControl
-            }
-
+        Group {
             // 内容视图
             if isFullscreenMode {
                 photoBrowserView
-            } else if let album = selectedAlbum, let albumMgr = albumManager {
-                // 相簿照片视图
-                if albumMgr.isLoadingPhotos {
-                    loadingView
-                } else {
-                    AlbumPhotoListView(
-                        albumManager: albumMgr,
-                        photoManager: photoManager,
-                        album: album,
-                        onPhotoSelect: { photo in
-                            currentPhotoID = photo.id
-                            scrollToPhotoID = nil
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isFullscreenMode = true
-                            }
-                        },
-                        onBack: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedAlbum = nil
-                            }
-                        },
-                        scrollToPhotoID: scrollToPhotoID
-                    )
-                }
-            } else {
-                // 根据 tab 显示不同视图
-                switch selectedTab {
-                case .allPhotos:
-                    if photoManager.isLoading {
-                        loadingView
-                    } else if photoManager.displayedPhotos.isEmpty && photoManager.hasLoadedOnce {
-                        emptyLibraryView
-                    } else {
-                        photoListView
+            } else if selectedTab == .allPhotos {
+                libraryNavigationView
+            } else if selectedTab == .albums {
+                albumsNavigationView
+            } else if selectedTab == .timeline {
+                timelineNavigationView
+            }
+        }
+    }
+
+    // MARK: - Library Navigation
+    private var libraryNavigationView: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                topSegmentedControl
+                photoListView
+            }
+            .navigationTitle(appTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if !membershipManager.isPremiumMember {
+                            membershipButton
+                        }
+                        trashButton
                     }
-                case .albums:
+                }
+            }
+        }
+        .tint(.white)
+    }
+
+    // MARK: - Navigation State
+    private var isAtRootLevel: Bool {
+        switch selectedTab {
+        case .allPhotos:
+            return true
+        case .albums:
+            return albumsPath.isEmpty
+        case .timeline:
+            return timelinePath.isEmpty
+        }
+    }
+
+    // MARK: - App Title
+    private var appTitle: String {
+        switch selectedTab {
+        case .allPhotos:
+            return String(localized: "Library")
+        case .albums:
+            return String(localized: "Albums")
+        case .timeline:
+            return String(localized: "Timeline")
+        }
+    }
+
+    // MARK: - Albums Navigation
+    private var albumsNavigationView: some View {
+        NavigationStack(path: $albumsPath) {
+            VStack(spacing: 0) {
+                topSegmentedControl
+                Group {
                     if let albumMgr = albumManager {
                         AlbumListView(albumManager: albumMgr) { album in
                             selectedAlbum = album
-                            Task {
+                            Task { [album] in
                                 await albumMgr.fetchPhotos(in: album)
+                                guard selectedAlbum?.id == album.id else { return }
+                                albumsPath.append(AlbumsDestination.albumPhotos(album.id))
                             }
                         }
                     } else {
                         loadingView
                     }
-                case .timeline:
-                    if let monthAlbum = selectedMonthAlbum {
-                        // 显示月份照片列表
+                }
+            }
+            .navigationTitle(appTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if !membershipManager.isPremiumMember {
+                            membershipButton
+                        }
+                        trashButton
+                    }
+                }
+            }
+            .task {
+                if let albumMgr = albumManager, albumMgr.albums.isEmpty {
+                    await albumMgr.fetchUserAlbums()
+                }
+            }
+            .navigationDestination(for: AlbumsDestination.self) { destination in
+                switch destination {
+                case .albumPhotos(let albumId):
+                    if let album = albumManager?.albums.first(where: { $0.id == albumId }),
+                       let albumMgr = albumManager {
+                        AlbumPhotoListView(
+                            albumManager: albumMgr,
+                            photoManager: photoManager,
+                            album: album,
+                            onPhotoSelect: { photo in
+                                currentPhotoID = photo.id
+                                scrollToPhotoID = nil
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    isFullscreenMode = true
+                                }
+                            },
+                            scrollToPhotoID: scrollToPhotoID
+                        )
+                    }
+                }
+            }
+        }
+        .onChange(of: albumsPath) { oldValue, newValue in
+            if newValue.isEmpty {
+                selectedAlbum = nil
+            }
+        }
+        .tint(.white)
+    }
+
+    // MARK: - Timeline Navigation
+    private var timelineNavigationView: some View {
+        NavigationStack(path: $timelinePath) {
+            VStack(spacing: 0) {
+                topSegmentedControl
+                Group {
+                    if let systemAlbumMgr = systemAlbumManager {
+                        PhotoGroupView(
+                            albumManager: systemAlbumMgr,
+                            photoManager: photoManager,
+                            onMonthSelect: { monthAlbum in
+                                selectedMonthAlbum = monthAlbum
+                                timelinePath.append(TimelineDestination.monthPhotos(monthAlbum.id))
+                            }
+                        )
+                    } else {
+                        loadingView
+                    }
+                }
+            }
+            .navigationTitle(appTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if !membershipManager.isPremiumMember {
+                            membershipButton
+                        }
+                        trashButton
+                    }
+                }
+            }
+            .navigationDestination(for: TimelineDestination.self) { destination in
+                switch destination {
+                case .monthPhotos(let albumId):
+                    if let monthAlbum = systemAlbumManager?.monthAlbums.first(where: { $0.id == albumId }) {
                         SystemMonthPhotosView(
                             monthAlbum: monthAlbum,
                             photoManager: photoManager,
@@ -247,74 +350,18 @@ struct ContentView: View {
                                     isFullscreenMode = true
                                 }
                             },
-                            onBack: {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    selectedMonthAlbum = nil
-                                }
-                            },
                             scrollToPhotoID: scrollToPhotoID
                         )
-                    } else if let systemAlbumMgr = systemAlbumManager {
-                        PhotoGroupView(
-                            albumManager: systemAlbumMgr,
-                            photoManager: photoManager,
-                            onMonthSelect: { monthAlbum in
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    selectedMonthAlbum = monthAlbum
-                                }
-                            }
-                        )
-                    } else {
-                        loadingView
                     }
                 }
             }
         }
-    }
-
-    // MARK: - Navigation Title Bar
-    private var navigationTitleBar: some View {
-        HStack {
-            Text(appTitle)
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-            Spacer()
-            if !membershipManager.isPremiumMember {
-                membershipButton
-            }
-            trashButton
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(backgroundMaterial)
-    }
-
-    // 根据滚动偏移返回背景材质
-    private var backgroundMaterial: some View {
-        Group {
-            if scrollOffset > 20 {
-                // 滚动超过20点时显示模糊背景
-                Color.black.opacity(0.8)
-                    .background(.ultraThinMaterial)
-            } else {
-                // 未滚动时透明背景
-                Color.clear
+        .onChange(of: timelinePath) { oldValue, newValue in
+            if newValue.isEmpty {
+                selectedMonthAlbum = nil
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
-    }
-
-    // 根据当前 tab 返回不同的标题
-    private var appTitle: String {
-        switch selectedTab {
-        case .allPhotos:
-            return String(localized: "Library")
-        case .albums:
-            return String(localized: "Albums")
-        case .timeline:
-            return String(localized: "Timeline")
-        }
+        .tint(.white)
     }
 
     // MARK: - Top Segmented Control
@@ -328,18 +375,19 @@ struct ContentView: View {
         .pickerStyle(.segmented)
         .controlSize(.large)
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .background(Color.black.opacity(0.95))
         .onChange(of: selectedTab) { oldValue, newValue in
-            // 切换 tab 时重置滚动偏移
             scrollOffset = 0
+            scrollToPhotoID = nil
+            isFullscreenMode = false
+            currentPhotoID = nil
 
-            // 切换 tab 时清除相簿选择
-            if newValue != .albums {
-                withAnimation {
-                    selectedAlbum = nil
-                }
-            }
+            // 切换 tab 时清除导航路径
+            albumsPath = NavigationPath()
+            timelinePath = NavigationPath()
+            selectedAlbum = nil
+            selectedMonthAlbum = nil
 
             // 切换到相簿 tab 时加载相簿列表（仅首次）
             if newValue == .albums, let albumMgr = albumManager, albumMgr.albums.isEmpty {
@@ -357,7 +405,7 @@ struct ContentView: View {
             photoManager: photoManager,
             onPhotoSelect: { photo in
                 currentPhotoID = photo.id
-                scrollToPhotoID = nil  // 重置，因为不是从返回操作触发的
+                scrollToPhotoID = nil
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isFullscreenMode = true
                 }
@@ -372,9 +420,7 @@ struct ContentView: View {
     // MARK: - Photo Browser
     private var photoBrowserView: some View {
         ZStack {
-            // Full-screen content
             Group {
-                // 根据当前模式选择不同的照片列表
                 let currentPhotos: [PhotoAsset] = {
                     if let monthAlbum = selectedMonthAlbum {
                         return monthAlbum.photoAssets
@@ -411,32 +457,26 @@ struct ContentView: View {
                     .id(currentPhoto.id)
                     .transition(systemTransition)
                     .onAppear {
-                        print("🖼️ Displaying photo: \(currentPhoto.id)")
-                        // 预加载当前照片前后的图片
                         if let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhoto.id }) {
                             if selectedAlbum == nil {
                                 photoManager.preloadAssets(photoIndex: currentIndex)
                             }
                         }
-                        // 显示手势提示（如果还没显示过）
                         showGestureInstructionsIfNeeded()
                     }
                 } else if currentPhotos.isEmpty {
                     emptyLibraryView
                 } else {
-                    // Fallback: should not happen
                     Text("No photo selected")
                         .foregroundColor(.white)
                 }
             }
             .ignoresSafeArea()
 
-            // Gesture instructions overlay
             if showGestureInstructions {
                 gestureInstructionsOverlay
             }
 
-            // 全屏页导航栏（无标题，返回 + 垃圾桶）
             VStack {
                 HStack {
                     Button {
@@ -464,12 +504,23 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if currentPhotoID == nil {
+            let currentPhotos: [PhotoAsset] = {
+                if let monthAlbum = selectedMonthAlbum {
+                    return monthAlbum.photoAssets
+                } else if let albumMgr = albumManager, selectedAlbum != nil {
+                    return albumMgr.displayedAlbumPhotos
+                } else {
+                    return photoManager.displayedPhotos
+                }
+            }()
+
+            if let id = currentPhotoID, !currentPhotos.isEmpty {
+                if !currentPhotos.contains(where: { $0.id == id }) {
+                    currentPhotoID = currentPhotos.first?.id
+                }
+            } else if currentPhotoID == nil {
                 initializeCurrentPhoto()
             }
-            let currentPhotos = selectedAlbum != nil ? albumManager?.displayedAlbumPhotos ?? [] : photoManager.displayedPhotos
-            print("🔍 CurrentPhotoID: \(currentPhotoID?.description ?? "nil")")
-            print("🔍 Displayed photos count: \(currentPhotos.count)")
         }
     }
 
@@ -481,33 +532,6 @@ struct ContentView: View {
             .combined(with: .opacity)
 
         return .asymmetric(insertion: insertion, removal: removal)
-    }
-
-    // MARK: - Navigation
-    private func goToNextPhoto() {
-        guard let currentIndex = photoManager.displayedPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
-            return
-        }
-
-        let nextIndex = currentIndex + 1
-        if nextIndex < photoManager.displayedPhotos.count {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                currentPhotoID = photoManager.displayedPhotos[nextIndex].id
-            }
-        }
-    }
-
-    private func goToPreviousPhoto() {
-        guard let currentIndex = photoManager.displayedPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
-            return
-        }
-
-        let previousIndex = currentIndex - 1
-        if previousIndex >= 0 {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                currentPhotoID = photoManager.displayedPhotos[previousIndex].id
-            }
-        }
     }
 
     // MARK: - Navigation for Album Photos
@@ -574,34 +598,25 @@ struct ContentView: View {
             }
         }()
 
-        // 存储删除前的索引位置
         guard let deletedIndex = currentPhotos.firstIndex(where: { $0.id == photo.id }) else {
             return
         }
 
-        // 在删除前确定下一张要显示的照片ID
         let nextPhotoID: String?
         if currentPhotos.count <= 1 {
-            // 只有这一张照片，删除后退出全屏
             nextPhotoID = nil
         } else if deletedIndex < currentPhotos.count - 1 {
-            // 不是最后一张，显示下一张
             nextPhotoID = currentPhotos[deletedIndex + 1].id
         } else {
-            // 是最后一张，显示前一张
             nextPhotoID = currentPhotos[deletedIndex - 1].id
         }
 
-        // 执行删除（在动画前）
         photoManager.addToTrash(photo)
 
-        // 使用动画平滑过渡
         withAnimation(.easeInOut(duration: 0.3)) {
             if let nextID = nextPhotoID {
-                // 显示下一张照片
                 currentPhotoID = nextID
             } else {
-                // 没有照片了，退出全屏
                 currentPhotoID = nil
                 isFullscreenMode = false
             }
@@ -754,7 +769,6 @@ struct ContentView: View {
         .allowsHitTesting(false)
         .transition(.opacity)
         .onAppear {
-            // 3秒后自动隐藏提示
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 withAnimation(.easeOut(duration: 0.5)) {
                     showGestureInstructions = false
@@ -766,7 +780,6 @@ struct ContentView: View {
 
     // MARK: - Show Gesture Instructions If Needed
     private func showGestureInstructionsIfNeeded() {
-        // 如果还没显示过提示，则显示
         if !hasShownGestureInstructions && !showGestureInstructions {
             withAnimation(.easeIn(duration: 0.3)) {
                 showGestureInstructions = true

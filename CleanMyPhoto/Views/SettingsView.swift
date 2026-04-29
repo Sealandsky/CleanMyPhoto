@@ -41,6 +41,22 @@ struct SettingsView: View {
                     }
                 }
 
+                // 调试选项
+                Section(String(localized: "Debug")) {
+                    Toggle(isOn: Binding(
+                        get: { membershipManager.isDebugPremium },
+                        set: { membershipManager.setPremiumMember($0) }
+                    )) {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.yellow)
+                                .frame(width: 30)
+                            Text(String(localized: "Premium Member"))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+
                 // 关于
                 Section(String(localized: "About")) {
                     HStack {

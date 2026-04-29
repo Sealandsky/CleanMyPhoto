@@ -46,9 +46,7 @@ struct PhotoGroupView: View {
                 MonthListView(
                     monthAlbums: albumManager.monthAlbums,
                     onMonthSelect: { monthAlbum in
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            onMonthSelect(monthAlbum)
-                        }
+                        onMonthSelect(monthAlbum)
                     }
                 )
             }
@@ -198,10 +196,7 @@ struct SystemMonthPhotosView: View {
     let monthAlbum: MonthAlbum
     @ObservedObject var photoManager: PhotoManager
     let onPhotoSelect: (PhotoAsset) -> Void
-    let onBack: () -> Void
     var scrollToPhotoID: String? = nil
-
-    @State private var scrollOffset: CGFloat = 0
 
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
@@ -212,93 +207,48 @@ struct SystemMonthPhotosView: View {
     }
 
     var body: some View {
-        ZStack {
-            // 主要内容区域
-            ScrollViewReader { proxy in
-                ScrollView {
-                    ZStack(alignment: .top) {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .preference(key: ScrollOffsetPreferenceKey.self,
-                                          value: -geometry.frame(in: .named("scrollView")).minY)
-                        }
-                        .frame(height: 0)
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            // 标题区域
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(monthAlbum.fullTitle)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal)
-                                    .padding(.top, 8)
-
-                                Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(photos) { photo in
+                        PhotoCell(photo: photo)
+                            .id(photo.id)
+                            .onTapGesture {
+                                onPhotoSelect(photo)
                             }
-
-                            // 照片网格
-                            LazyVGrid(columns: columns, spacing: 2) {
-                                ForEach(photos) { photo in
-                                    PhotoCell(photo: photo)
-                                        .id(photo.id)
-                                        .onTapGesture {
-                                            onPhotoSelect(photo)
-                                        }
-                                }
-                            }
-                            .padding(.horizontal, 2)
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .background(Color.black)
+            .onAppear {
+                if let photoID = scrollToPhotoID {
+                    proxy.scrollTo(photoID, anchor: .center)
+                }
+            }
+            .onChange(of: scrollToPhotoID) { oldValue, newValue in
+                guard let photoID = newValue else { return }
+                let photoExists = photos.contains(where: { $0.id == photoID })
+                if photoExists {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
                         }
                     }
                 }
-                .background(Color.black)
-                .coordinateSpace(name: "scrollView")
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
-                    scrollOffset = offset
-                }
-                .onAppear {
-                    if let scrollToID = scrollToPhotoID {
-                        proxy.scrollTo(scrollToID, anchor: .center)
-                    }
-                }
-            }
-
-            // 浮动返回按钮
-            VStack {
-                HStack {
-                    Button {
-                        onBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(backButtonBackground)
-                            .clipShape(Circle())
-                    }
-                    Spacer()
-                }
-                .padding()
-
-                Spacer()
             }
         }
-    }
-
-    // 根据滚动偏移返回背景材质
-    private var backButtonBackground: some View {
-        Group {
-            if scrollOffset > 20 {
-                Color.black.opacity(0.8)
-                    .background(.ultraThinMaterial)
-            } else {
-                Color.black.opacity(0.8)
+        .navigationTitle(monthAlbum.fullTitle)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
     }
 }
 
@@ -322,8 +272,7 @@ struct SystemMonthPhotosView: View {
             thumbnail: nil
         ),
         photoManager: PhotoManager(),
-        onPhotoSelect: { _ in },
-        onBack: {}
+        onPhotoSelect: { _ in }
     )
 })
 

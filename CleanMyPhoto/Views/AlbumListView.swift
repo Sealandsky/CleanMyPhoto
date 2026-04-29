@@ -12,7 +12,8 @@ struct AlbumListView: View {
     let onAlbumSelect: (AlbumModel) -> Void
 
     private let columns = [
-        GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
@@ -22,7 +23,7 @@ struct AlbumListView: View {
             } else if albumManager.albums.isEmpty {
                 emptyAlbumsView
             } else {
-                LazyVGrid(columns: columns, spacing: 16) {
+                LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(albumManager.albums) { album in
                         AlbumCell(album: album)
                             .onTapGesture {
@@ -30,7 +31,8 @@ struct AlbumListView: View {
                             }
                     }
                 }
-                .padding()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
             }
         }
         .background(Color.black)
@@ -38,12 +40,13 @@ struct AlbumListView: View {
 
     // MARK: - Skeleton Grid
     private var skeletonGrid: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
+        LazyVGrid(columns: columns, spacing: 12) {
             ForEach(0..<6, id: \.self) { _ in
                 AlbumCellSkeleton()
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
     }
 
     private var emptyAlbumsView: some View {

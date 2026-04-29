@@ -12,105 +12,55 @@ struct AlbumPhotoListView: View {
     @ObservedObject var photoManager: PhotoManager
     let album: AlbumModel
     let onPhotoSelect: (PhotoAsset) -> Void
-    let onBack: () -> Void
     var scrollToPhotoID: String? = nil
-
-    @State private var scrollOffset: CGFloat = 0
 
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
     ]
 
     var body: some View {
-        ZStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    ZStack(alignment: .top) {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .preference(key: ScrollOffsetPreferenceKey.self,
-                                          value: -geometry.frame(in: .named("scrollView")).minY)
-                        }
-                        .frame(height: 0)
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            // 相簿标题
-                            Text(album.title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-
-                            Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-
-                            LazyVGrid(columns: columns, spacing: 2) {
-                                ForEach(albumManager.displayedAlbumPhotos) { photo in
-                                    PhotoCell(photo: photo)
-                                        .id(photo.id)
-                                        .onTapGesture {
-                                            onPhotoSelect(photo)
-                                        }
-                                }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(albumManager.displayedAlbumPhotos) { photo in
+                        PhotoCell(photo: photo)
+                            .id(photo.id)
+                            .onTapGesture {
+                                onPhotoSelect(photo)
                             }
-                        }
                     }
                 }
-                .background(Color.black)
-                .coordinateSpace(name: "scrollView")
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
-                    scrollOffset = offset
-                }
-                .onChange(of: scrollToPhotoID) { oldValue, newValue in
-                    guard let photoID = newValue else { return }
-                    let photoExists = albumManager.displayedAlbumPhotos.contains(where: { $0.id == photoID })
+                .padding(.horizontal, 2)
+            }
+            .background(Color.black)
+            .onChange(of: scrollToPhotoID) { oldValue, newValue in
+                guard let photoID = newValue else { return }
+                let photoExists = albumManager.displayedAlbumPhotos.contains(where: { $0.id == photoID })
 
-                    if photoExists {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            withTransaction(Transaction(animation: nil)) {
-                                proxy.scrollTo(photoID, anchor: .center)
-                            }
+                if photoExists {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
                         }
                     }
                 }
             }
-
-            // 返回按钮
-            VStack {
-                HStack {
-                    Button {
-                        onBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(backButtonBackground)
-                            .clipShape(Circle())
-                    }
-
-                    Spacer()
+            .onAppear {
+                if let photoID = scrollToPhotoID {
+                    proxy.scrollTo(photoID, anchor: .center)
                 }
-                .padding()
-
-                Spacer()
             }
         }
-    }
-
-    // 根据滚动偏移返回背景材质
-    private var backButtonBackground: some View {
-        Group {
-            if scrollOffset > 20 {
-                Color.black.opacity(0.8)
-                    .background(.ultraThinMaterial)
-            } else {
-                Color.black.opacity(0.8)
+        .navigationTitle(album.title)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: scrollOffset)
     }
 }
