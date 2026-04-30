@@ -55,6 +55,7 @@ struct AlbumPhotoListView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Text("\(albumManager.displayedAlbumPhotos.count) \(String(localized: "photos"))")

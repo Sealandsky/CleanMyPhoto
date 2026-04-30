@@ -42,19 +42,23 @@ class MembershipManager: ObservableObject {
         membershipStatus.remainingTrialDays ?? 0
     }
 
+    #if DEBUG
+    private(set) var isDebugPremium = false
+    #endif
+
     var isPremiumMember: Bool {
-        membershipStatus.isPremiumMember
+        #if DEBUG
+        if isDebugPremium { return true }
+        #endif
+        return membershipStatus.isPremiumMember
     }
 
     // MARK: - Debug Override
+    #if DEBUG
     func setPremiumMember(_ isPremium: Bool) {
-        membershipStatus.currentTier = isPremium ? .yearly : .free
-        membershipStatus.saveToStorage()
+        isDebugPremium = isPremium
     }
-
-    var isDebugPremium: Bool {
-        membershipStatus.currentTier != .free
-    }
+    #endif
 
     // MARK: - Init
     init() {

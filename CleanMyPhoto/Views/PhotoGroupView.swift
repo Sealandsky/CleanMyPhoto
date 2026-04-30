@@ -242,6 +242,7 @@ struct SystemMonthPhotosView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")

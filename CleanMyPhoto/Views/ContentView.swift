@@ -31,7 +31,6 @@ struct ContentView: View {
 
     @State private var showTrash = false
     @State private var currentPhotoID: String? = nil
-    @State private var navigationDirection: NavigationDirection = .forward
     @State private var isFullscreenMode = false
     @State private var scrollToPhotoID: String? = nil
     @State private var showMembershipPaywall = false
@@ -51,10 +50,6 @@ struct ContentView: View {
 
     // 滚动偏移状态
     @State private var scrollOffset: CGFloat = 0
-
-    enum NavigationDirection {
-        case forward, backward
-    }
 
     var body: some View {
         Group {
@@ -193,8 +188,6 @@ struct ContentView: View {
             }
             .navigationTitle(appTitle)
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
@@ -206,7 +199,6 @@ struct ContentView: View {
                 }
             }
         }
-        .tint(.white)
     }
 
     // MARK: - Navigation State
@@ -255,8 +247,6 @@ struct ContentView: View {
             }
             .navigationTitle(appTitle)
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
@@ -299,7 +289,6 @@ struct ContentView: View {
                 selectedAlbum = nil
             }
         }
-        .tint(.white)
     }
 
     // MARK: - Timeline Navigation
@@ -324,8 +313,6 @@ struct ContentView: View {
             }
             .navigationTitle(appTitle)
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
@@ -361,7 +348,6 @@ struct ContentView: View {
                 selectedMonthAlbum = nil
             }
         }
-        .tint(.white)
     }
 
     // MARK: - Top Segmented Control
@@ -417,54 +403,46 @@ struct ContentView: View {
         )
     }
 
+    private var currentPhotos: [PhotoAsset] {
+        if let monthAlbum = selectedMonthAlbum {
+            return monthAlbum.photoAssets
+        } else if let albumMgr = albumManager, selectedAlbum != nil {
+            return albumMgr.displayedAlbumPhotos
+        } else {
+            return photoManager.displayedPhotos
+        }
+    }
+
     // MARK: - Photo Browser
     private var photoBrowserView: some View {
         ZStack {
             Group {
-                let currentPhotos: [PhotoAsset] = {
-                    if let monthAlbum = selectedMonthAlbum {
-                        return monthAlbum.photoAssets
-                    } else if let albumMgr = albumManager, selectedAlbum != nil {
-                        return albumMgr.displayedAlbumPhotos
-                    } else {
-                        return photoManager.displayedPhotos
-                    }
-                }()
+                let photos = currentPhotos
 
-                if let currentPhoto = currentPhotos.first(where: { $0.id == currentPhotoID }) {
+                if !photos.isEmpty, currentPhotoID != nil {
                     DraggablePhotoView(
-                        photo: currentPhoto,
-                        onDelete: {
-                            handlePhotoDeletion(currentPhoto)
-                        },
-                        onNext: {
-                            navigationDirection = .forward
-                            goToNextPhotoInCurrentAlbum()
-                        },
-                        onPrevious: {
-                            navigationDirection = .backward
-                            goToPreviousPhotoInCurrentAlbum()
+                        photos: photos,
+                        currentPhotoID: currentPhotoID ?? "",
+                        onPhotoChange: { id, index in
+                            currentPhotoID = id
+                            scrollToPhotoID = nil
+                            if selectedAlbum == nil {
+                                photoManager.preloadAssets(photoIndex: index)
+                            }
                         },
                         onDismiss: {
                             scrollToPhotoID = currentPhotoID
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                                 isFullscreenMode = false
                             }
                         },
                         screenSize: ScreenSizeHelper.screenSize
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .id(currentPhoto.id)
-                    .transition(systemTransition)
                     .onAppear {
-                        if let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhoto.id }) {
-                            if selectedAlbum == nil {
-                                photoManager.preloadAssets(photoIndex: currentIndex)
-                            }
-                        }
                         showGestureInstructionsIfNeeded()
                     }
-                } else if currentPhotos.isEmpty {
+                } else if photos.isEmpty {
                     emptyLibraryView
                 } else {
                     Text("No photo selected")
@@ -486,12 +464,11 @@ struct ContentView: View {
                         }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.body)
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
                     }
-                    .buttonStyle(.glass)
+                    .glassEffect(.regular.interactive(), in: Circle())
 
                     Spacer()
 
@@ -503,122 +480,14 @@ struct ContentView: View {
                 Spacer()
             }
         }
+        .toolbar(.hidden, for: .tabBar)
         .onAppear {
-            let currentPhotos: [PhotoAsset] = {
-                if let monthAlbum = selectedMonthAlbum {
-                    return monthAlbum.photoAssets
-                } else if let albumMgr = albumManager, selectedAlbum != nil {
-                    return albumMgr.displayedAlbumPhotos
-                } else {
-                    return photoManager.displayedPhotos
-                }
-            }()
-
             if let id = currentPhotoID, !currentPhotos.isEmpty {
                 if !currentPhotos.contains(where: { $0.id == id }) {
                     currentPhotoID = currentPhotos.first?.id
                 }
             } else if currentPhotoID == nil {
                 initializeCurrentPhoto()
-            }
-        }
-    }
-
-    // MARK: - System Transition
-    private var systemTransition: AnyTransition {
-        let insertion = AnyTransition.move(edge: navigationDirection == .forward ? .trailing : .leading)
-            .combined(with: .opacity)
-        let removal = AnyTransition.move(edge: navigationDirection == .forward ? .leading : .trailing)
-            .combined(with: .opacity)
-
-        return .asymmetric(insertion: insertion, removal: removal)
-    }
-
-    // MARK: - Navigation for Album Photos
-    private func goToNextPhotoInCurrentAlbum() {
-        let currentPhotos: [PhotoAsset] = {
-            if let monthAlbum = selectedMonthAlbum {
-                return monthAlbum.photoAssets
-            } else if let albumMgr = albumManager, selectedAlbum != nil {
-                return albumMgr.displayedAlbumPhotos
-            } else {
-                return photoManager.displayedPhotos
-            }
-        }()
-
-        guard let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
-            return
-        }
-
-        let nextIndex = currentIndex + 1
-        if nextIndex < currentPhotos.count {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                currentPhotoID = currentPhotos[nextIndex].id
-            }
-        }
-    }
-
-    private func goToPreviousPhotoInCurrentAlbum() {
-        let currentPhotos: [PhotoAsset] = {
-            if let monthAlbum = selectedMonthAlbum {
-                return monthAlbum.photoAssets
-            } else if let albumMgr = albumManager, selectedAlbum != nil {
-                return albumMgr.displayedAlbumPhotos
-            } else {
-                return photoManager.displayedPhotos
-            }
-        }()
-
-        guard let currentIndex = currentPhotos.firstIndex(where: { $0.id == currentPhotoID }) else {
-            return
-        }
-
-        let previousIndex = currentIndex - 1
-        if previousIndex >= 0 {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                currentPhotoID = currentPhotos[previousIndex].id
-            }
-        }
-    }
-
-    // MARK: - Photo Deletion Handler
-    private func handlePhotoDeletion(_ photo: PhotoAsset) {
-        guard !membershipManager.isTrialExpired || membershipManager.isPremiumMember else {
-            showMembershipPaywall = true
-            return
-        }
-
-        let currentPhotos: [PhotoAsset] = {
-            if let monthAlbum = selectedMonthAlbum {
-                return monthAlbum.photoAssets
-            } else if let albumMgr = albumManager, selectedAlbum != nil {
-                return albumMgr.displayedAlbumPhotos
-            } else {
-                return photoManager.displayedPhotos
-            }
-        }()
-
-        guard let deletedIndex = currentPhotos.firstIndex(where: { $0.id == photo.id }) else {
-            return
-        }
-
-        let nextPhotoID: String?
-        if currentPhotos.count <= 1 {
-            nextPhotoID = nil
-        } else if deletedIndex < currentPhotos.count - 1 {
-            nextPhotoID = currentPhotos[deletedIndex + 1].id
-        } else {
-            nextPhotoID = currentPhotos[deletedIndex - 1].id
-        }
-
-        photoManager.addToTrash(photo)
-
-        withAnimation(.easeInOut(duration: 0.3)) {
-            if let nextID = nextPhotoID {
-                currentPhotoID = nextID
-            } else {
-                currentPhotoID = nil
-                isFullscreenMode = false
             }
         }
     }
@@ -637,24 +506,23 @@ struct ContentView: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "trash.fill")
-                    .font(.body)
-                    .foregroundColor(.white)
+                    .font(.title3)
+                    .foregroundColor(.primary)
 
                 if photoManager.trashCount > 0 {
                     Text("\(photoManager.trashCount)")
-                        .font(.caption)
+                        .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                        .padding(6)
+                        .padding(4)
                         .background(Color.red)
                         .clipShape(Circle())
-                        .offset(x: 5, y: -5)
+                        .offset(x: 6, y: -6)
                 }
             }
-            .frame(width: 36, height: 40)
-            .clipShape(Circle())
+            .frame(width: 44, height: 44)
         }
-        .buttonStyle(.glass)
+        .glassEffect(.regular.interactive(), in: Circle())
     }
 
     // MARK: - Membership Button
@@ -663,11 +531,11 @@ struct ContentView: View {
             showMembershipPaywall = true
         } label: {
             Image(systemName: "crown.fill")
-                .font(.body)
+                .font(.title3)
                 .foregroundColor(.yellow)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
         }
-        .buttonStyle(.glass)
+        .glassEffect(.regular.interactive())
     }
 
     // MARK: - Trial Warning Banner
@@ -720,17 +588,6 @@ struct ContentView: View {
         VStack {
             Spacer()
             VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up")
-                    Text(String(localized: "Swipe up to delete"))
-                }
-                .font(.caption)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.left")
                     Text(String(localized: "Left for older"))

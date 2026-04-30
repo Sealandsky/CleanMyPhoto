@@ -878,6 +878,7 @@
       }
     },
     "Release to Close" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -894,6 +895,7 @@
       }
     },
     "Release to Delete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1102,6 +1104,7 @@
       }
     },
     "Swipe up to delete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

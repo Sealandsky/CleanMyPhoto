@@ -24,7 +24,7 @@ struct PhotoCell: View {
                 .scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .contentShape(Rectangle())
-                .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
         .aspectRatio(1, contentMode: .fit)

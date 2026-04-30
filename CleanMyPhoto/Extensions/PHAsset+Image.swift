@@ -9,19 +9,35 @@ import SwiftUI
 import Photos
 import UIKit
 
+// MARK: - Image Memory Cache
+@MainActor
+final class PhotoImageCache {
+    static let shared = PhotoImageCache()
+    private var cache: [String: UIImage] = [:]
+
+    func get(_ identifier: String) -> UIImage? {
+        cache[identifier]
+    }
+
+    func set(_ identifier: String, image: UIImage) {
+        cache[identifier] = image
+    }
+}
+
 // MARK: - SwiftUI Image View for PHAsset
 struct AssetImage: View {
     let asset: PHAsset
     let targetSize: CGSize
     let contentMode: ContentMode
+    var highQuality: Bool = false
 
     @State private var image: UIImage?
-    @State private var isLoading = true
 
-    init(asset: PHAsset, targetSize: CGSize, contentMode: ContentMode = .fit) {
+    init(asset: PHAsset, targetSize: CGSize, contentMode: ContentMode = .fit, highQuality: Bool = false) {
         self.asset = asset
         self.targetSize = targetSize
         self.contentMode = contentMode
+        self.highQuality = highQuality
     }
 
     var body: some View {
@@ -30,38 +46,30 @@ struct AssetImage: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-            } else if isLoading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
             } else {
-                Image(systemName: "photo")
-                    .font(.system(size: 50))
-                    .foregroundColor(.gray)
+                Color.black
             }
         }
         .onAppear {
+            if let cached = PhotoImageCache.shared.get(asset.localIdentifier) {
+                image = cached
+            }
             loadImage()
         }
-        .onChange(of: asset.localIdentifier) { _, _ in
-            image = nil
-            isLoading = true
+        .onChange(of: asset.localIdentifier) { _, newID in
+            if let cached = PhotoImageCache.shared.get(newID) {
+                image = cached
+            }
             loadImage()
         }
     }
 
     private func loadImage() {
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
+        options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
-        options.progressHandler = { progress, _, _, _ in
-            // 可选：显示加载进度
-            if progress >= 1.0 {
-                print("✅ Image fully loaded")
-            }
-        }
 
-        // 使用调用者指定的 targetSize，支持不同场景的图片尺寸需求
         PHImageManager.default().requestImage(
             for: asset,
             targetSize: self.targetSize,
@@ -71,17 +79,11 @@ struct AssetImage: View {
             Task { @MainActor in
                 if let img = resultImage {
                     self.image = img
-
-                    // 检查是否是缩略图（degraded）
-                    let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
-                    if !isDegraded {
-                        self.isLoading = false
-                    }
+                    PhotoImageCache.shared.set(self.asset.localIdentifier, image: img)
                 }
 
                 if let error = info?[PHImageErrorKey] as? Error {
-                    print("❌ Image loading error: \(error.localizedDescription)")
-                    self.isLoading = false
+                    print("Image loading error: \(error.localizedDescription)")
                 }
             }
         }
