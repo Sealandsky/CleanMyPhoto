@@ -27,12 +27,15 @@ class PhotoManager: ObservableObject {
     private let imageManager = PHCachingImageManager()
     private let maxPhotoCount = 50
     private var currentFetchOffset = 0
+    private(set) var statisticsManager: StatisticsManager?
+    private(set) var totalPhotoCount: Int = 0
 
     var trashCount: Int {
         pendingDeletionIDs.count
     }
 
-    init() {
+    init(statisticsManager: StatisticsManager? = nil) {
+        self.statisticsManager = statisticsManager
         // 初始化时检查当前的权限状态
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
@@ -80,11 +83,12 @@ class PhotoManager: ObservableObject {
     private func fetchPhotos(offset: Int) async {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        fetchOptions.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.image.rawValue)
+        fetchOptions.predicate = NSPredicate(format: "mediaType IN %@", [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue])
         fetchOptions.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared]
         fetchOptions.includeAllBurstAssets = false
 
         let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+        totalPhotoCount = fetchResult.count
         print("📸 FetchResult total count: \(fetchResult.count)")
 
         // Calculate range to fetch
@@ -179,6 +183,13 @@ class PhotoManager: ObservableObject {
     // MARK: - Update Displayed Photos
     private func updateDisplayedPhotos() {
         displayedPhotos = allPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+        updateStatistics()
+    }
+
+    /// 更新统计数据
+    private func updateStatistics() {
+        let videoCount = displayedPhotos.filter { $0.asset.mediaType == .video }.count
+        statisticsManager?.updateStats(photoCount: totalPhotoCount, videoCount: videoCount, trash: trashCount)
     }
 
     // MARK: - Trash Management
@@ -187,6 +198,8 @@ class PhotoManager: ObservableObject {
         // 添加到 trashedAssets（如果还不存在）
         if !trashedAssets.contains(where: { $0.id == photo.id }) {
             trashedAssets.append(photo)
+            // 记录删除统计（获取资源大小）
+            recordAssetDeletion(photo.asset)
         }
         updateDisplayedPhotos()
     }
@@ -225,6 +238,14 @@ class PhotoManager: ObservableObject {
                 PHAssetChangeRequest.deleteAssets(assetsToDelete as NSArray)
             }
 
+            // 记录批量删除统计
+            let count = trashedAssets.count
+            var totalSize: Int64 = 0
+            for asset in trashedAssets {
+                totalSize += getAssetSize(asset.asset)
+            }
+            statisticsManager?.recordDeletions(count: count, totalSize: totalSize)
+
             // Remove from all photos and clear pending deletions
             allPhotos.removeAll { trashedAssets.contains($0) }
             pendingDeletionIDs.removeAll()
@@ -233,6 +254,28 @@ class PhotoManager: ObservableObject {
         } catch {
             errorMessage = "Failed to delete photos: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Statistics Helper
+
+    /// 记录单个资源删除
+    private func recordAssetDeletion(_ asset: PHAsset) {
+        let size = getAssetSize(asset)
+        statisticsManager?.recordDeletion(assetSize: size)
+    }
+
+    /// 获取资源大小（字节）
+    private func getAssetSize(_ asset: PHAsset) -> Int64 {
+        let options = PHImageRequestOptions()
+        options.isSynchronous = true
+        options.isNetworkAccessAllowed = false
+        options.deliveryMode = .fastFormat
+
+        var size: Int64 = 0
+        _ = imageManager.requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
+            size = Int64(data?.count ?? 0)
+        }
+        return size
     }
 
     // MARK: - Image Loading Helper

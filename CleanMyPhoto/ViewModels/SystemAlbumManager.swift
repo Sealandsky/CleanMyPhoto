@@ -15,6 +15,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var selectedYear: Int? = nil
     @Published var monthAlbums: [MonthAlbum] = []
+    @Published var allMonthAlbums: [Int: [MonthAlbum]] = [:]
 
     private let imageManager = PHCachingImageManager()
     private var thumbnailSize: CGSize = .zero
@@ -89,6 +90,77 @@ class SystemAlbumManager: NSObject, ObservableObject {
         if let year = selectedYear {
             print("📅 Loading months for year: \(year)")
             await loadMonthAlbumsForYear(year)
+        }
+    }
+
+    /// 加载所有年份的月份相册
+    func fetchAllMonths() async {
+        var result: [Int: [MonthAlbum]] = [:]
+        for yearAlbum in yearAlbums {
+            let months = await buildMonthAlbums(for: yearAlbum.year)
+            result[yearAlbum.year] = months
+        }
+        allMonthAlbums = result
+    }
+
+    /// 构建指定年份的 MonthAlbum 数组（不更新 published 属性）
+    private func buildMonthAlbums(for year: Int) async -> [MonthAlbum] {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+              let endDate = calendar.date(from: DateComponents(year: year, month: 12, day: 31, hour: 23, minute: 59, second: 59)) else {
+            return []
+        }
+
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared]
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.predicate = NSPredicate(format: "creationDate >= %@ AND creationDate <= %@", startDate as NSDate, endDate as NSDate)
+
+        let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+
+        var monthAssets: [Int: [PHAsset]] = [:]
+        fetchResult.enumerateObjects { asset, _, _ in
+            if let creationDate = asset.creationDate {
+                let month = calendar.component(.month, from: creationDate)
+                monthAssets[month, default: []].append(asset)
+            }
+        }
+
+        var albums: [MonthAlbum] = []
+        for (month, assets) in monthAssets.sorted(by: { $0.key > $1.key }) {
+            let album = MonthAlbum(
+                collection: nil, fetchResult: nil, assets: assets,
+                year: year, month: month, thumbnail: nil
+            )
+            albums.append(album)
+            Task { await self.loadMonthThumbnailForAll(album) }
+        }
+        return albums
+    }
+
+    /// 加载月份缩略图到 allMonthAlbums
+    private func loadMonthThumbnailForAll(_ album: MonthAlbum) async {
+        guard let asset = album.assets.first else { return }
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.resizeMode = .fast
+        options.isNetworkAccessAllowed = true
+
+        await withUnsafeContinuation { (continuation: UnsafeContinuation<Void, Never>) in
+            var isResumed = false
+            imageManager.requestImage(for: asset, targetSize: CGSize(width: 400, height: 400), contentMode: .aspectFill, options: options) { image, info in
+                if let image, !(info?[PHImageResultIsDegradedKey] as? Bool ?? false) {
+                    Task { @MainActor in
+                        guard var months = self.allMonthAlbums[album.year] else { return }
+                        if let idx = months.firstIndex(where: { $0.id == album.id }) {
+                            months[idx].thumbnail = image
+                            self.allMonthAlbums[album.year] = months
+                        }
+                    }
+                }
+                if !isResumed { isResumed = true; continuation.resume() }
+            }
         }
     }
 

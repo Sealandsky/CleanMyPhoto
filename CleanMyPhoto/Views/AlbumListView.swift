@@ -31,8 +31,8 @@ struct AlbumListView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 12)
             }
         }
         .background(Color.black)
@@ -45,8 +45,8 @@ struct AlbumListView: View {
                 AlbumCellSkeleton()
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 4)
+        .padding(.bottom, 12)
     }
 
     private var emptyAlbumsView: some View {

@@ -212,6 +212,9 @@
         }
       }
     },
+    "CleanMyPhoto" : {
+
+    },
     "CleanMyPhoto needs access to your photo library to help you organize and clean up unwanted photos." : {
       "localizations" : {
         "en" : {
@@ -291,6 +294,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除所有照片"
+          }
+        }
+      }
+    },
+    "Deleted Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已删除照片"
           }
         }
       }
@@ -387,6 +406,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始使用"
+          }
+        }
+      }
+    },
+    "In Trash" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Trash"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回收站中"
           }
         }
       }
@@ -503,6 +538,23 @@
         }
       }
     },
+    "Manage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理"
+          }
+        }
+      }
+    },
     "Maximize Your Photo Storage" : {
       "localizations" : {
         "en" : {
@@ -536,6 +588,7 @@
       }
     },
     "Membership Status" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -595,6 +648,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最受欢迎"
+          }
+        }
+      }
+    },
+    "Move to Trash" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to Trash"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移至回收站"
           }
         }
       }
@@ -1040,6 +1109,7 @@
       }
     },
     "Select a year" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1070,6 +1140,41 @@
           }
         }
       }
+    },
+    "Space Saved" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space Saved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已释放空间"
+          }
+        }
+      }
+    },
+    "Statistics" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistics"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用统计"
+          }
+        }
+      }
+    },
+    "Subscribe or one-time purchase" : {
+
     },
     "Subscription Terms" : {
       "localizations" : {
@@ -1104,7 +1209,6 @@
       }
     },
     "Swipe up to delete" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1180,6 +1284,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如需使用 CleanMyPhoto，请前往设置开启相册访问权限。"
+          }
+        }
+      }
+    },
+    "Total Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总照片数"
           }
         }
       }
@@ -1345,6 +1465,7 @@
       }
     },
     "View Mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

@@ -23,11 +23,23 @@ enum MainTab: String, CaseIterable {
             return String(localized: "Timeline")
         }
     }
+
+    var icon: String {
+        switch self {
+        case .allPhotos:
+            return "photo.on.rectangle.angled"
+        case .albums:
+            return "photo.stack"
+        case .timeline:
+            return "calendar"
+        }
+    }
 }
 
 struct ContentView: View {
     @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
+    @EnvironmentObject var statisticsManager: StatisticsManager
 
     @State private var showTrash = false
     @State private var currentPhotoID: String? = nil
@@ -165,39 +177,47 @@ struct ContentView: View {
 
     // MARK: - Content Views
     private var contentViews: some View {
-        Group {
-            // 内容视图
+        ZStack {
             if isFullscreenMode {
                 photoBrowserView
-            } else if selectedTab == .allPhotos {
-                libraryNavigationView
-            } else if selectedTab == .albums {
-                albumsNavigationView
-            } else if selectedTab == .timeline {
-                timelineNavigationView
             }
+
+            libraryNavigationView
+                .opacity(selectedTab == .allPhotos && !isFullscreenMode ? 1 : 0)
+                .allowsHitTesting(selectedTab == .allPhotos && !isFullscreenMode)
+
+            albumsNavigationView
+                .opacity(selectedTab == .albums && !isFullscreenMode ? 1 : 0)
+                .allowsHitTesting(selectedTab == .albums && !isFullscreenMode)
+
+            timelineNavigationView
+                .opacity(selectedTab == .timeline && !isFullscreenMode ? 1 : 0)
+                .allowsHitTesting(selectedTab == .timeline && !isFullscreenMode)
         }
+        .background(Color(.systemBackground)) // 固定背景，防止露黑
     }
+
+    @State private var selectedTabBeforeSwitch: MainTab = .allPhotos
 
     // MARK: - Library Navigation
     private var libraryNavigationView: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                topSegmentedControl
-                photoListView
-            }
-            .navigationTitle(appTitle)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        if !membershipManager.isPremiumMember {
-                            membershipButton
+            photoListView
+                .navigationTitle(appTitle)
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        topSegmentedControl
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 12) {
+                            if !membershipManager.isPremiumMember {
+                                membershipButton
+                            }
+                            trashButton
                         }
-                        trashButton
                     }
                 }
-            }
         }
     }
 
@@ -228,26 +248,26 @@ struct ContentView: View {
     // MARK: - Albums Navigation
     private var albumsNavigationView: some View {
         NavigationStack(path: $albumsPath) {
-            VStack(spacing: 0) {
-                topSegmentedControl
-                Group {
-                    if let albumMgr = albumManager {
-                        AlbumListView(albumManager: albumMgr) { album in
-                            selectedAlbum = album
-                            Task { [album] in
-                                await albumMgr.fetchPhotos(in: album)
-                                guard selectedAlbum?.id == album.id else { return }
-                                albumsPath.append(AlbumsDestination.albumPhotos(album.id))
-                            }
+            Group {
+                if let albumMgr = albumManager {
+                    AlbumListView(albumManager: albumMgr) { album in
+                        selectedAlbum = album
+                        Task { [album] in
+                            await albumMgr.fetchPhotos(in: album)
+                            guard selectedAlbum?.id == album.id else { return }
+                            albumsPath.append(AlbumsDestination.albumPhotos(album.id))
                         }
-                    } else {
-                        loadingView
                     }
+                } else {
+                    loadingView
                 }
             }
             .navigationTitle(appTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    topSegmentedControl
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         if !membershipManager.isPremiumMember {
@@ -294,26 +314,26 @@ struct ContentView: View {
     // MARK: - Timeline Navigation
     private var timelineNavigationView: some View {
         NavigationStack(path: $timelinePath) {
-            VStack(spacing: 0) {
-                topSegmentedControl
-                Group {
-                    if let systemAlbumMgr = systemAlbumManager {
-                        PhotoGroupView(
-                            albumManager: systemAlbumMgr,
-                            photoManager: photoManager,
-                            onMonthSelect: { monthAlbum in
-                                selectedMonthAlbum = monthAlbum
-                                timelinePath.append(TimelineDestination.monthPhotos(monthAlbum.id))
-                            }
-                        )
-                    } else {
-                        loadingView
-                    }
+            Group {
+                if let systemAlbumMgr = systemAlbumManager {
+                    PhotoGroupView(
+                        albumManager: systemAlbumMgr,
+                        photoManager: photoManager,
+                        onMonthSelect: { monthAlbum in
+                            selectedMonthAlbum = monthAlbum
+                            timelinePath.append(TimelineDestination.monthPhotos(monthAlbum.id))
+                        }
+                    )
+                } else {
+                    loadingView
                 }
             }
             .navigationTitle(appTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    topSegmentedControl
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         if !membershipManager.isPremiumMember {
@@ -350,32 +370,25 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Top Segmented Control
+    // MARK: - Top Tab Bar
     private var topSegmentedControl: some View {
-        Picker("View Mode", selection: $selectedTab) {
+        HStack(spacing: 8) {
             ForEach(MainTab.allCases, id: \.self) { tab in
-                Text(tab.localizedText)
-                    .tag(tab)
+                tabButton(for: tab)
             }
         }
-        .pickerStyle(.segmented)
-        .controlSize(.large)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.black.opacity(0.95))
+        .padding(.vertical, 4)
         .onChange(of: selectedTab) { oldValue, newValue in
-            scrollOffset = 0
+            selectedTabBeforeSwitch = oldValue
             scrollToPhotoID = nil
             isFullscreenMode = false
             currentPhotoID = nil
 
-            // 切换 tab 时清除导航路径
             albumsPath = NavigationPath()
             timelinePath = NavigationPath()
             selectedAlbum = nil
             selectedMonthAlbum = nil
 
-            // 切换到相簿 tab 时加载相簿列表（仅首次）
             if newValue == .albums, let albumMgr = albumManager, albumMgr.albums.isEmpty {
                 albumMgr.isLoadingAlbums = true
                 Task {
@@ -383,6 +396,35 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private func tabButton(for tab: MainTab) -> some View {
+        let isSelected = selectedTab == tab
+        return Button {
+            selectedTab = tab
+        } label: {
+            Label(tab.localizedText, systemImage: tab.icon)
+                .font(.body)
+                .fontWeight(.medium)
+                .foregroundColor(isSelected ? .black : .white.opacity(0.6))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .opacity(isSelected ? 0 : 1)
+                )
+                .background(
+                    Capsule()
+                        .fill(Color.white)
+                        .opacity(isSelected ? 1 : 0)
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Photo List View
@@ -430,10 +472,15 @@ struct ContentView: View {
                                 photoManager.preloadAssets(photoIndex: index)
                             }
                         },
+                        onDelete: { photo in
+                            photoManager.addToTrash(photo)
+                        },
                         onDismiss: {
                             scrollToPhotoID = currentPhotoID
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                isFullscreenMode = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    isFullscreenMode = false
+                                }
                             }
                         },
                         screenSize: ScreenSizeHelper.screenSize
@@ -472,7 +519,7 @@ struct ContentView: View {
 
                     Spacer()
 
-                    trashButton
+                    fullscreenTrashButton
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -504,25 +551,37 @@ struct ContentView: View {
         Button {
             showTrash = true
         } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "trash.fill")
-                    .font(.title3)
-                    .foregroundColor(.primary)
+            Image(systemName: "trash.fill")
+                .font(.body)
+                .foregroundColor(.primary)
+        }
+        .buttonStyle(.plain)
+        .badge(photoManager.trashCount)
+    }
 
-                if photoManager.trashCount > 0 {
-                    Text("\(photoManager.trashCount)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(4)
-                        .background(Color.red)
-                        .clipShape(Circle())
-                        .offset(x: 6, y: -6)
-                }
-            }
-            .frame(width: 44, height: 44)
+    // MARK: - Fullscreen Trash Button
+    private var fullscreenTrashButton: some View {
+        Button {
+            showTrash = true
+        } label: {
+            Image(systemName: "trash.fill")
+                .font(.title3)
+                .foregroundColor(.primary)
+                .frame(width: 44, height: 44)
         }
         .glassEffect(.regular.interactive(), in: Circle())
+        .overlay(alignment: .topTrailing) {
+            if photoManager.trashCount > 0 {
+                Text("\(photoManager.trashCount)")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding(4)
+                    .background(Color.red)
+                    .clipShape(Circle())
+                    .offset(x: 4, y: -2)
+            }
+        }
     }
 
     // MARK: - Membership Button
@@ -613,6 +672,17 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down")
                     Text(String(localized: "Swipe down to close"))
+                }
+                .font(.caption)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.6))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up")
+                    Text(String(localized: "Swipe up to delete"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)

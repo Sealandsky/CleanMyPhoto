@@ -30,7 +30,7 @@ struct AlbumPhotoListView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 4)
             }
             .background(Color.black)
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
@@ -47,7 +47,11 @@ struct AlbumPhotoListView: View {
             }
             .onAppear {
                 if let photoID = scrollToPhotoID {
-                    proxy.scrollTo(photoID, anchor: .center)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
+                        }
+                    }
                 }
             }
         }

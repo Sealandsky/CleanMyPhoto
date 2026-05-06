@@ -22,7 +22,7 @@ struct AlbumModel: Identifiable, Equatable {
 
         // 获取相册内的资源数量
         let fetchOptions = PHFetchOptions()
-        fetchOptions.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.image.rawValue)
+        fetchOptions.predicate = NSPredicate(format: "mediaType IN %@", [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue])
         let assets = PHAsset.fetchAssets(in: collection, options: fetchOptions)
         self.assetCount = assets.count
 

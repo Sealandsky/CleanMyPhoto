@@ -48,6 +48,7 @@ struct PhotoListView: View {
                                 }
                         }
                     }
+                    .padding(.horizontal, 4)
 
                     // Loading indicator at bottom
                     if photoManager.isLoadingMore {
@@ -64,9 +65,12 @@ struct PhotoListView: View {
                 onScrollOffsetChanged?(offset)
             }
             .onAppear {
-                // 只在视图出现时滚动到指定位置
                 if let photoID = scrollToPhotoID {
-                    scrollToPhoto(proxy: proxy, photoID: photoID)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
+                        }
+                    }
                 }
             }
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
@@ -89,10 +93,6 @@ struct PhotoListView: View {
         }
     }
 
-    private func scrollToPhoto(proxy: ScrollViewProxy, photoID: String) {
-        // 直接滚动到照片位置
-        proxy.scrollTo(photoID, anchor: .center)
-    }
 }
 
 // MARK: - Preview

@@ -40,6 +40,7 @@ enum AppTab: String, CaseIterable {
 struct MainTabView: View {
     @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
+    @EnvironmentObject var statisticsManager: StatisticsManager
 
     @State private var selectedTab: AppTab = .photos
 
@@ -67,4 +68,5 @@ struct MainTabView: View {
     MainTabView()
         .environmentObject(PhotoManager())
         .environmentObject(MembershipManager())
+        .environmentObject(StatisticsManager())
 }

@@ -13,6 +13,7 @@ struct DraggablePhotoView: View {
     let photos: [PhotoAsset]
     var currentPhotoID: String
     let onPhotoChange: (String, Int) -> Void
+    var onDelete: ((PhotoAsset) -> Void)?
     let onDismiss: () -> Void
     let screenSize: CGSize
 
@@ -21,9 +22,11 @@ struct DraggablePhotoView: View {
     @State private var isDragging = false
     @State private var isNavigating = false
     @State private var navigationID: UInt = 0
+    @State private var deleteID: UInt = 0
     @State private var hasTriggeredHaptic = false
 
     private let dismissThreshold: CGFloat = 60
+    private let deleteThreshold: CGFloat = 80
 
     private var safeIndex: Int {
         photos.isEmpty ? 0 : min(max(localIndex, 0), photos.count - 1)
@@ -33,10 +36,11 @@ struct DraggablePhotoView: View {
     private var previousPhoto: PhotoAsset? { safeIndex > 0 ? photos[safeIndex - 1] : nil }
     private var nextPhoto: PhotoAsset? { safeIndex < photos.count - 1 ? photos[safeIndex + 1] : nil }
 
-    init(photos: [PhotoAsset], currentPhotoID: String, onPhotoChange: @escaping (String, Int) -> Void, onDismiss: @escaping () -> Void, screenSize: CGSize) {
+    init(photos: [PhotoAsset], currentPhotoID: String, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize) {
         self.photos = photos
         self.currentPhotoID = currentPhotoID
         self.onPhotoChange = onPhotoChange
+        self.onDelete = onDelete
         self.onDismiss = onDismiss
         self.screenSize = screenSize
         let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) ?? 0
@@ -59,8 +63,8 @@ struct DraggablePhotoView: View {
                 }
 
                 // Current photo
-                photoLayer(currentPhoto)
-                    .offset(x: offset.width)
+                currentMediaLayer(currentPhoto)
+                    .offset(x: offset.width, y: offset.height)
                     .zIndex(1)
 
                 // Next photo (visible when swiping left)
@@ -69,9 +73,25 @@ struct DraggablePhotoView: View {
                         .offset(x: screenSize.width + offset.width)
                         .zIndex(0)
                 }
+
+                // Delete indicator
+                if showDeleteIndicator && onDelete != nil {
+                    VStack {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 40, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(16)
+                            .background(Circle().fill(Color.red.opacity(0.8)))
+                        Text(String(localized: "Move to Trash"))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.white)
+                    }
+                    .transition(.opacity)
+                    .opacity(offset.height < -deleteThreshold ? 1 : 0.5)
+                    .zIndex(10)
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipped()
             .gesture(
                 DragGesture(coordinateSpace: .global)
                     .onChanged { value in
@@ -89,17 +109,47 @@ struct DraggablePhotoView: View {
         }
     }
 
-    // MARK: - Photo Layer
+    // MARK: - Photo Layer (swipe neighbors — always thumbnail)
     private func photoLayer(_ photoAsset: PhotoAsset) -> some View {
         AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+    }
+
+    // MARK: - Current Photo Layer (media-appropriate player)
+    @ViewBuilder
+    private func currentMediaLayer(_ photoAsset: PhotoAsset) -> some View {
+        switch photoAsset.mediaType {
+        case .video:
+            ZStack {
+                photoLayer(photoAsset)
+                VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .id(photoAsset.id)
+        case .livePhoto:
+            ZStack {
+                photoLayer(photoAsset)
+                LivePhotoPlayerView(asset: photoAsset.asset)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .id(photoAsset.id)
+        default:
+            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+        }
     }
 
     // MARK: - Gesture Handlers
+    @State private var showDeleteIndicator = false
+
     private func handleDragChanged(_ value: DragGesture.Value) {
-        if isNavigating {
-            completePendingNavigation()
-        }
+        if isNavigating { return }
 
         isDragging = true
         let translation = value.translation
@@ -107,19 +157,32 @@ struct DraggablePhotoView: View {
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
             if abs(translation.width) > abs(translation.height) {
                 offset = CGSize(width: translation.width, height: 0)
+                showDeleteIndicator = false
+            } else if translation.height > 0 {
+                offset = CGSize(width: 0, height: translation.height)
+                showDeleteIndicator = false
             } else {
                 offset = CGSize(width: 0, height: translation.height)
+                showDeleteIndicator = abs(translation.height) > deleteThreshold
             }
         }
     }
 
     private func handleDragEnded(_ value: DragGesture.Value) {
+        if isNavigating { return }
+
         let horizontal = value.translation.width
         let vertical = value.translation.height
         let velocity = value.velocity.width
 
-        // Vertical dismiss (swipe down)
-        if abs(vertical) > abs(horizontal) && vertical > dismissThreshold {
+        // Swipe up to delete
+        if vertical < -deleteThreshold && onDelete != nil {
+            performDeleteAnimation()
+            return
+        }
+
+        // Swipe down to dismiss
+        if vertical > dismissThreshold {
             performDismissAnimation()
             return
         }
@@ -148,16 +211,6 @@ struct DraggablePhotoView: View {
 
     // MARK: - Navigate (in-place, no view recreation)
     private enum SwipeDirection { case forward, backward }
-
-    private func completePendingNavigation() {
-        if offset.width < 0 && localIndex < photos.count - 1 {
-            localIndex += 1
-        } else if offset.width > 0 && localIndex > 0 {
-            localIndex -= 1
-        }
-        onPhotoChange(currentPhoto.id, localIndex)
-        isNavigating = false
-    }
 
     private func navigate(direction: SwipeDirection) {
         guard (direction == .forward && localIndex < photos.count - 1) ||
@@ -199,13 +252,56 @@ struct DraggablePhotoView: View {
 
     // MARK: - Dismiss Animation
     private func performDismissAnimation() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+        withAnimation(.easeOut(duration: 0.3)) {
             offset = CGSize(width: 0, height: screenSize.height)
         }
 
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                onDismiss()
+            }
+        }
+    }
+
+    // MARK: - Delete Animation
+    private func performDeleteAnimation() {
+        triggerConfirmHaptic()
+
+        let currentDelID = deleteID + 1
+        deleteID = currentDelID
+
+        let photoToDelete = currentPhoto
+        let hasMore = nextPhoto != nil || previousPhoto != nil
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            offset = CGSize(width: 0, height: -screenSize.height)
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            onDismiss()
-            resetPositionImmediate()
+            guard deleteID == currentDelID else { return }
+
+            onDelete?(photoToDelete)
+
+            if hasMore {
+                if nextPhoto != nil {
+                    // nextPhoto 会占据删除后的 localIndex 位置，索引不变
+                } else if localIndex > 0 {
+                    localIndex -= 1
+                }
+                onPhotoChange(currentPhoto.id, localIndex)
+            } else {
+                onDismiss()
+            }
+
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                offset = .zero
+                isDragging = false
+                showDeleteIndicator = false
+            }
         }
     }
 

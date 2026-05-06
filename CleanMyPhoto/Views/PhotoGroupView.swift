@@ -14,23 +14,8 @@ struct PhotoGroupView: View {
     let onMonthSelect: (MonthAlbum) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 左侧年份列表
-            YearListView(
-                yearAlbums: albumManager.yearAlbums,
-                selectedYear: albumManager.selectedYear,
-                onYearSelect: { year in
-                    albumManager.selectedYear = year
-                    Task {
-                        await albumManager.loadMonthAlbumsForYear(year)
-                    }
-                }
-            )
-            .frame(width: 120)
-            .background(Color.black.opacity(0.3))
-
-            // 右侧月份列表
-            if albumManager.isLoading {
+        Group {
+            if albumManager.isLoading && albumManager.allMonthAlbums.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView()
@@ -43,151 +28,85 @@ struct PhotoGroupView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                MonthListView(
-                    monthAlbums: albumManager.monthAlbums,
-                    onMonthSelect: { monthAlbum in
-                        onMonthSelect(monthAlbum)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(albumManager.yearAlbums) { yearAlbum in
+                            Section {
+                                if let months = albumManager.allMonthAlbums[yearAlbum.year], !months.isEmpty {
+                                    LazyVGrid(columns: [
+                                        GridItem(.flexible()),
+                                        GridItem(.flexible())
+                                    ], spacing: 12) {
+                                        ForEach(months) { monthAlbum in
+                                            MonthCardView(monthAlbum: monthAlbum)
+                                                .onTapGesture {
+                                                    onMonthSelect(monthAlbum)
+                                                }
+                                        }
+                                    }
+                                    .padding(.horizontal, 4)
+                                }
+                            } header: {
+                                HStack {
+                                    Text(verbatim: "\(yearAlbum.year)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .padding(.leading, 0)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                                .padding(.bottom, 8)
+                            }
+                        }
                     }
-                )
+                    .padding(.bottom, 16)
+                }
             }
         }
         .background(Color.black)
         .task {
             await albumManager.fetchYearAlbums()
+            await albumManager.fetchAllMonths()
         }
     }
 }
 
-// MARK: - Year List View (只显示年份文字)
-struct YearListView: View {
-    let yearAlbums: [YearAlbum]
-    let selectedYear: Int?
-    let onYearSelect: (Int) -> Void
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(yearAlbums) { album in
-                    Button {
-                        onYearSelect(album.year)
-                    } label: {
-                        VStack(spacing: 8) {
-                            Text("\(album.year)")
-                                .font(.system(size: 20, weight: album.year == selectedYear ? .bold : .regular))
-                                .foregroundColor(album.year == selectedYear ? .white : .secondary)
-
-                            Text("\(album.photoCount)\(String(localized: "photos"))")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            album.year == selectedYear ?
-                            Color.white.opacity(0.1) : Color.clear
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Month List View
-struct MonthListView: View {
-    let monthAlbums: [MonthAlbum]
-    let onMonthSelect: (MonthAlbum) -> Void
-
-    var body: some View {
-        Group {
-            if monthAlbums.isEmpty {
-                VStack {
-                    Spacer()
-                    Text(String(localized: "Select a year"))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 12) {
-                        ForEach(monthAlbums) { monthAlbum in
-                            MonthCardView(monthAlbum: monthAlbum)
-                                .onTapGesture {
-                                    onMonthSelect(monthAlbum)
-                                }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 12)
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .background(Color.black)
-    }
-}
-
-// MARK: - Month Card View (使用系统封面)
+// MARK: - Month Card View
 struct MonthCardView: View {
     let monthAlbum: MonthAlbum
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 系统封面（大图）
-            GeometryReader { geometry in
-                ZStack {
-                    if let thumbnail = monthAlbum.thumbnail {
-                        // 优先使用缓存的缩略图
-                        Image(uiImage: thumbnail)
-                            .resizable()
-                            .scaledToFill()
-                    } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
-                        // 如果没有缓存，使用 AssetImage 加载
-                        AssetImage(
-                            asset: asset,
-                            targetSize: CGSize(width: 400, height: 400),
-                            contentMode: .fill
-                        )
+        PhotoCard {
+            PhotoCardCover {
+                if let thumbnail = monthAlbum.thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
                         .scaledToFill()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.gray)
-                            )
-                    }
+                } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
+                    AssetImage(
+                        asset: asset,
+                        targetSize: CGSize(width: 400, height: 400),
+                        contentMode: .fill
+                    )
+                    .scaledToFill()
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                        )
                 }
-                .frame(width: geometry.size.width, height: 150)
-                .contentShape(Rectangle())
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipped()
             }
-            .frame(height: 150)
 
-            // 月份信息
-            VStack(spacing: 4) {
-                Text(monthAlbum.monthName)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text("\(monthAlbum.photoCount)\(String(localized: "photos"))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 10)
+            PhotoCardInfo(
+                title: monthAlbum.monthName,
+                subtitle: "\(monthAlbum.photoCount)\(String(localized: "photos"))"
+            )
         }
-        .frame(maxWidth: .infinity)
-        .background(Color.gray.opacity(0.2))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -218,7 +137,7 @@ struct SystemMonthPhotosView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 4)
             }
             .background(Color.black)
             .onAppear {
@@ -253,132 +172,10 @@ struct SystemMonthPhotosView: View {
     }
 }
 
-// MARK: - Previews
-#Preview("PhotoGroupView - Full View", body: {
+#Preview("PhotoGroupView", body: {
     PhotoGroupView(
         albumManager: SystemAlbumManager(),
         photoManager: PhotoManager(),
         onMonthSelect: { _ in }
     )
 })
-
-#Preview("SystemMonthPhotosView", body: {
-    SystemMonthPhotosView(
-        monthAlbum: MonthAlbum(
-            collection: nil,
-            fetchResult: nil,
-            assets: [],
-            year: 2025,
-            month: 3,
-            thumbnail: nil
-        ),
-        photoManager: PhotoManager(),
-        onPhotoSelect: { _ in }
-    )
-})
-
-#Preview("PhotoGroupView - With Sample Data", body: {
-    PhotoGroupViewWithSampleData()
-})
-
-#Preview("YearListView", body: {
-    let sampleYears = [
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2026, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2024, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2023, thumbnail: nil),
-    ]
-
-    YearListView(
-        yearAlbums: sampleYears,
-        selectedYear: 2025,
-        onYearSelect: { _ in }
-    )
-    .frame(width: 120, height: 500)
-    .background(Color.black)
-})
-
-#Preview("MonthListView - Empty", body: {
-    MonthListView(
-        monthAlbums: [],
-        onMonthSelect: { _ in }
-    )
-    .frame(width: 300, height: 500)
-})
-
-#Preview("MonthListView - With Data", body: {
-    let sampleMonths = [
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 12, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 11, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 10, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 9, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 8, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 7, thumbnail: nil),
-    ]
-
-    MonthListView(
-        monthAlbums: sampleMonths,
-        onMonthSelect: { _ in }
-    )
-    .frame(width: 300, height: 500)
-})
-
-#Preview("MonthCardView", body: {
-    let sampleMonth = MonthAlbum(
-        collection: nil,
-        fetchResult: nil,
-        assets: [],
-        year: 2025,
-        month: 3,
-        thumbnail: nil
-    )
-
-    MonthCardView(monthAlbum: sampleMonth)
-        .frame(width: 150)
-        .padding()
-    .background(Color.black)
-})
-
-// MARK: - Preview Helper Views
-/// 用于预览的完整视图，包含示例数据
-struct PhotoGroupViewWithSampleData: View {
-    @State private var selectedYear: Int? = 2025
-
-    private let sampleYears = [
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2026, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2024, thumbnail: nil),
-        YearAlbum(collection: nil, fetchResult: nil, assets: [], year: 2023, thumbnail: nil),
-    ]
-
-    private let sampleMonths = [
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 12, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 11, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 10, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 9, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 8, thumbnail: nil),
-        MonthAlbum(collection: nil, fetchResult: nil, assets: [], year: 2025, month: 7, thumbnail: nil),
-    ]
-
-    var body: some View {
-        // 显示年月列表（有数据）
-        HStack(spacing: 0) {
-            // 左侧年份列表
-            YearListView(
-                yearAlbums: sampleYears,
-                selectedYear: selectedYear,
-                onYearSelect: { year in
-                    selectedYear = year
-                }
-            )
-            .frame(width: 120)
-            .background(Color.black.opacity(0.3))
-
-            // 右侧月份列表
-            MonthListView(
-                monthAlbums: sampleMonths,
-                onMonthSelect: { _ in }
-            )
-        }
-    }
-}
