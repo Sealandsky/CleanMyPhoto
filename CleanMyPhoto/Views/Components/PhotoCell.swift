@@ -1,16 +1,10 @@
-//
-//  PhotoCell.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/9.
-//
-
 import SwiftUI
 import Photos
 
-// MARK: - Photo Cell
 struct PhotoCell: View {
     let photo: PhotoAsset
+    var isSelected: Bool = false
+    var isSelectMode: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -26,9 +20,18 @@ struct PhotoCell: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 mediaBadge
+
+                if isSelectMode && !isSelected {
+                    Color.black.opacity(0.2)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if isSelectMode {
+                    selectionIndicator
+                }
             }
             .overlay(alignment: .bottomLeading) {
-                if photo.isFavorite {
+                if !isSelectMode && photo.isFavorite {
                     favoriteBadge
                 }
             }
@@ -36,7 +39,28 @@ struct PhotoCell: View {
         .aspectRatio(1, contentMode: .fit)
     }
 
-    // MARK: - Media Badge
+    private var selectionIndicator: some View {
+        Group {
+            if isSelected {
+                ZStack {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 28, height: 28)
+                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 1)
+
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundColor(.blue)
+                }
+            } else {
+                Image(systemName: "circle")
+                    .font(.system(size: 26))
+                    .foregroundColor(.white.opacity(0.8))
+                    .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 1)
+            }
+        }
+        .padding(6)
+    }
 
     @ViewBuilder
     private var mediaBadge: some View {

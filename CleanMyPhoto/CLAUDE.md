@@ -102,3 +102,17 @@ CleanMyPhoto/
 ├── Resources/       # CleanMyPhotoApp (app entry)
 └── Utils/           # ScreenSizeHelper, etc.
 ```
+
+## Project Context
+
+This is a SwiftUI photo app. All UI work should use SwiftUI conventions. Prefer SwiftUI-native approaches (GeometryReader, UIScreen.main.bounds replacement APIs, @available checks) over UIKit workarounds.
+
+## Bug Fixing Rules
+
+- When fixing UI bugs, always check ALL views that use a shared component or pattern — not just the one the user mentions. If a caching fix is needed in one view, search for the same pattern in sibling views.
+- Before investigating formatting or display bugs, first verify the bug actually exists by reading the current code and checking if the issue might be locale-related or already resolved. Don't spend time hunting for problems that may not be present.
+
+## UI Change Rules
+
+- When the user describes where a UI element should be placed, confirm the specific screen/view name before making changes. Distinguish between 'list page' vs 'detail/fullscreen page' vs 'grid view' explicitly.
+- Do not apply frosted glass / .ultraThinMaterial / blur effects to icons or small UI elements unless explicitly requested. Keep icon styles simple by default (plain SF Symbol, solid color).

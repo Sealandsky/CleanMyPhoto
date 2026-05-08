@@ -74,12 +74,12 @@ struct ContentView: View {
             }
         }
         .task {
+            guard !photoManager.hasLoadedOnce else { return }
+
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
             } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
-                if photoManager.displayedPhotos.isEmpty {
-                    await photoManager.fetchAllPhotos()
-                }
+                await photoManager.fetchAllPhotos()
             }
 
             if albumManager == nil {
@@ -105,6 +105,8 @@ struct ContentView: View {
                 Text(errorMessage)
             }
         }
+        .toolbar(photoManager.isSelectMode ? .hidden : .visible, for: .tabBar)
+        .animation(.easeInOut(duration: 0.2), value: photoManager.isSelectMode)
     }
 
     // MARK: - Permission View
@@ -204,17 +206,21 @@ struct ContentView: View {
         NavigationStack {
             photoListView
                 .navigationTitle(appTitle)
-                .navigationBarTitleDisplayMode(.large)
+                .navigationBarTitleDisplayMode(photoManager.isSelectMode ? .inline : .large)
                 .toolbar {
                     ToolbarItem(placement: .principal) {
-                        topSegmentedControl
+                        if !photoManager.isSelectMode {
+                            topSegmentedControl
+                        }
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 12) {
-                            if !membershipManager.isPremiumMember {
-                                membershipButton
+                    if !photoManager.isSelectMode {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            HStack(spacing: 12) {
+                                if !membershipManager.isPremiumMember {
+                                    membershipButton
+                                }
+                                trashButton
                             }
-                            trashButton
                         }
                     }
                 }
@@ -266,14 +272,18 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    topSegmentedControl
+                    if !photoManager.isSelectMode {
+                        topSegmentedControl
+                    }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        if !membershipManager.isPremiumMember {
-                            membershipButton
+                if !photoManager.isSelectMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 12) {
+                            if !membershipManager.isPremiumMember {
+                                membershipButton
+                            }
+                            trashButton
                         }
-                        trashButton
                     }
                 }
             }
@@ -332,14 +342,18 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    topSegmentedControl
+                    if !photoManager.isSelectMode {
+                        topSegmentedControl
+                    }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        if !membershipManager.isPremiumMember {
-                            membershipButton
+                if !photoManager.isSelectMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 12) {
+                            if !membershipManager.isPremiumMember {
+                                membershipButton
+                            }
+                            trashButton
                         }
-                        trashButton
                     }
                 }
             }
@@ -554,6 +568,7 @@ struct ContentView: View {
             Image(systemName: "trash.fill")
                 .font(.body)
                 .foregroundColor(.primary)
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .badge(photoManager.trashCount)

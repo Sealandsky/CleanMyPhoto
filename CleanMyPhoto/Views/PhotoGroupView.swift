@@ -67,8 +67,10 @@ struct PhotoGroupView: View {
         }
         .background(Color.black)
         .task {
-            await albumManager.fetchYearAlbums()
-            await albumManager.fetchAllMonths()
+            if albumManager.yearAlbums.isEmpty {
+                await albumManager.fetchYearAlbums()
+                await albumManager.fetchAllMonths()
+            }
         }
     }
 }
@@ -116,10 +118,12 @@ struct SystemMonthPhotosView: View {
     @ObservedObject var photoManager: PhotoManager
     let onPhotoSelect: (PhotoAsset) -> Void
     var scrollToPhotoID: String? = nil
+    @Environment(GridSettings.self) private var gridSettings
+    @State private var selectionManager = SelectionManager()
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
-    ]
+    private var columns: [GridItem] {
+        GridColumnHelper.columns(count: gridSettings.columnCount)
+    }
 
     private var photos: [PhotoAsset] {
         monthAlbum.photoAssets
@@ -128,13 +132,29 @@ struct SystemMonthPhotosView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 2) {
+                LazyVGrid(columns: columns, spacing: GridColumnHelper.spacing) {
                     ForEach(photos) { photo in
-                        PhotoCell(photo: photo)
-                            .id(photo.id)
-                            .onTapGesture {
+                        PhotoCell(
+                            photo: photo,
+                            isSelected: selectionManager.isSelected(photo.id),
+                            isSelectMode: selectionManager.isSelectMode
+                        )
+                        .id(photo.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if selectionManager.isSelectMode {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    selectionManager.toggle(photo.id)
+                                }
+                            } else {
                                 onPhotoSelect(photo)
                             }
+                        }
+                        .onLongPressGesture(minimumDuration: 0.3) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectionManager.toggle(photo.id)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 4)
@@ -157,18 +177,49 @@ struct SystemMonthPhotosView: View {
                 }
             }
         }
-        .navigationTitle(monthAlbum.fullTitle)
-        .navigationBarTitleDisplayMode(.large)
+        .onChange(of: selectionManager.isSelectMode) { _, newValue in
+            photoManager.isSelectMode = newValue
+        }
+        .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : monthAlbum.fullTitle)
+        .navigationBarTitleDisplayMode(selectionManager.isSelectMode ? .inline : .large)
+        .navigationBarBackButtonHidden(selectionManager.isSelectMode)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            if selectionManager.isSelectMode {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(String(localized: "Cancel")) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectionManager.clearSelection()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        let selected = photos.filter { selectionManager.isSelected($0.id) }
+                        for photo in selected {
+                            photoManager.addToTrash(photo)
+                        }
+                        selectionManager.clearSelection()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "trash.fill")
+                            Text(String(localized: "Delete"))
+                        }
+                    }
+                    .tint(.red)
+                    .disabled(selectionManager.isEmpty)
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
     }
 }
 

@@ -16,6 +16,7 @@ struct DraggablePhotoView: View {
     var onDelete: ((PhotoAsset) -> Void)?
     let onDismiss: () -> Void
     let screenSize: CGSize
+    let photoSpacing: CGFloat = 20
 
     @State private var localIndex: Int
     @State private var offset: CGSize = .zero
@@ -58,7 +59,7 @@ struct DraggablePhotoView: View {
                 // Previous photo (visible when swiping right)
                 if let prev = previousPhoto {
                     photoLayer(prev)
-                        .offset(x: -screenSize.width + offset.width)
+                        .offset(x: -screenSize.width - photoSpacing + offset.width)
                         .zIndex(0)
                 }
 
@@ -70,7 +71,7 @@ struct DraggablePhotoView: View {
                 // Next photo (visible when swiping left)
                 if let next = nextPhoto {
                     photoLayer(next)
-                        .offset(x: screenSize.width + offset.width)
+                        .offset(x: screenSize.width + photoSpacing + offset.width)
                         .zIndex(0)
                 }
 
@@ -222,11 +223,11 @@ struct DraggablePhotoView: View {
         let currentNavID = navigationID + 1
         navigationID = currentNavID
         isNavigating = true
-
+        let pageStep = screenSize.width + photoSpacing
         withAnimation(.spring(response: 0.35, dampingFraction: 0.95)) {
             offset = direction == .forward
-                ? CGSize(width: -screenSize.width, height: 0)
-                : CGSize(width: screenSize.width, height: 0)
+                ? CGSize(width: -pageStep, height: 0)
+                : CGSize(width: pageStep, height: 0)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

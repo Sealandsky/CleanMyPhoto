@@ -10,8 +10,10 @@ struct SettingsView: View {
     @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
     @State private var showMembership = false
+    @Environment(GridSettings.self) private var gridSettings
 
     var body: some View {
+        @Bindable var gridSettings = gridSettings
         NavigationView {
             List {
                 // 会员卡片（独立展示）
@@ -90,6 +92,26 @@ struct SettingsView: View {
                     StatRow(icon: "externaldrive",
                             title: String(localized: "Space Saved"),
                             value: statisticsManager.storageSpaceSavedText)
+                }
+
+                // 显示设置
+                Section(String(localized: "Display")) {
+                    HStack {
+                        Image(systemName: "square.grid.2x2")
+                            .foregroundColor(.white)
+                            .frame(width: 30)
+
+                        Text(String(localized: "Grid Layout"))
+
+                        Spacer()
+
+                        Picker("", selection: $gridSettings.columnCount) {
+                            Text("2").tag(2)
+                            Text("3").tag(3)
+                            Text("4").tag(4)
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
 
                 // 调试选项

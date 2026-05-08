@@ -58,8 +58,8 @@ struct PhotoAsset: Identifiable, Equatable {
     }
 
     private static func isGIF(_ asset: PHAsset) -> Bool {
-        let resources = PHAssetResource.assetResources(for: asset)
-        return resources.contains { $0.uniformTypeIdentifier == "com.compuserve.gif" }
+        PHAssetResource.assetResources(for: asset)
+            .contains { $0.uniformTypeIdentifier == "com.compuserve.gif" }
     }
 
     // MARK: - Video Duration

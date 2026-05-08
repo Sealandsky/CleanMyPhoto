@@ -15,6 +15,7 @@ struct CleanMyPhotoApp: App {
     @StateObject private var statisticsManager = StatisticsManager()
     @StateObject private var photoManager: PhotoManager
     @StateObject private var membershipManager = MembershipManager()
+    @State private var gridSettings = GridSettings()
 
     init() {
         let stats = StatisticsManager()
@@ -32,6 +33,7 @@ struct CleanMyPhotoApp: App {
                     .environmentObject(membershipManager)
             } else {
                 MainTabView()
+                    .environment(gridSettings)
                     .environmentObject(photoManager)
                     .environmentObject(membershipManager)
                     .environmentObject(statisticsManager)

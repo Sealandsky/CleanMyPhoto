@@ -23,6 +23,7 @@ class PhotoManager: ObservableObject {
     @Published var hasMorePhotos: Bool = true
     @Published var hasLoadedOnce: Bool = false
     @Published var errorMessage: String?
+    @Published var isSelectMode: Bool = false
 
     private let imageManager = PHCachingImageManager()
     private let maxPhotoCount = 50
@@ -195,11 +196,12 @@ class PhotoManager: ObservableObject {
     // MARK: - Trash Management
     func addToTrash(_ photo: PhotoAsset) {
         pendingDeletionIDs.insert(photo.id)
-        // 添加到 trashedAssets（如果还不存在）
         if !trashedAssets.contains(where: { $0.id == photo.id }) {
             trashedAssets.append(photo)
-            // 记录删除统计（获取资源大小）
-            recordAssetDeletion(photo.asset)
+            Task {
+                let size = await getAssetSize(photo.asset)
+                statisticsManager?.recordDeletion(assetSize: size)
+            }
         }
         updateDisplayedPhotos()
     }
@@ -238,11 +240,10 @@ class PhotoManager: ObservableObject {
                 PHAssetChangeRequest.deleteAssets(assetsToDelete as NSArray)
             }
 
-            // 记录批量删除统计
             let count = trashedAssets.count
             var totalSize: Int64 = 0
             for asset in trashedAssets {
-                totalSize += getAssetSize(asset.asset)
+                totalSize += await getAssetSize(asset.asset)
             }
             statisticsManager?.recordDeletions(count: count, totalSize: totalSize)
 
@@ -258,24 +259,8 @@ class PhotoManager: ObservableObject {
 
     // MARK: - Statistics Helper
 
-    /// 记录单个资源删除
-    private func recordAssetDeletion(_ asset: PHAsset) {
-        let size = getAssetSize(asset)
-        statisticsManager?.recordDeletion(assetSize: size)
-    }
-
-    /// 获取资源大小（字节）
-    private func getAssetSize(_ asset: PHAsset) -> Int64 {
-        let options = PHImageRequestOptions()
-        options.isSynchronous = true
-        options.isNetworkAccessAllowed = false
-        options.deliveryMode = .fastFormat
-
-        var size: Int64 = 0
-        _ = imageManager.requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
-            size = Int64(data?.count ?? 0)
-        }
-        return size
+    private func getAssetSize(_ asset: PHAsset) async -> Int64 {
+        await PHAssetSizeHelper.getAssetSize(asset)
     }
 
     // MARK: - Image Loading Helper

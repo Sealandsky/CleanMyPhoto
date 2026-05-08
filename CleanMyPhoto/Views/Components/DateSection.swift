@@ -10,10 +10,7 @@ import SwiftUI
 struct DateSectionView: View {
     let dateGroup: DateGroup
     let onPhotoSelect: (PhotoAsset) -> Void
-
-    private let columns = [
-        GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
-    ]
+    @Environment(GridSettings.self) private var gridSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -37,7 +34,7 @@ struct DateSectionView: View {
             .padding(.horizontal, 16)
 
             // 照片网格
-            LazyVGrid(columns: columns, spacing: 2) {
+            LazyVGrid(columns: GridColumnHelper.columns(count: gridSettings.columnCount), spacing: GridColumnHelper.spacing) {
                 ForEach(dateGroup.photos) { photo in
                     PhotoCell(photo: photo)
                         .onTapGesture {

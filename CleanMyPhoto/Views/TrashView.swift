@@ -1,13 +1,5 @@
-//
-//  TrashView.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/7.
-//
-
 import SwiftUI
 
-// MARK: - Trash View
 struct TrashView: View {
     @ObservedObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
@@ -16,6 +8,10 @@ struct TrashView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingRestoreConfirmation = false
     @State private var showMembershipPaywall = false
+    @Environment(GridSettings.self) private var gridSettings
+    @State private var selectionManager = SelectionManager()
+
+    private var trashedPhotos: [PhotoAsset] { photoManager.getTrashedAssets() }
 
     var body: some View {
         NavigationView {
@@ -23,19 +19,43 @@ struct TrashView: View {
                 if photoManager.trashCount == 0 {
                     emptyTrashView
                 } else {
-                    trashGridView
+                    trashContent
                 }
             }
-            .navigationTitle(String(localized: "Trash Bin"))
+            .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Trash Bin"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "Close")) {
-                        dismiss()
+                    if selectionManager.isSelectMode {
+                        Button(String(localized: "Cancel")) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectionManager.clearSelection()
+                            }
+                        }
+                    } else {
+                        Button(String(localized: "Close")) {
+                            dismiss()
+                        }
                     }
                 }
 
-                if photoManager.trashCount > 0 {
+                if selectionManager.isSelectMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            for id in selectionManager.selectedIDs {
+                                photoManager.restoreFromTrash(id)
+                            }
+                            selectionManager.clearSelection()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.uturn.backward")
+                                Text(String(localized: "Restore"))
+                            }
+                        }
+                        .tint(.green)
+                        .disabled(selectionManager.isEmpty)
+                    }
+                } else if photoManager.trashCount > 0 {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(String(localized: "Restore All")) {
                             showingRestoreConfirmation = true
@@ -79,6 +99,7 @@ struct TrashView: View {
             .sheet(isPresented: $showMembershipPaywall) {
                 MembershipView(isMandatory: true)
             }
+            .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
         }
     }
 
@@ -101,30 +122,44 @@ struct TrashView: View {
         }
     }
 
-    // MARK: - Trash Grid
-    private var trashGridView: some View {
+    // MARK: - Trash Content
+    private var trashContent: some View {
         ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 2)
-            ], spacing: 2) {
-                ForEach(photoManager.getTrashedAssets()) { photo in
-                    PhotoCell(photo: photo)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                withAnimation {
-                                    photoManager.restoreFromTrash(photo.id)
-                                }
-                            } label: {
-                                Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
+            LazyVGrid(columns: GridColumnHelper.columns(count: gridSettings.columnCount), spacing: GridColumnHelper.spacing) {
+                ForEach(trashedPhotos) { photo in
+                    PhotoCell(
+                        photo: photo,
+                        isSelected: selectionManager.isSelected(photo.id),
+                        isSelectMode: selectionManager.isSelectMode
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectionManager.isSelectMode {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                selectionManager.toggle(photo.id)
                             }
                         }
+                    }
+                    .onLongPressGesture(minimumDuration: 0.3) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectionManager.toggle(photo.id)
+                        }
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            withAnimation {
+                                photoManager.restoreFromTrash(photo.id)
+                            }
+                        } label: {
+                            Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-// MARK: - Preview
 #Preview {
     TrashView(photoManager: PhotoManager())
 }
