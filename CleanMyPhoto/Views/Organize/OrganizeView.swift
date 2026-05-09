@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct OrganizeView: View {
     @Bindable var organizeManager: PhotoOrganizeManager
@@ -7,7 +8,7 @@ struct OrganizeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 categoryCards
 
                 if organizeManager.isAnalyzing {
@@ -16,9 +17,9 @@ struct OrganizeView: View {
                     scanActionCard
                 }
             }
-            .padding(.bottom, 16)
+            .padding(16)
         }
-        .background(Color.black)
+        .background(Color(UIColor.systemGroupedBackground))
         .task {
             if organizeManager.totalGroupCount == 0 && !organizeManager.isAnalyzing {
                 await performInitialScan()
@@ -45,12 +46,60 @@ struct OrganizeView: View {
         await organizeManager.quickAnalysis()
     }
 
+    // MARK: - Category Cards
+
+    private var categoryCards: some View {
+        ForEach(OrganizeCategory.allCases) { category in
+            categoryCard(for: category)
+        }
+    }
+
+    private func categoryCard(for category: OrganizeCategory) -> some View {
+        let count = organizeManager.stat(for: category)
+        let hasResults = count > 0
+        let identifiers = Array((organizeManager.scanResults[category] ?? [])
+            .flatMap { $0.localIdentifiers }
+            .prefix(3))
+
+        return Button {
+            if hasResults {
+                onCategorySelect(category)
+            } else {
+                organizeManager.startFullAnalysis()
+            }
+        } label: {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(hasResults ? "\(count)" : "0")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundColor(hasResults ? .primary : .secondary)
+
+                    Text(category.localizedText)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                CategoryThumbnails(identifiers: identifiers)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemGroupedBackground))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(organizeManager.isAnalyzing)
+    }
+
     // MARK: - Progress Card
 
     private var progressCard: some View {
         VStack(spacing: 12) {
             ProgressView(value: organizeManager.analysisProgress)
-                .tint(.white)
+                .tint(.blue)
 
             if !organizeManager.currentStep.isEmpty {
                 Text(organizeManager.currentStep)
@@ -61,77 +110,10 @@ struct OrganizeView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
         .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    // MARK: - Category Cards
-
-    private var categoryCards: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
-        ], spacing: 12) {
-            ForEach(OrganizeCategory.allCases) { category in
-                categoryCard(for: category)
-            }
-        }
-        .padding(.horizontal, 16)
-    }
-
-    private func categoryCard(for category: OrganizeCategory) -> some View {
-        let count = organizeManager.stat(for: category)
-        let hasResults = count > 0
-
-        return Button {
-            if hasResults {
-                onCategorySelect(category)
-            } else {
-                organizeManager.startFullAnalysis()
-            }
-        } label: {
-            VStack(spacing: 12) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 32))
-                    .foregroundColor(hasResults ? .white : .white.opacity(0.4))
-
-                Text(category.localizedText)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-
-                if hasResults {
-                    Text("\(count)")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                } else {
-                    Text(String(localized: "Scan"))
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .opacity(hasResults ? 1 : 0.5)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(hasResults ? 0.2 : 0.1), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(organizeManager.isAnalyzing)
     }
 
     // MARK: - Scan Action Card
@@ -145,17 +127,17 @@ struct OrganizeView: View {
             HStack(spacing: 14) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(.blue)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(String(localized: "Start Scan"))
                         .font(.body)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)
                 }
 
@@ -163,20 +145,74 @@ struct OrganizeView: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(.secondary)
             }
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemGroupedBackground))
             )
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
         .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+}
+
+// MARK: - Category Thumbnails
+
+struct CategoryThumbnails: View {
+    let identifiers: [String]
+    @State private var assets: [PHAsset] = []
+
+    private let thumbSize: CGFloat = 52
+    private let overlap: CGFloat = 20
+
+    var body: some View {
+        Group {
+            if assets.isEmpty {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+            } else {
+                ZStack {
+                    ForEach(Array(assets.prefix(3).enumerated()), id: \.offset) { index, asset in
+                        thumbView(for: asset)
+                            .offset(x: overlap * CGFloat(index))
+                            .zIndex(Double(2 - index))
+                    }
+                }
+                .frame(
+                    width: thumbSize + overlap * CGFloat(max(min(assets.count, 3) - 1, 0)),
+                    height: thumbSize
+                )
+            }
+        }
+        .onAppear { loadAssets() }
+        .onChange(of: identifiers) { _, _ in loadAssets() }
+    }
+
+    private func thumbView(for asset: PHAsset) -> some View {
+        AssetImage(asset: asset, targetSize: CGSize(width: 200, height: 200), contentMode: .fill)
+            .aspectRatio(1, contentMode: .fill)
+            .frame(width: thumbSize, height: thumbSize)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white, lineWidth: 2)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+
+    private func loadAssets() {
+        guard !identifiers.isEmpty else { return }
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+        var loaded: [PHAsset] = []
+        result.enumerateObjects { asset, _, _ in
+            loaded.append(asset)
+        }
+        assets = identifiers.compactMap { id in
+            loaded.first { $0.localIdentifier == id }
+        }
     }
 }

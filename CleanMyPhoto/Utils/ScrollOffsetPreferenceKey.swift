@@ -1,10 +1,3 @@
-//
-//  ScrollOffsetPreferenceKey.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/3/30.
-//
-
 import SwiftUI
 
 // MARK: - Scroll Offset Preference Key

@@ -1,7 +1,4 @@
-//
-//  MainTabView.swift
-//  CleanMyPhoto
-//
+
 
 import SwiftUI
 

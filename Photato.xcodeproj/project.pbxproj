@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = D8E4F3D82F3785780010E310 /* Build configuration list for PBXProject "CleanMyPhoto" */;
+			buildConfigurationList = D8E4F3D82F3785780010E310 /* Build configuration list for PBXProject "Photato" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -261,6 +261,7 @@
 				DEVELOPMENT_TEAM = 7686JA7SFY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Photato;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to help you organize and delete unwanted photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -296,6 +297,7 @@
 				DEVELOPMENT_TEAM = 7686JA7SFY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Photato;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to help you organize and delete unwanted photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -323,7 +325,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D8E4F3D82F3785780010E310 /* Build configuration list for PBXProject "CleanMyPhoto" */ = {
+		D8E4F3D82F3785780010E310 /* Build configuration list for PBXProject "Photato" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D8E4F3E62F37857A0010E310 /* Debug */,

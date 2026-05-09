@@ -1,9 +1,3 @@
-//
-//  WelcomePage.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/15.
-//
 
 
 import SwiftUI
@@ -35,7 +29,7 @@ struct WelcomePage: View {
 
                 // 欢迎文字
                 VStack(spacing: 8) {
-                    Text(String(localized: "Welcome to CleanMyPhotos"))
+                    Text(String(localized: "Welcome to Photato"))
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
 

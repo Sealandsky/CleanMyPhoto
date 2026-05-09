@@ -8,6 +8,9 @@ struct OrganizeResultsView: View {
     @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
     @State private var hasInitialized = false
+    @State private var isFullscreenMode = false
+    @State private var currentPhotoID: String? = nil
+    @State private var showTrash = false
 
     private var isGroupedMode: Bool {
         category == .similar || category == .duplicates
@@ -21,11 +24,25 @@ struct OrganizeResultsView: View {
         organizeManager.groups(for: category)
     }
 
+    private var allPhotos: [PhotoAsset] {
+        isGroupedMode
+            ? displayedGroups.flatMap { $0.loadedPhotos }
+            : displayedPhotos
+    }
+
     var body: some View {
-        if isGroupedMode {
-            groupedBody
-        } else {
-            flatBody
+        ZStack {
+            Group {
+                if isGroupedMode {
+                    groupedBody
+                } else {
+                    flatBody
+                }
+            }
+
+            if isFullscreenMode {
+                fullscreenView
+            }
         }
         .background(Color.black)
         .toolbar {
@@ -46,9 +63,6 @@ struct OrganizeResultsView: View {
                 hasInitialized = true
                 await organizeManager.loadCategory(category)
             }
-        }
-        .onDisappear {
-            organizeManager.clearCategoryState(category)
         }
     }
 
@@ -164,6 +178,8 @@ struct OrganizeResultsView: View {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     selectionManager.toggle(photo.id)
                 }
+            } else {
+                openFullscreen(photo)
             }
         }
         .onLongPressGesture(minimumDuration: 0.3) {
@@ -225,6 +241,8 @@ struct OrganizeResultsView: View {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     selectionManager.toggle(photo.id)
                 }
+            } else {
+                openFullscreen(photo)
             }
         }
         .onLongPressGesture(minimumDuration: 0.3) {
@@ -275,6 +293,92 @@ struct OrganizeResultsView: View {
     }
 
     // MARK: - Helpers
+
+    private func openFullscreen(_ photo: PhotoAsset) {
+        currentPhotoID = photo.id
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isFullscreenMode = true
+        }
+    }
+
+    // MARK: - Fullscreen View
+
+    private var fullscreenView: some View {
+        ZStack {
+            Group {
+                let photos = allPhotos
+                if !photos.isEmpty, currentPhotoID != nil {
+                    DraggablePhotoView(
+                        photos: photos,
+                        currentPhotoID: currentPhotoID ?? "",
+                        onPhotoChange: { id, _ in
+                            currentPhotoID = id
+                        },
+                        onDelete: { photo in
+                            photoManager.addToTrash(photo)
+                        },
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                isFullscreenMode = false
+                            }
+                        },
+                        screenSize: ScreenSizeHelper.screenSize
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .ignoresSafeArea()
+
+            VStack {
+                HStack {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isFullscreenMode = false
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+
+                    Spacer()
+
+                    Button {
+                        showTrash = true
+                    } label: {
+                        Image(systemName: "trash.fill")
+                            .font(.title3)
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .overlay(alignment: .topTrailing) {
+                        if photoManager.trashCount > 0 {
+                            Text("\(photoManager.trashCount)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(4)
+                                .background(Color.red)
+                                .clipShape(Circle())
+                                .offset(x: 4, y: -2)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+
+                Spacer()
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .sheet(isPresented: $showTrash) {
+            TrashView(photoManager: photoManager)
+        }
+    }
 
     private func deselectAll(in group: OrganizeGroupDisplay) {
         for photo in group.loadedPhotos {

@@ -362,6 +362,10 @@ final class PhotoOrganizeManager {
     // MARK: - Paginated Category Loading
 
     func loadCategory(_ category: OrganizeCategory) async {
+        if categoryPageStates[category]?.hasMore == false || !(categoryPageStates[category]?.groups.isEmpty ?? true) {
+            return
+        }
+
         var state = OrganizeCategoryPageState()
         let groups = scanResults[category] ?? []
         state.allIdentifiers = groups.flatMap { $0.localIdentifiers }

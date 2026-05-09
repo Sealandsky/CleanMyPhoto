@@ -1,7 +1,4 @@
-//
-//  SettingsView.swift
-//  CleanMyPhoto
-//
+
 
 import SwiftUI
 import StoreKit
@@ -28,7 +25,7 @@ struct SettingsView: View {
                                 .opacity(0.85)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(String(localized: "CleanMyPhoto"))
+                                Text(String(localized: "Photato"))
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
@@ -40,23 +37,25 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            HStack(spacing: 2) {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                Text(String(localized: membershipManager.isPremiumMember ? "Upgrade" : "Upgrade"))
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
+                            if membershipManager.membershipStatus.currentTier != .lifetime {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                    Text(String(localized: "Upgrade"))
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                                )
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Capsule())
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                            )
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Capsule())
                         }
                         .padding(.vertical, 28)
                         .padding(.horizontal, 16)
@@ -98,28 +97,36 @@ struct SettingsView: View {
                 Section(String(localized: "Display")) {
                     HStack {
                         Image(systemName: "square.grid.2x2")
-                            .foregroundColor(.white)
                             .frame(width: 30)
 
                         Text(String(localized: "Grid Layout"))
 
                         Spacer()
 
-                        Picker("", selection: $gridSettings.columnCount) {
-                            Text("2").tag(2)
-                            Text("3").tag(3)
-                            Text("4").tag(4)
+                        Menu {
+                            Button { gridSettings.columnCount = 2 } label: {
+                                Label("2", systemImage: "square.grid.2x2")
+                            }
+                            Button { gridSettings.columnCount = 3 } label: {
+                                Label("3", systemImage: "square.grid.3x2")
+                            }
+                            Button { gridSettings.columnCount = 4 } label: {
+                                Label("4", systemImage: "square.grid.4x3")
+                            }
+                        } label: {
+                            Text("\(gridSettings.columnCount)")
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
-                        .pickerStyle(.segmented)
                     }
                 }
 
                 // 调试选项
+                #if DEBUG
                 Section(String(localized: "Debug")) {
-                    Toggle(isOn: Binding(
-                        get: { membershipManager.isDebugPremium },
-                        set: { membershipManager.setPremiumMember($0) }
-                    )) {
+                    Toggle(isOn: $membershipManager.isDebugPremium) {
                         HStack {
                             Image(systemName: "crown.fill")
                                 .foregroundColor(.yellow)
@@ -129,6 +136,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                #endif
 
                 // 关于
                 Section(String(localized: "About")) {
@@ -175,7 +183,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(String(localized: "Settings"))
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.automatic)
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)
@@ -208,7 +216,7 @@ struct SettingsView: View {
         if membershipManager.isPremiumMember {
             return membershipStatusText
         } else if membershipManager.remainingTrialDays > 0 {
-            return String(localized: "Trial expires in \(membershipManager.remainingTrialDays) days")
+            return String(localized: "\(membershipManager.remainingTrialDays) days trial remaining")
         } else {
             return String(localized: "Subscribe or one-time purchase")
         }

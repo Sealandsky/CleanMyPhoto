@@ -1,10 +1,3 @@
-//
-//  MembershipStatus.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/21.
-//
-
 import Foundation
 
 // MARK: - Membership Tier
@@ -20,10 +13,10 @@ struct MembershipStatus {
     var currentTier: MembershipTier
     var trialStartDate: Date?
 
-    // 计算试用期结束日期（3天后）
+    // 计算试用期结束日期（7天后）
     var trialExpirationDate: Date? {
         guard let startDate = trialStartDate else { return nil }
-        return Calendar.current.date(byAdding: .day, value: 3, to: startDate)
+        return Calendar.current.date(byAdding: .day, value: 7, to: startDate)
     }
 
     // 试用期是否激活

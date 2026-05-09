@@ -1,7 +1,4 @@
-//
-//  PhotoCard.swift
-//  CleanMyPhoto
-//
+
 
 import SwiftUI
 

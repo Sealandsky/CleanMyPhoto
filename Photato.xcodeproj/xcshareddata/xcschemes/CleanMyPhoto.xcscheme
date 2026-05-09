@@ -18,7 +18,7 @@
                BlueprintIdentifier = "D8E4F3DC2F3785780010E310"
                BuildableName = "CleanMyPhoto.app"
                BlueprintName = "CleanMyPhoto"
-               ReferencedContainer = "container:CleanMyPhoto.xcodeproj">
+               ReferencedContainer = "container:Photato.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -47,7 +47,7 @@
             BlueprintIdentifier = "D8E4F3DC2F3785780010E310"
             BuildableName = "CleanMyPhoto.app"
             BlueprintName = "CleanMyPhoto"
-            ReferencedContainer = "container:CleanMyPhoto.xcodeproj">
+            ReferencedContainer = "container:Photato.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -64,7 +64,7 @@
             BlueprintIdentifier = "D8E4F3DC2F3785780010E310"
             BuildableName = "CleanMyPhoto.app"
             BlueprintName = "CleanMyPhoto"
-            ReferencedContainer = "container:CleanMyPhoto.xcodeproj">
+            ReferencedContainer = "container:Photato.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

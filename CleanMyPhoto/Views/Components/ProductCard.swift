@@ -1,9 +1,4 @@
-//
-//  ProductCard.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/21.
-//
+
 
 import SwiftUI
 

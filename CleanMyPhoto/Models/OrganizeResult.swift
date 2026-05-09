@@ -4,8 +4,8 @@ import Photos
 // MARK: - Organize Category
 
 enum OrganizeCategory: String, CaseIterable, Identifiable {
-    case duplicates
     case similar
+    case duplicates
     case screenshots
     case lowQuality
     case largeFiles

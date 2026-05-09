@@ -1,9 +1,4 @@
-//
-//  ContentView.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/7.
-//
+
 
 import SwiftUI
 import Photos
@@ -105,8 +100,9 @@ struct ContentView: View {
                 Text(errorMessage)
             }
         }
-        .toolbar(photoManager.isSelectMode ? .hidden : .visible, for: .tabBar)
+        .toolbar(photoManager.isSelectMode || isFullscreenMode ? .hidden : .visible, for: .tabBar)
         .animation(.easeInOut(duration: 0.2), value: photoManager.isSelectMode)
+        .animation(.easeInOut(duration: 0.2), value: isFullscreenMode)
     }
 
     // MARK: - Permission View
@@ -121,7 +117,7 @@ struct ContentView: View {
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "CleanMyPhoto needs access to your photo library to help you organize and clean up unwanted photos."))
+                Text(String(localized: "Photato needs access to your photo library to help you organize and clean up unwanted photos."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -146,7 +142,7 @@ struct ContentView: View {
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text(String(localized: "To use CleanMyPhoto, please enable photo library access in Settings."))
+                Text(String(localized: "To use Photato, please enable photo library access in Settings."))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -605,11 +601,11 @@ struct ContentView: View {
             showMembershipPaywall = true
         } label: {
             Image(systemName: "crown.fill")
-                .font(.title3)
+                .font(.body)
                 .foregroundColor(.yellow)
                 .frame(width: 44, height: 44)
         }
-        .glassEffect(.regular.interactive())
+        .buttonStyle(.plain)
     }
 
     // MARK: - Trial Warning Banner

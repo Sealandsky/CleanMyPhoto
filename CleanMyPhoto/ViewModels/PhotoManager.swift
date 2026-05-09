@@ -1,10 +1,3 @@
-//
-//  PhotoManager.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/7.
-//
-
 import SwiftUI
 import Photos
 import Combine

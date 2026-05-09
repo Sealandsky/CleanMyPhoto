@@ -1,10 +1,3 @@
-//
-//  MembershipManager.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/21.
-//
-
 import SwiftUI
 import StoreKit
 import Combine
@@ -43,22 +36,16 @@ class MembershipManager: ObservableObject {
     }
 
     #if DEBUG
-    private(set) var isDebugPremium = false
+    @Published var isDebugPremium = false
     #endif
 
     var isPremiumMember: Bool {
         #if DEBUG
-        if isDebugPremium { return true }
-        #endif
+        return isDebugPremium
+        #else
         return membershipStatus.isPremiumMember
+        #endif
     }
-
-    // MARK: - Debug Override
-    #if DEBUG
-    func setPremiumMember(_ isPremium: Bool) {
-        isDebugPremium = isPremium
-    }
-    #endif
 
     // MARK: - Init
     init() {

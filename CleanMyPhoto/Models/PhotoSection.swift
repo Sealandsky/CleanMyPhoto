@@ -1,10 +1,3 @@
-//
-//  PhotoSection.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/9.
-//
-
 import Foundation
 
 // MARK: - Photo Section Model

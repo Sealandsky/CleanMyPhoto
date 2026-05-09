@@ -1,10 +1,3 @@
-//
-//  SubscriptionProduct.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/21.
-//
-
 import Foundation
 
 // MARK: - Subscription Type
@@ -25,9 +18,9 @@ enum SubscriptionType: String, CaseIterable {
     // 价格显示文本
     var priceText: String {
         switch self {
-        case .monthly: return "¥6"
-        case .yearly: return "¥68"
-        case .lifetime: return "¥128"
+        case .monthly: return "$2.99"
+        case .yearly: return "$12.99"
+        case .lifetime: return "$23.99"
         }
     }
 
@@ -49,7 +42,7 @@ enum SubscriptionType: String, CaseIterable {
     var savingsText: String? {
         switch self {
         case .monthly: return nil
-        case .yearly: return String(localized: "Save 53%")
+        case .yearly: return String(localized: "Save 64%")
         case .lifetime: return nil
         }
     }

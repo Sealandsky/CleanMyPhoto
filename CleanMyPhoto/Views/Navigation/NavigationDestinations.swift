@@ -1,7 +1,4 @@
-//
-//  NavigationDestinations.swift
-//  CleanMyPhoto
-//
+
 
 import Foundation
 

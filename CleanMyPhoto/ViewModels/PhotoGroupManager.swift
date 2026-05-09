@@ -1,10 +1,3 @@
-//
-//  PhotoGroupManager.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/3/29.
-//
-
 import SwiftUI
 import Photos
 import Foundation

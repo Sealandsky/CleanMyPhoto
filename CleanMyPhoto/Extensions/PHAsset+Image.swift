@@ -52,7 +52,7 @@ struct AssetImage: View {
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .aspectRatio(contentMode: contentMode)
             } else {
                 Color.black
             }

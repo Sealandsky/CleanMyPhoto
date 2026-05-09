@@ -1,7 +1,7 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "": {},
+    "·": {},
     "/month": {
       "localizations": {
         "en": {
@@ -39,13 +39,7 @@
       "localizations": {
         "en": {
           "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld %2$@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
+            "state": "new",
             "value": "%1$lld %2$@"
           }
         }
@@ -67,6 +61,22 @@
         }
       }
     },
+    "%lld days trial remaining": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld days trial remaining"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "免费试用剩余 %lld 天"
+          }
+        }
+      }
+    },
     "%lld duplicates": {
       "localizations": {
         "en": {
@@ -83,6 +93,7 @@
         }
       }
     },
+    "%lld photos": {},
     "%lld Selected": {
       "localizations": {
         "en": {
@@ -119,13 +130,7 @@
       "localizations": {
         "en": {
           "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld%2$@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
+            "state": "new",
             "value": "%1$lld%2$@"
           }
         }
@@ -179,6 +184,7 @@
         }
       }
     },
+    "0": {},
     "2": {},
     "3": {},
     "4": {},
@@ -230,23 +236,6 @@
         }
       }
     },
-    "Analyzing photo %lld/%lld...": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Analyzing photo %1$lld/%2$lld..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在分析照片 %1$lld/%2$lld..."
-          }
-        }
-      }
-    },
     "Are you sure you want to permanently delete %lld photo(s)? This action cannot be undone.": {
       "localizations": {
         "en": {
@@ -263,6 +252,246 @@
         }
       }
     },
+    "Benefit Batch Delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch Delete & Trash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "批量删除与回收站"
+          }
+        }
+      }
+    },
+    "Benefit Batch Delete Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage deletions with undo capability"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持批量删除与撤销管理"
+          }
+        }
+      }
+    },
+    "Benefit Duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate & Similar Detection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复与相似照片检测"
+          }
+        }
+      }
+    },
+    "Benefit Duplicate Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find and remove identical or similar photos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发现并移除重复或相似的照片"
+          }
+        }
+      }
+    },
+    "Benefit Fullscreen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fullscreen Photo Browser"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全屏手势浏览"
+          }
+        }
+      }
+    },
+    "Benefit Fullscreen Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swipe gestures for intuitive browsing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用手势直觉化浏览照片"
+          }
+        }
+      }
+    },
+    "Benefit Grid Layout": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Grid Layout"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义网格布局"
+          }
+        }
+      }
+    },
+    "Benefit Grid Layout Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose your preferred photo grid size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择喜欢的照片网格大小"
+          }
+        }
+      }
+    },
+    "Benefit Large File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large File Scanner"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大体积照片扫描"
+          }
+        }
+      }
+    },
+    "Benefit Large File Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spot photos taking up too much space"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找出占用过多空间的照片"
+          }
+        }
+      }
+    },
+    "Benefit Low Quality": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low Quality Detection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "低质量照片识别"
+          }
+        }
+      }
+    },
+    "Benefit Low Quality Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detect blurry and low-resolution photos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "识别模糊和低分辨率照片"
+          }
+        }
+      }
+    },
+    "Benefit Screenshot": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screenshot Cleanup"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕截图一键清理"
+          }
+        }
+      }
+    },
+    "Benefit Screenshot Sub": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quickly find and remove old screenshots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速找到并清理过期截图"
+          }
+        }
+      }
+    },
+    "Best": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最优推荐"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "en": {
@@ -275,23 +504,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消"
-          }
-        }
-      }
-    },
-    "CleanMyPhoto": {},
-    "CleanMyPhoto needs access to your photo library to help you organize and clean up unwanted photos.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CleanMyPhoto needs access to your photo library to help you organize and clean up unwanted photos."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CleanMyPhoto 需要获取你的相册权限，以便帮你整理并清理无用照片。"
           }
         }
       }
@@ -388,23 +600,6 @@
         }
       }
     },
-    "Deselect All": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deselect All"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "取消全选"
-          }
-        }
-      }
-    },
     "Display": {
       "localizations": {
         "en": {
@@ -469,22 +664,8 @@
         }
       }
     },
-    "Failed to load products: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Failed to load products: %@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "加载产品失败: %@"
-          }
-        }
-      }
-    },
+    "Failed to load products: %@": {},
+    "Find duplicates, similar photos, screenshots and more": {},
     "Free": {
       "localizations": {
         "en": {
@@ -497,22 +678,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "免费版"
-          }
-        }
-      }
-    },
-    "Future Upgrades": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Future Upgrades"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未来功能升级"
           }
         }
       }
@@ -549,6 +714,22 @@
         }
       }
     },
+    "Identical photos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identical photos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完全相同的照片"
+          }
+        }
+      }
+    },
     "In Trash": {
       "localizations": {
         "en": {
@@ -561,6 +742,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "回收站中"
+          }
+        }
+      }
+    },
+    "Keep All": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留全部"
           }
         }
       }
@@ -1017,22 +1214,6 @@
     },
     "Photos you swipe up to delete will appear here.": {},
     "Premium Member": {},
-    "Priority Support": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Priority Support"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "优先支持"
-          }
-        }
-      }
-    },
     "Privacy Policy": {
       "localizations": {
         "en": {
@@ -1081,22 +1262,7 @@
         }
       }
     },
-    "Purchase failed: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Purchase failed: %@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "购买失败: %@"
-          }
-        }
-      }
-    },
+    "Purchase failed: %@": {},
     "Purchase pending confirmation": {
       "localizations": {
         "en": {
@@ -1145,40 +1311,6 @@
         }
       }
     },
-    "Release to Close": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Release to Close"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "松手关闭"
-          }
-        }
-      }
-    },
-    "Release to Delete": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Release to Delete"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "松手删除"
-          }
-        }
-      }
-    },
     "Restore": {
       "localizations": {
         "en": {
@@ -1195,22 +1327,7 @@
         }
       }
     },
-    "Restore %lld photo(s) to the main list?": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restore %lld photo(s) to the main list?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "恢复 %lld 张照片到主列表？"
-          }
-        }
-      }
-    },
+    "Restore %lld photo(s) to the main list?": {},
     "Restore All": {
       "localizations": {
         "en": {
@@ -1243,22 +1360,7 @@
         }
       }
     },
-    "Restore failed: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restore failed: %@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "恢复购买失败: %@"
-          }
-        }
-      }
-    },
+    "Restore failed: %@": {},
     "Restore Purchases": {
       "localizations": {
         "en": {
@@ -1291,23 +1393,26 @@
         }
       }
     },
-    "Save 53%": {
+    "Save 64%": {
+      "comment": "Savings percentage for yearly subscription",
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Save 53%"
+            "value": "Save 64%"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "省53%"
+            "value": "省 64%"
           }
         }
       }
     },
     "Scan": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1319,23 +1424,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "扫描"
-          }
-        }
-      }
-    },
-    "Scanning for duplicates...": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scanning for duplicates..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在扫描重复照片..."
           }
         }
       }
@@ -1420,40 +1508,6 @@
         }
       }
     },
-    "Select a year": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select a year"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请选择年份"
-          }
-        }
-      }
-    },
-    "Select All": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "全选"
-          }
-        }
-      }
-    },
     "Settings": {
       "localizations": {
         "en": {
@@ -1486,6 +1540,22 @@
         }
       }
     },
+    "Similar photos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Similar photos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "相似照片"
+          }
+        }
+      }
+    },
     "Space Saved": {
       "localizations": {
         "en": {
@@ -1502,6 +1572,7 @@
         }
       }
     },
+    "Start Scan": {},
     "Statistics": {
       "localizations": {
         "en": {
@@ -1567,22 +1638,6 @@
         }
       }
     },
-    "Tap a category to scan": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tap a category to scan"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "点击分类进行扫描"
-          }
-        }
-      }
-    },
     "Terms of Use": {
       "localizations": {
         "en": {
@@ -1627,22 +1682,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "日期"
-          }
-        }
-      }
-    },
-    "To use CleanMyPhoto, please enable photo library access in Settings.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "To use CleanMyPhoto, please enable photo library access in Settings."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如需使用 CleanMyPhoto，请前往设置开启相册访问权限。"
           }
         }
       }
@@ -1695,22 +1734,7 @@
         }
       }
     },
-    "Trial expires in %lld days": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trial expires in %lld days"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "试用期还剩 %lld 天"
-          }
-        }
-      }
-    },
+    "Trial expires in %lld days": {},
     "Try 3 Days Free": {
       "localizations": {
         "en": {
@@ -1723,22 +1747,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "试用 3 天"
-          }
-        }
-      }
-    },
-    "Unlimited Usage": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unlimited Usage"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无限制使用"
           }
         }
       }
@@ -1823,39 +1831,6 @@
         }
       }
     },
-    "View Mode": {
-      "extractionState": "stale",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看模式"
-          }
-        }
-      }
-    },
-    "Welcome to CleanMyPhotos": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Welcome to CleanMyPhotos"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "欢迎使用 CleanMyPhotos"
-          }
-        }
-      }
-    },
     "Yearly": {
       "localizations": {
         "en": {
@@ -1920,66 +1895,51 @@
         }
       }
     },
-    "Best": {
+    "Photato": {},
+    "Photato needs access to your photo library to help you organize and clean up unwanted photos.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Best"
+            "value": "Photato needs access to your photo library to help you organize and clean up unwanted photos."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "最优推荐"
+            "value": "Photato 需要获取你的相册权限，以便帮你整理并清理无用照片。"
           }
         }
       }
     },
-    "Keep All": {
+    "To use Photato, please enable photo library access in Settings.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keep All"
+            "value": "To use Photato, please enable photo library access in Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "保留全部"
+            "value": "如需使用 Photato，请前往设置开启相册访问权限。"
           }
         }
       }
     },
-    "Identical photos": {
+    "Welcome to Photato": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Identical photos"
+            "value": "Welcome to Photato"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "完全相同的照片"
-          }
-        }
-      }
-    },
-    "Similar photos": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Similar photos"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "相似照片"
+            "value": "欢迎使用 Photato"
           }
         }
       }

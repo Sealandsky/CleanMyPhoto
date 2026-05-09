@@ -1,10 +1,3 @@
-//
-//  CleanMyPhotoApp.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/7.
-//
-
 import SwiftUI
 
 @main
@@ -26,18 +19,21 @@ struct CleanMyPhotoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if !hasShownWelcome {
-                WelcomePage()
-            } else if !hasShownMembership {
-                MembershipView(isMandatory: false)
-                    .environmentObject(membershipManager)
-            } else {
-                MainTabView()
-                    .environment(gridSettings)
-                    .environmentObject(photoManager)
-                    .environmentObject(membershipManager)
-                    .environmentObject(statisticsManager)
+            Group {
+                if !hasShownWelcome {
+                    WelcomePage()
+                } else if !hasShownMembership {
+                    MembershipView(isMandatory: false)
+                        .environmentObject(membershipManager)
+                } else {
+                    MainTabView()
+                        .environment(gridSettings)
+                        .environmentObject(photoManager)
+                        .environmentObject(membershipManager)
+                        .environmentObject(statisticsManager)
+                }
             }
+            .environment(\.font, Font.system(.body, design: .rounded))
         }
     }
 }

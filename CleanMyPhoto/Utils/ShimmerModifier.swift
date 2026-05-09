@@ -1,8 +1,3 @@
-//
-//  ShimmerModifier.swift
-//  CleanMyPhoto
-//
-
 import SwiftUI
 
 struct ShimmerModifier: ViewModifier {

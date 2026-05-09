@@ -1,9 +1,3 @@
-//
-//  DraggablePhotoView.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/7.
-//
 
 import SwiftUI
 import Photos

@@ -1,10 +1,3 @@
-//
-//  ScreenSizeHelper.swift
-//  CleanMyPhoto
-//
-//  Created by Claude on 2026/2/10.
-//
-
 import UIKit
 
 /// 屏幕尺寸辅助工具

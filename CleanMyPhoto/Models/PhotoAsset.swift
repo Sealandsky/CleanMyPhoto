@@ -1,10 +1,3 @@
-//
-//  PhotoAsset.swift
-//  CleanMyPhoto
-//
-//  Created by 陈嘉华 on 2026/2/9.
-//
-
 import Foundation
 import Photos
 
