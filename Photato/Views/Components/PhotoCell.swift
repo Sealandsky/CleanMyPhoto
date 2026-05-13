@@ -72,7 +72,7 @@ struct PhotoCell: View {
         case .gif:
             textBadge("GIF", .purple)
         case .screenshot:
-            textBadge("SCREEN", .orange)
+            textBadge(String(localized: "SS"), .orange)
         case .image:
             EmptyView()
         }

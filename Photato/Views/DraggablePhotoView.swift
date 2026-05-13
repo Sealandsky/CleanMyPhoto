@@ -19,7 +19,11 @@ struct DraggablePhotoView: View {
     @State private var navigationID: UInt = 0
     @State private var deleteID: UInt = 0
     @State private var hasTriggeredHaptic = false
-
+    // 卡片样式配置（和你截图匹配）
+    private let cardCornerRadius: CGFloat = 24
+    private let cardPadding: CGFloat = 24 // 卡片和屏幕边缘的距离
+    private let cardShadowRadius: CGFloat = 16
+    private let cardShadowOpacity: CGFloat = 0.15
     private let dismissThreshold: CGFloat = 60
     private let deleteThreshold: CGFloat = 80
 
@@ -45,26 +49,26 @@ struct DraggablePhotoView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.black
+                Color(.systemBackground)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
 
                 // Previous photo (visible when swiping right)
                 if let prev = previousPhoto {
-                    photoLayer(prev)
+                    photoCardLayer(prev)
                         .offset(x: -screenSize.width - photoSpacing + offset.width)
                         .zIndex(0)
                 }
 
                 // Current photo
-                currentMediaLayer(currentPhoto)
+                currentMediaCardLayer(currentPhoto)
                     .offset(x: offset.width, y: offset.height)
                     .zIndex(1)
 
                 // Next photo (visible when swiping left)
                 if let next = nextPhoto {
-                    photoLayer(next)
+                    photoCardLayer(next)
                         .offset(x: screenSize.width + photoSpacing + offset.width)
                         .zIndex(0)
                 }
@@ -139,7 +143,49 @@ struct DraggablePhotoView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
         }
     }
+    // MARK: - Photo Card Layer（带卡片样式的前后图）
+        private func photoCardLayer(_ photoAsset: PhotoAsset) -> some View {
+            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .cornerRadius(cardCornerRadius)
+                .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+                .padding(cardPadding)
+                .clipped()
+        }
 
+        // MARK: - Current Photo Card Layer（带卡片样式的当前图）
+        @ViewBuilder
+        private func currentMediaCardLayer(_ photoAsset: PhotoAsset) -> some View {
+            switch photoAsset.mediaType {
+            case .video:
+                ZStack {
+                    photoCardLayer(photoAsset)
+                    VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .cornerRadius(cardCornerRadius)
+                        .padding(cardPadding)
+                        .clipped()
+                }
+                .id(photoAsset.id)
+            case .livePhoto:
+                ZStack {
+                    photoCardLayer(photoAsset)
+                    LivePhotoPlayerView(asset: photoAsset.asset)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .cornerRadius(cardCornerRadius)
+                        .padding(cardPadding)
+                        .clipped()
+                }
+                .id(photoAsset.id)
+            default:
+                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .cornerRadius(cardCornerRadius)
+                    .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+                    .padding(cardPadding)
+                    .clipped()
+            }
+        }
     // MARK: - Gesture Handlers
     @State private var showDeleteIndicator = false
 

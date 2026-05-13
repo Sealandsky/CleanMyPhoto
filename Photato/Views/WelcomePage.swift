@@ -45,41 +45,20 @@ struct WelcomePage: View {
             Spacer()
 
             // 底部按钮区域
-            VStack(spacing: 16) {
-                // 开始使用按钮（查看会员选项）
-                Button(action: {
-                    hasShownWelcome = true
-                    // 保持 hasShownMembership = false，显示会员页
-                }) {
-                    HStack {
-                        Text(String(localized: "Get Started"))
-                            .font(.system(size: 20, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 72)
-                    .background(Color("PrimaryBtn"))
-                    .cornerRadius(22)
+            Button(action: {
+                hasShownWelcome = true
+            }) {
+                HStack {
+                    Text(String(localized: "Try 7 Days Free"))
+                        .font(.system(size: 20, weight: .semibold))
                 }
-                .padding(.horizontal, 32)
-
-                // 试用按钮（直接跳过会员页）
-                Button(action: {
-                    hasShownWelcome = true
-                    hasShownMembership = true // 跳过会员页
-                }) {
-                    HStack {
-                        Text(String(localized: "Try 3 Days Free"))
-                            .font(.system(size: 20, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 72)
-                    .background(Color.white.opacity(0.12))
-                    .cornerRadius(22)
-                }
-                .padding(.horizontal, 32)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 72)
+                .background(Color("PrimaryBtn"))
+                .cornerRadius(22)
             }
+            .padding(.horizontal, 32)
         }
         .background(Color.black)
     }

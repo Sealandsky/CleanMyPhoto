@@ -49,12 +49,12 @@ struct AlbumListView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
 
-            Text("No Albums Found")
+            Text(String(localized: "No Albums Found"))
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
 
-            Text("You haven't created any albums yet.")
+            Text(String(localized: "You haven't created any albums yet."))
                 .font(.body)
                 .foregroundColor(.secondary)
         }

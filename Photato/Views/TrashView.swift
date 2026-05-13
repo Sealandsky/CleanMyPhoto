@@ -63,7 +63,7 @@ struct TrashView: View {
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(String(localized: "Empty All")) {
+                        Button(String(localized: "Empty Trash")) {
                             guard !membershipManager.isTrialExpired || membershipManager.isPremiumMember else {
                                 showMembershipPaywall = true
                                 return
@@ -83,7 +83,7 @@ struct TrashView: View {
                     }
                 }
             } message: {
-                Text(String(localized: "Restore \(photoManager.trashCount) photo(s) to the main list?"))
+                Text(String(localized: "Restore \(photoManager.trashCount) photos to your library?"))
             }
             .alert(String(localized: "Delete All Photos"), isPresented: $showingDeleteConfirmation) {
                 Button(String(localized: "Cancel"), role: .cancel) { }
@@ -94,7 +94,7 @@ struct TrashView: View {
                     }
                 }
             } message: {
-                Text(String(localized: "Are you sure you want to permanently delete \(photoManager.trashCount) photo(s)? This action cannot be undone."))
+                Text(String(localized: "Permanently delete \(photoManager.trashCount) photos? This cannot be undone."))
             }
             .sheet(isPresented: $showMembershipPaywall) {
                 MembershipView(isMandatory: true)

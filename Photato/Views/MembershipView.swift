@@ -102,8 +102,9 @@ struct MembershipView: View {
                 .font(.system(size: 26, weight: .bold))
                 .foregroundColor(.white)
 
-            if membershipManager.remainingTrialDays > 0 {
-                Text(String(localized: "\(membershipManager.remainingTrialDays) days trial remaining"))
+            if membershipManager.remainingTrialDays > 0,
+               let text = membershipManager.remainingTrialText {
+                Text(text)
                     .font(.system(size: 16))
                     .foregroundColor(.blue)
             } else {
@@ -180,6 +181,7 @@ struct MembershipView: View {
             ForEach(SubscriptionType.allCases, id: \.self) { productType in
                 ProductCard(
                     productType: productType,
+                    products: membershipManager.products,
                     isSelected: membershipManager.selectedProduct == productType,
                     onTap: {
                         withAnimation(.spring(response: 0.3)) {

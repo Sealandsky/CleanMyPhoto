@@ -59,12 +59,10 @@ struct PhotoAsset: Identifiable, Equatable {
 
     var videoDuration: String? {
         guard asset.mediaType == .video else { return nil }
-        let duration = asset.duration
-        if duration < 60 {
-            return String(format: "0:%02d", Int(duration))
-        }
-        let mins = Int(duration) / 60
-        let secs = Int(duration) % 60
-        return String(format: "%d:%02d", mins, secs)
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute, .second]
+        formatter.zeroFormattingBehavior = .pad
+        formatter.unitsStyle = .positional
+        return formatter.string(from: asset.duration)
     }
 }

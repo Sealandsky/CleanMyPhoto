@@ -82,18 +82,8 @@ class StatisticsManager: ObservableObject {
     }
 
     private func formatBytes(_ bytes: Int) -> String {
-        let bytes = Int64(bytes)
-        if bytes >= 1_000_000_000 {
-            let gb = Double(bytes) / 1_000_000_000.0
-            return String(format: "%.2f GB", gb)
-        } else if bytes >= 1_000_000 {
-            let mb = Double(bytes) / 1_000_000.0
-            return String(format: "%.1f MB", mb)
-        } else if bytes >= 1000 {
-            let kb = Double(bytes) / 1000.0
-            return String(format: "%.0f KB", kb)
-        } else {
-            return "\(bytes) B"
-        }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 }

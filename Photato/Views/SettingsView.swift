@@ -1,7 +1,6 @@
 
 
 import SwiftUI
-import StoreKit
 
 struct SettingsView: View {
     @EnvironmentObject var membershipManager: MembershipManager
@@ -25,7 +24,7 @@ struct SettingsView: View {
                                 .opacity(0.85)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(String(localized: "Photato"))
+                                Text(String(localized: "Photato Pro"))
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
@@ -111,7 +110,7 @@ struct SettingsView: View {
                                 Label("3", systemImage: "square.grid.3x2")
                             }
                             Button { gridSettings.columnCount = 4 } label: {
-                                Label("4", systemImage: "square.grid.4x3")
+                                Label("4", systemImage: "square.grid.3x2.fill")
                             }
                         } label: {
                             Text("\(gridSettings.columnCount)")
@@ -122,21 +121,6 @@ struct SettingsView: View {
                         }
                     }
                 }
-
-                // 调试选项
-                #if DEBUG
-                Section(String(localized: "Debug")) {
-                    Toggle(isOn: $membershipManager.isDebugPremium) {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundColor(.yellow)
-                                .frame(width: 30)
-                            Text(String(localized: "Premium Member"))
-                                .foregroundColor(.primary)
-                        }
-                    }
-                }
-                #endif
 
                 // 关于
                 Section(String(localized: "About")) {
@@ -151,7 +135,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    Link(destination: URL(string: "https://example.com/privacy")!) {
+                    Link(destination: URL(string: "https://sealandsky.github.io/privacy/privacy.html")!) {
                         HStack {
                             Image(systemName: "hand.raised")
                                 .foregroundColor(.white)
@@ -166,7 +150,7 @@ struct SettingsView: View {
                     }
                     .foregroundColor(.primary)
 
-                    Link(destination: URL(string: "https://example.com/terms")!) {
+                    Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
                         HStack {
                             Image(systemName: "doc.text")
                                 .foregroundColor(.white)
@@ -205,8 +189,8 @@ struct SettingsView: View {
             case .free:
                 return String(localized: "Free")
             }
-        } else if membershipManager.remainingTrialDays > 0 {
-            return String(localized: "\(membershipManager.remainingTrialDays) days left in trial")
+        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
+            return text
         } else {
             return String(localized: "Free")
         }
@@ -215,8 +199,8 @@ struct SettingsView: View {
     private var membershipCardSubtitle: String {
         if membershipManager.isPremiumMember {
             return membershipStatusText
-        } else if membershipManager.remainingTrialDays > 0 {
-            return String(localized: "\(membershipManager.remainingTrialDays) days trial remaining")
+        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
+            return text
         } else {
             return String(localized: "Subscribe or one-time purchase")
         }

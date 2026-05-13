@@ -113,13 +113,8 @@ struct OrganizeCacheSummary: Codable {
 
 enum ByteFormatter {
     static func format(_ bytes: Int64) -> String {
-        if bytes >= 1_000_000_000 {
-            return String(format: "%.1f GB", Double(bytes) / 1_000_000_000.0)
-        } else if bytes >= 1_000_000 {
-            return String(format: "%.1f MB", Double(bytes) / 1_000_000.0)
-        } else if bytes >= 1000 {
-            return String(format: "%.0f KB", Double(bytes) / 1000.0)
-        }
-        return "\(bytes) B"
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }

@@ -35,6 +35,10 @@ class MembershipManager: ObservableObject {
         membershipStatus.remainingTrialDays ?? 0
     }
 
+    var remainingTrialText: String? {
+        membershipStatus.remainingTrialText
+    }
+
     #if DEBUG
     @Published var isDebugPremium = false
     #endif
@@ -89,7 +93,7 @@ class MembershipManager: ObservableObject {
             print("✅ Loaded \(products.count) products")
         } catch {
             print("❌ Failed to load products: \(error.localizedDescription)")
-            self.purchaseError = String(localized: "Failed to load products: \(error.localizedDescription)")
+            self.purchaseError = friendlyErrorMessage(error)
         }
     }
 
@@ -157,7 +161,7 @@ class MembershipManager: ObservableObject {
             }
         } catch {
             print("❌ Purchase failed: \(error.localizedDescription)")
-            purchaseError = String(localized: "Purchase failed: \(error.localizedDescription)")
+            purchaseError = friendlyErrorMessage(error)
         }
 
         isLoadingPurchase = false
@@ -173,7 +177,7 @@ class MembershipManager: ObservableObject {
             purchaseError = nil
         } catch {
             print("❌ Restore failed: \(error.localizedDescription)")
-            purchaseError = String(localized: "Restore failed: \(error.localizedDescription)")
+            purchaseError = friendlyErrorMessage(error)
         }
 
         isLoadingPurchase = false
@@ -211,6 +215,37 @@ class MembershipManager: ObservableObject {
             membershipStatus.saveToStorage()
             print("💳 Membership updated from transaction: \(tier.rawValue)")
         }
+    }
+
+    private func friendlyErrorMessage(_ error: Error) -> String {
+        let nsError = error as NSError
+        let code = nsError.code
+        let domain = nsError.domain
+
+        // StoreKit network errors
+        if domain == "SKErrorDomain" {
+            if code == 0 {
+                return String(localized: "Cannot connect to the App Store. Please check your network connection and try again.")
+            } else if code == 2 {
+                return String(localized: "Cannot connect to the App Store. Please check your network connection and try again.")
+            }
+        }
+
+        // URLError / network errors
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return String(localized: "No internet connection. Please check your network and try again.")
+            case .timedOut:
+                return String(localized: "Connection timed out. Please try again.")
+            case .cannotConnectToHost:
+                return String(localized: "Cannot connect to the App Store. Please try again later.")
+            default:
+                break
+            }
+        }
+
+        return error.localizedDescription
     }
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {

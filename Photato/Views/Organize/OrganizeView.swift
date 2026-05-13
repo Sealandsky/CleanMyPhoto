@@ -34,7 +34,7 @@ struct OrganizeView: View {
                 }
             } else if organizeManager.totalGroupCount > 0 {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(String(localized: "Re-scan")) {
+                    Button(String(localized: "Rescan")) {
                         organizeManager.startFullAnalysis()
                     }
                 }

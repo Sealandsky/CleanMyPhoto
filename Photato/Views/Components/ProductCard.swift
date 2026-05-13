@@ -1,9 +1,11 @@
 
 
 import SwiftUI
+import StoreKit
 
 struct ProductCard: View {
     let productType: SubscriptionType
+    let products: [Product]
     let isSelected: Bool
     let onTap: () -> Void
 
@@ -40,7 +42,7 @@ struct ProductCard: View {
 
                 // 右侧：价格
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(productType.priceText)
+                    Text(productType.priceText(from: products))
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
 
@@ -96,18 +98,21 @@ struct ProductCard: View {
     VStack(spacing: 16) {
         ProductCard(
             productType: .monthly,
+            products: [],
             isSelected: false,
             onTap: {}
         )
 
         ProductCard(
             productType: .yearly,
+            products: [],
             isSelected: true,
             onTap: {}
         )
 
         ProductCard(
             productType: .lifetime,
+            products: [],
             isSelected: false,
             onTap: {}
         )

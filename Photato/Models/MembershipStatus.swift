@@ -34,6 +34,22 @@ struct MembershipStatus {
         return max(0, days)
     }
 
+    // 剩余试用时间（格式化字符串，含天和小时）
+    var remainingTrialText: String? {
+        guard let expirationDate = trialExpirationDate else { return nil }
+        let components = Calendar.current.dateComponents([.day, .hour], from: Date(), to: expirationDate)
+        let days = max(0, components.day ?? 0)
+        let hours = max(0, components.hour ?? 0)
+
+        if days > 0 {
+            if hours > 0 {
+                return String(localized: "\(days)d \(hours)h remaining")
+            }
+            return String(localized: "\(days)d remaining")
+        }
+        return String(localized: "\(hours)h remaining")
+    }
+
     // 是否为付费会员
     var isPremiumMember: Bool {
         currentTier != .free

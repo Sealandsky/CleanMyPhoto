@@ -1,10 +1,11 @@
 import Foundation
+import StoreKit
 
 // MARK: - Subscription Type
 enum SubscriptionType: String, CaseIterable {
-    case monthly = "com.cleanmyphoto.subscription.monthly"
-    case yearly = "com.cleanmyphoto.subscription.yearly"
-    case lifetime = "com.cleanmyphoto.purchase.lifetime"
+    case monthly = "com.photato.subscription.monthly"
+    case yearly = "com.photato.subscription.yearly"
+    case lifetime = "com.photato.purchase.lifetime"
 
     // 显示名称
     var displayName: String {
@@ -15,12 +16,15 @@ enum SubscriptionType: String, CaseIterable {
         }
     }
 
-    // 价格显示文本
-    var priceText: String {
+    // 价格显示文本（优先使用 StoreKit 真实价格）
+    func priceText(from products: [Product]) -> String {
+        if let product = products.first(where: { $0.id == self.rawValue }) {
+            return product.displayPrice
+        }
         switch self {
         case .monthly: return "$2.99"
         case .yearly: return "$12.99"
-        case .lifetime: return "$23.99"
+        case .lifetime: return "$24.99"
         }
     }
 

@@ -615,7 +615,7 @@ struct ContentView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
 
-                Text(String(localized: "Trial expires in \(membershipManager.remainingTrialDays) days"))
+                Text(membershipManager.remainingTrialText ?? String(localized: "Trial expiring"))
                     .font(.system(size: 13))
                     .foregroundColor(.white)
 
@@ -660,7 +660,7 @@ struct ContentView: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.left")
-                    Text(String(localized: "Left for older"))
+                    Text(String(localized: "Older"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
@@ -671,7 +671,7 @@ struct ContentView: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.right")
-                    Text(String(localized: "Right for newer"))
+                    Text(String(localized: "Newer"))
                 }
                 .font(.caption)
                 .padding(.horizontal, 16)
