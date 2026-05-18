@@ -52,8 +52,8 @@ struct MembershipView: View {
         ScrollView {
             VStack(spacing: 28) {
                 headerSection
-                benefitsSection
                 productCardsSection
+                benefitsSection
                 termsSection
             }
             .padding(.top, isMandatory ? 40 : 60)

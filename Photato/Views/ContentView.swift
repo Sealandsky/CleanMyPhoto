@@ -313,6 +313,9 @@ struct ContentView: View {
         .onChange(of: albumsPath) { oldValue, newValue in
             if newValue.isEmpty {
                 selectedAlbum = nil
+                if !oldValue.isEmpty, let albumMgr = albumManager {
+                    Task { await albumMgr.fetchUserAlbums() }
+                }
             }
         }
     }
@@ -356,7 +359,7 @@ struct ContentView: View {
             .navigationDestination(for: TimelineDestination.self) { destination in
                 switch destination {
                 case .monthPhotos(let albumId):
-                    if let monthAlbum = systemAlbumManager?.monthAlbums.first(where: { $0.id == albumId }) {
+                    if let monthAlbum = selectedMonthAlbum {
                         SystemMonthPhotosView(
                             monthAlbum: monthAlbum,
                             photoManager: photoManager,
@@ -376,6 +379,12 @@ struct ContentView: View {
         .onChange(of: timelinePath) { oldValue, newValue in
             if newValue.isEmpty {
                 selectedMonthAlbum = nil
+                if !oldValue.isEmpty, let systemAlbumMgr = systemAlbumManager {
+                    Task {
+                        await systemAlbumMgr.fetchYearAlbums()
+                        await systemAlbumMgr.fetchAllMonths()
+                    }
+                }
             }
         }
     }
@@ -457,7 +466,7 @@ struct ContentView: View {
 
     private var currentPhotos: [PhotoAsset] {
         if let monthAlbum = selectedMonthAlbum {
-            return monthAlbum.photoAssets
+            return monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
         } else if let albumMgr = albumManager, selectedAlbum != nil {
             return albumMgr.displayedAlbumPhotos
         } else {

@@ -95,7 +95,7 @@ struct SettingsView: View {
                 // 显示设置
                 Section(String(localized: "Display")) {
                     HStack {
-                        Image(systemName: "square.grid.2x2.fill")
+                        Image(systemName: "square.grid.2x2")
                             .frame(width: 30)
 
                         Text(String(localized: "Grid Layout"))
@@ -114,6 +114,30 @@ struct SettingsView: View {
                             }
                         } label: {
                             Text("\(gridSettings.columnCount)")
+                                .foregroundColor(.secondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    HStack {
+                        Image(systemName: "rectangle.split.3x1")
+                            .frame(width: 30)
+
+                        Text(String(localized: "Photo Ratio"))
+
+                        Spacer()
+
+                        Menu {
+                            Button { gridSettings.aspectRatio = 1.0 } label: {
+                                Label("1:1", systemImage: "square")
+                            }
+                            Button { gridSettings.aspectRatio = 3.0 / 4.0 } label: {
+                                Label("3:4", systemImage: "rectangle.portrait")
+                            }
+                        } label: {
+                            Text(gridSettings.aspectRatio == 1.0 ? "1:1" : "3:4")
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.caption2)

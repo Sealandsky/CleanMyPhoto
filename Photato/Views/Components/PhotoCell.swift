@@ -5,6 +5,7 @@ struct PhotoCell: View {
     let photo: PhotoAsset
     var isSelected: Bool = false
     var isSelectMode: Bool = false
+    @Environment(GridSettings.self) private var gridSettings
 
     var body: some View {
         GeometryReader { geometry in
@@ -36,7 +37,7 @@ struct PhotoCell: View {
                 }
             }
         }
-        .aspectRatio(1, contentMode: .fit)
+        .aspectRatio(gridSettings.aspectRatio, contentMode: .fit)
     }
 
     private var selectionIndicator: some View {

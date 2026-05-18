@@ -121,7 +121,7 @@ struct SystemMonthPhotosView: View {
     }
 
     private var photos: [PhotoAsset] {
-        monthAlbum.photoAssets
+        monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
     var body: some View {

@@ -243,10 +243,16 @@
     "0" : {
 
     },
+    "1:1" : {
+
+    },
     "2" : {
 
     },
     "3" : {
+
+    },
+    "3:4" : {
 
     },
     "4" : {
@@ -773,6 +779,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查找重复、相似照片、截图等"
+          }
+        }
+      }
+    },
+    "Found %lld items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Found %lld items"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发现 %lld 项"
           }
         }
       }
@@ -1375,6 +1397,22 @@
         }
       }
     },
+    "Photo Ratio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo Ratio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照片比例"
+          }
+        }
+      }
+    },
     "photos" : {
       "localizations" : {
         "en" : {
@@ -1870,6 +1908,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上划删除"
+          }
+        }
+      }
+    },
+    "Tap a category below to review" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a category below to review"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击下方分类查看详情"
           }
         }
       }

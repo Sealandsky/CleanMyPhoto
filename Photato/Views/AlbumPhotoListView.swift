@@ -127,7 +127,7 @@ struct AlbumPhotoListView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 4)
         .padding(.vertical, 8)
     }
 

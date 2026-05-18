@@ -1,3 +1,4 @@
+
 import SwiftUI
 import Photos
 
@@ -9,13 +10,8 @@ struct OrganizeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
+                scanCard
                 categoryCards
-
-                if organizeManager.isAnalyzing {
-                    progressCard
-                } else if organizeManager.totalGroupCount == 0 && organizeManager.hasLoadedInitialData {
-                    scanActionCard
-                }
             }
             .padding(16)
         }
@@ -25,25 +21,137 @@ struct OrganizeView: View {
                 await performInitialScan()
             }
         }
-        .toolbar {
-            if organizeManager.isAnalyzing {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(String(localized: "Cancel")) {
-                        organizeManager.cancelAnalysis()
-                    }
-                }
-            } else if organizeManager.totalGroupCount > 0 {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(String(localized: "Rescan")) {
-                        organizeManager.startFullAnalysis()
-                    }
-                }
-            }
-        }
     }
 
     private func performInitialScan() async {
         await organizeManager.quickAnalysis()
+    }
+
+    // MARK: - Scan Card
+
+    @ViewBuilder
+    private var scanCard: some View {
+        if organizeManager.isAnalyzing {
+            scanningCard
+        } else if organizeManager.totalGroupCount > 0 {
+            rescanCard
+        } else if organizeManager.hasLoadedInitialData {
+            startScanCard
+        }
+    }
+
+    private var startScanCard: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                organizeManager.startFullAnalysis()
+            }
+        } label: {
+            HStack(spacing: 16) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "Start Scan"))
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(20)
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 0, green: 0.52, blue: 1.0), Color(red: 0, green: 0.72, blue: 1.0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var rescanCard: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                let totalCount = OrganizeCategory.allCases.reduce(0) { $0 + organizeManager.stat(for: $1) }
+                Text(String(localized: "Found \(totalCount) items"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(String(localized: "Tap a category below to review"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    organizeManager.startFullAnalysis()
+                }
+            } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text(String(localized: "Rescan"))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                )
+                .background(Color.white.opacity(0.1))
+                .clipShape(Capsule())
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
+    }
+
+    private var scanningCard: some View {
+        VStack(spacing: 12) {
+            HStack {
+                ProgressView(value: organizeManager.analysisProgress)
+                    .tint(.blue)
+
+                Button(String(localized: "Cancel")) {
+                    organizeManager.cancelAnalysis()
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            }
+
+            if !organizeManager.currentStep.isEmpty {
+                Text(organizeManager.currentStep)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
     }
 
     // MARK: - Category Cards
@@ -59,7 +167,7 @@ struct OrganizeView: View {
         let hasResults = count > 0
         let identifiers = Array((organizeManager.scanResults[category] ?? [])
             .flatMap { $0.localIdentifiers }
-            .prefix(3))
+            .prefix(2))
 
         return Button {
             if hasResults {
@@ -82,6 +190,7 @@ struct OrganizeView: View {
                 Spacer()
 
                 CategoryThumbnails(identifiers: identifiers)
+                    .padding(.trailing, -4)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 18)
@@ -93,69 +202,6 @@ struct OrganizeView: View {
         .buttonStyle(.plain)
         .disabled(organizeManager.isAnalyzing)
     }
-
-    // MARK: - Progress Card
-
-    private var progressCard: some View {
-        VStack(spacing: 12) {
-            ProgressView(value: organizeManager.analysisProgress)
-                .tint(.blue)
-
-            if !organizeManager.currentStep.isEmpty {
-                Text(organizeManager.currentStep)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
-        )
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    // MARK: - Scan Action Card
-
-    private var scanActionCard: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                organizeManager.startFullAnalysis()
-            }
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(.blue)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Start Scan"))
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-
-                    Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color(UIColor.secondarySystemGroupedBackground))
-            )
-        }
-        .buttonStyle(.plain)
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
-    }
 }
 
 // MARK: - Category Thumbnails
@@ -164,8 +210,8 @@ struct CategoryThumbnails: View {
     let identifiers: [String]
     @State private var assets: [PHAsset] = []
 
-    private let thumbSize: CGFloat = 52
-    private let overlap: CGFloat = 20
+    private let thumbWidth: CGFloat = 52
+    private let thumbRatio: CGFloat = 4.0 / 3.0 // 3:4 portrait (height / width)
 
     var body: some View {
         Group {
@@ -175,16 +221,14 @@ struct CategoryThumbnails: View {
                     .foregroundColor(Color(UIColor.tertiaryLabel))
             } else {
                 ZStack {
-                    ForEach(Array(assets.prefix(3).enumerated()), id: \.offset) { index, asset in
+                    ForEach(Array(assets.prefix(2).enumerated()), id: \.offset) { index, asset in
                         thumbView(for: asset)
-                            .offset(x: overlap * CGFloat(index))
-                            .zIndex(Double(2 - index))
+                            .rotationEffect(.degrees(index == 0 ? -8 : 6))
+                            .offset(x: index == 0 ? -8 : 10, y: index == 0 ? 2 : -2)
+                            .zIndex(index == 0 ? 0 : 1)
                     }
                 }
-                .frame(
-                    width: thumbSize + overlap * CGFloat(max(min(assets.count, 3) - 1, 0)),
-                    height: thumbSize
-                )
+                .frame(width: thumbWidth * 2 + 10, height: thumbWidth * thumbRatio + 8)
             }
         }
         .onAppear { loadAssets() }
@@ -192,13 +236,14 @@ struct CategoryThumbnails: View {
     }
 
     private func thumbView(for asset: PHAsset) -> some View {
-        AssetImage(asset: asset, targetSize: CGSize(width: 200, height: 200), contentMode: .fill)
-            .aspectRatio(1, contentMode: .fill)
-            .frame(width: thumbSize, height: thumbSize)
+        let height = thumbWidth * thumbRatio
+        return AssetImage(asset: asset, targetSize: CGSize(width: 200, height: 280), contentMode: .fill)
+            .aspectRatio(3.0 / 4.0, contentMode: .fill)
+            .frame(width: thumbWidth, height: height)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.white, lineWidth: 2)
             )
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)

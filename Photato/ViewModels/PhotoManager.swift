@@ -25,7 +25,7 @@ class PhotoManager: ObservableObject {
     private(set) var totalPhotoCount: Int = 0
 
     var trashCount: Int {
-        pendingDeletionIDs.count
+        trashedAssets.count
     }
 
     init(statisticsManager: StatisticsManager? = nil) {
@@ -242,8 +242,8 @@ class PhotoManager: ObservableObject {
 
             // Remove from all photos and clear pending deletions
             allPhotos.removeAll { trashedAssets.contains($0) }
-            pendingDeletionIDs.removeAll()
-            trashedAssets.removeAll()  // 清空 trashedAssets
+            trashedAssets.removeAll()
+            // Keep pendingDeletionIDs so album/month lists continue to filter deleted photos
             updateDisplayedPhotos()
         } catch {
             errorMessage = "Failed to delete photos: \(error.localizedDescription)"
