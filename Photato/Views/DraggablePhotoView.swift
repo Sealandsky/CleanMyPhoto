@@ -21,7 +21,7 @@ struct DraggablePhotoView: View {
     @State private var hasTriggeredHaptic = false
     // 卡片样式配置（和你截图匹配）
     private let cardCornerRadius: CGFloat = 24
-    private let cardPadding: CGFloat = 24 // 卡片和屏幕边缘的距离
+    private let cardPadding: CGFloat = 0 // 卡片和屏幕边缘的距离
     private let cardShadowRadius: CGFloat = 16
     private let cardShadowOpacity: CGFloat = 0.15
     private let dismissThreshold: CGFloat = 60

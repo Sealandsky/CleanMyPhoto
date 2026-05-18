@@ -10,9 +10,22 @@
 		D8E4F3DD2F3785780010E310 /* Photato.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photato.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D878BF442FB80203003DA8E9 /* Exceptions for "Photato" folder in "Photato" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D8E4F3DC2F3785780010E310 /* Photato */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D8E4F3DF2F3785780010E310 /* Photato */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D878BF442FB80203003DA8E9 /* Exceptions for "Photato" folder in "Photato" target */,
+			);
 			path = Photato;
 			sourceTree = "<group>";
 		};
@@ -261,6 +274,7 @@
 				DEVELOPMENT_TEAM = 7686JA7SFY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Photato/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photato;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";
@@ -299,6 +313,7 @@
 				DEVELOPMENT_TEAM = 7686JA7SFY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Photato/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photato;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";

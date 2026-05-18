@@ -95,7 +95,7 @@ struct SettingsView: View {
                 // 显示设置
                 Section(String(localized: "Display")) {
                     HStack {
-                        Image(systemName: "square.grid.2x2")
+                        Image(systemName: "square.grid.2x2.fill")
                             .frame(width: 30)
 
                         Text(String(localized: "Grid Layout"))
@@ -104,10 +104,10 @@ struct SettingsView: View {
 
                         Menu {
                             Button { gridSettings.columnCount = 2 } label: {
-                                Label("2", systemImage: "square.grid.2x2")
+                                Label("2", systemImage: "square.grid.2x2.fill")
                             }
                             Button { gridSettings.columnCount = 3 } label: {
-                                Label("3", systemImage: "square.grid.3x2")
+                                Label("3", systemImage: "square.grid.3x2.fill")
                             }
                             Button { gridSettings.columnCount = 4 } label: {
                                 Label("4", systemImage: "square.grid.3x2.fill")
