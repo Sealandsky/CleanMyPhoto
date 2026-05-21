@@ -1,5 +1,6 @@
 
 import SwiftUI
+import Photos
 
 struct DateSectionView: View {
     let dateGroup: DateGroup

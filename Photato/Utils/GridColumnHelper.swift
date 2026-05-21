@@ -21,7 +21,7 @@ final class GridSettings {
         self.columnCount = storedColumns > 0 ? storedColumns : GridColumnHelper.defaultCount
 
         let storedRatio = UserDefaults.standard.double(forKey: GridColumnHelper.ratioStorageKey)
-        self.aspectRatio = storedRatio > 0 ? storedRatio : GridColumnHelper.defaultRatio
+        self.aspectRatio = (storedRatio >= 0.1 && storedRatio <= 2.0) ? storedRatio : GridColumnHelper.defaultRatio
     }
 }
 

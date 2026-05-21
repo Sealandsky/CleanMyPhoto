@@ -64,7 +64,7 @@ struct TrashView: View {
 
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(String(localized: "Empty Trash")) {
-                            guard !membershipManager.isTrialExpired || membershipManager.isPremiumMember else {
+                            guard membershipManager.isPremiumMember || !membershipManager.isTrialExpired else {
                                 showMembershipPaywall = true
                                 return
                             }
@@ -162,4 +162,5 @@ struct TrashView: View {
 
 #Preview {
     TrashView(photoManager: PhotoManager())
+        .environment(GridSettings())
 }

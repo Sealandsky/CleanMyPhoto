@@ -58,13 +58,7 @@ struct SettingsView: View {
                         }
                         .padding(.vertical, 28)
                         .padding(.horizontal, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(red: 0, green: 0.52, blue: 1.0), Color(red: 0, green: 0.72, blue: 1.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                        .background(.accentGradient)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -242,6 +236,7 @@ struct SettingsView: View {
         SettingsView()
             .environmentObject(MembershipManager())
             .environmentObject(StatisticsManager())
+            .environment(GridSettings())
     }
 }
 

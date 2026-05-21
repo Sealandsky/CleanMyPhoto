@@ -6,6 +6,7 @@ struct PhotoCell: View {
     var isSelected: Bool = false
     var isSelectMode: Bool = false
     @Environment(GridSettings.self) private var gridSettings
+    @State private var imageLoaded = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -13,7 +14,8 @@ struct PhotoCell: View {
                 AssetImage(
                     asset: photo.asset,
                     targetSize: CGSize(width: 400, height: 400),
-                    contentMode: .fill
+                    contentMode: .fill,
+                    onLoad: { imageLoaded = true }
                 )
                 .scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height)
@@ -21,6 +23,7 @@ struct PhotoCell: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 mediaBadge
+                    .opacity(imageLoaded ? 1 : 0)
 
                 if isSelectMode && !isSelected {
                     Color.black.opacity(0.2)
@@ -34,10 +37,12 @@ struct PhotoCell: View {
             .overlay(alignment: .bottomLeading) {
                 if !isSelectMode && photo.isFavorite {
                     favoriteBadge
+                        .opacity(imageLoaded ? 1 : 0)
                 }
             }
         }
         .aspectRatio(gridSettings.aspectRatio, contentMode: .fit)
+        .animation(.easeIn(duration: 0.2), value: imageLoaded)
     }
 
     private var selectionIndicator: some View {
@@ -133,4 +138,5 @@ struct PhotoCell: View {
 
 #Preview {
     PhotoCell(photo: PhotoAsset(asset: PHAsset()))
+        .environment(GridSettings())
 }

@@ -1,4 +1,3 @@
-
 import SwiftUI
 import Photos
 
@@ -13,6 +12,8 @@ struct OrganizeView: View {
                 scanCard
                 categoryCards
             }
+            .animation(.easeInOut(duration: 0.3), value: organizeManager.isAnalyzing)
+            .animation(.easeInOut(duration: 0.3), value: organizeManager.totalGroupCount > 0)
             .padding(16)
         }
         .background(Color(UIColor.systemGroupedBackground))
@@ -33,52 +34,59 @@ struct OrganizeView: View {
     private var scanCard: some View {
         if organizeManager.isAnalyzing {
             scanningCard
+                .transition(.opacity.combined(with: .move(edge: .top)))
         } else if organizeManager.totalGroupCount > 0 {
             rescanCard
+                .transition(.opacity.combined(with: .move(edge: .top)))
         } else if organizeManager.hasLoadedInitialData {
             startScanCard
+                .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
     private var startScanCard: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                organizeManager.startFullAnalysis()
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Start Scan"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-        } label: {
-            HStack(spacing: 16) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundColor(.white)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Start Scan"))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+            Spacer()
 
-                    Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
-                        .multilineTextAlignment(.leading)
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    organizeManager.startFullAnalysis()
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [Color(red: 0, green: 0.52, blue: 1.0), Color(red: 0, green: 0.72, blue: 1.0)],
-                    startPoint: .leading,
-                    endPoint: .trailing
+            } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "magnifyingglass.circle.fill")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text(String(localized: "Scan"))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                 )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.white.opacity(0.1))
+                .clipShape(Capsule())
+            }
         }
-        .buttonStyle(.plain)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
     }
 
     private var rescanCard: some View {
@@ -102,7 +110,7 @@ struct OrganizeView: View {
                 }
             } label: {
                 HStack(spacing: 2) {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: "arrow.clockwise.circle.fill")
                         .font(.title3)
                         .fontWeight(.semibold)
                     Text(String(localized: "Rescan"))
@@ -128,23 +136,40 @@ struct OrganizeView: View {
     }
 
     private var scanningCard: some View {
-        VStack(spacing: 12) {
-            HStack {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(organizeManager.currentStep.isEmpty
+                     ? String(localized: "Scanning...")
+                     : organizeManager.currentStep)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+
                 ProgressView(value: organizeManager.analysisProgress)
                     .tint(.blue)
-
-                Button(String(localized: "Cancel")) {
-                    organizeManager.cancelAnalysis()
-                }
-                .font(.subheadline)
-                .foregroundColor(.blue)
             }
 
-            if !organizeManager.currentStep.isEmpty {
-                Text(organizeManager.currentStep)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer()
+
+            Button {
+                organizeManager.cancelAnalysis()
+            } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text(String(localized: "Cancel"))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                )
+                .background(Color.white.opacity(0.1))
+                .clipShape(Capsule())
             }
         }
         .padding(16)
@@ -201,6 +226,7 @@ struct OrganizeView: View {
         }
         .buttonStyle(.plain)
         .disabled(organizeManager.isAnalyzing)
+        .opacity(organizeManager.isAnalyzing ? 0.5 : 1)
     }
 }
 
@@ -228,7 +254,10 @@ struct CategoryThumbnails: View {
                             .zIndex(index == 0 ? 0 : 1)
                     }
                 }
-                .frame(width: thumbWidth * 2 + 10, height: thumbWidth * thumbRatio + 8)
+                .frame(
+                    width: thumbWidth * 2 + 10,
+                    height: thumbWidth * thumbRatio + 8
+                )
             }
         }
         .onAppear { loadAssets() }

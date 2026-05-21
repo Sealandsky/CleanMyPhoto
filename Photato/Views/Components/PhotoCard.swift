@@ -62,3 +62,26 @@ struct PhotoCardInfo: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+#Preview {
+    ScrollView {
+        VStack(spacing: 16) {
+            PhotoCard {
+                PhotoCardCover {
+                    Rectangle().fill(Color.blue.opacity(0.3))
+                }
+                PhotoCardInfo(title: "My Album", subtitle: "42 photos")
+            }
+            .padding(.horizontal)
+
+            PhotoCard {
+                PhotoCardCover(coverHeight: 200) {
+                    LinearGradient(colors: [.purple, .blue], startPoint: .top, endPoint: .bottom)
+                }
+                PhotoCardInfo(title: "Vacation", subtitle: "128 photos")
+            }
+            .padding(.horizontal)
+        }
+    }
+    .background(Color.black)
+}

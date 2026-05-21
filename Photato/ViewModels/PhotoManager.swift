@@ -243,7 +243,7 @@ class PhotoManager: ObservableObject {
             // Remove from all photos and clear pending deletions
             allPhotos.removeAll { trashedAssets.contains($0) }
             trashedAssets.removeAll()
-            // Keep pendingDeletionIDs so album/month lists continue to filter deleted photos
+            cleanupStaleDeletionIDs()
             updateDisplayedPhotos()
         } catch {
             errorMessage = "Failed to delete photos: \(error.localizedDescription)"
@@ -251,6 +251,11 @@ class PhotoManager: ObservableObject {
     }
 
     // MARK: - Statistics Helper
+
+    private func cleanupStaleDeletionIDs() {
+        let allIDs = Set(allPhotos.map(\.id))
+        pendingDeletionIDs.subtract(allIDs)
+    }
 
     private func getAssetSize(_ asset: PHAsset) async -> Int64 {
         await PHAssetSizeHelper.getAssetSize(asset)

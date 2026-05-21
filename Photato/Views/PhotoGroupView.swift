@@ -224,4 +224,5 @@ struct SystemMonthPhotosView: View {
         photoManager: PhotoManager(),
         onMonthSelect: { _ in }
     )
+    .environment(GridSettings())
 })

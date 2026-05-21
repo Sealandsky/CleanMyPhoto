@@ -1,6 +1,7 @@
 
 
 import SwiftUI
+import Photos
 
 struct YearSectionView: View {
     let yearGroup: YearGroup

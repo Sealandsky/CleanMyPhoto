@@ -163,12 +163,6 @@ struct ContentView: View {
     private var mainView: some View {
         ZStack {
             contentViews
-
-            if !membershipManager.isPremiumMember &&
-               membershipManager.membershipStatus.isTrialActive &&
-               membershipManager.remainingTrialDays <= 1 {
-                trialWarningBanner
-            }
         }
         .background(Color.black)
     }

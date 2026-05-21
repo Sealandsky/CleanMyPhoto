@@ -37,14 +37,16 @@ struct AssetImage: View {
     let targetSize: CGSize
     let contentMode: ContentMode
     var highQuality: Bool = false
+    var onLoad: (() -> Void)? = nil
 
     @State private var image: UIImage?
 
-    init(asset: PHAsset, targetSize: CGSize, contentMode: ContentMode = .fit, highQuality: Bool = false) {
+    init(asset: PHAsset, targetSize: CGSize, contentMode: ContentMode = .fit, highQuality: Bool = false, onLoad: (() -> Void)? = nil) {
         self.asset = asset
         self.targetSize = targetSize
         self.contentMode = contentMode
         self.highQuality = highQuality
+        self.onLoad = onLoad
     }
 
     var body: some View {
@@ -60,12 +62,14 @@ struct AssetImage: View {
         .onAppear {
             if let cached = PhotoImageCache.shared.get(asset.localIdentifier) {
                 image = cached
+                onLoad?()
             }
             loadImage()
         }
         .onChange(of: asset.localIdentifier) { _, newID in
             if let cached = PhotoImageCache.shared.get(newID) {
                 image = cached
+                onLoad?()
             }
             loadImage()
         }
@@ -87,6 +91,7 @@ struct AssetImage: View {
                 if let img = resultImage {
                     self.image = img
                     PhotoImageCache.shared.set(self.asset.localIdentifier, image: img)
+                    self.onLoad?()
                 }
 
                 if let error = info?[PHImageErrorKey] as? Error {

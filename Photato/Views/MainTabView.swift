@@ -102,4 +102,5 @@ struct MainTabView: View {
         .environmentObject(PhotoManager())
         .environmentObject(MembershipManager())
         .environmentObject(StatisticsManager())
+        .environment(GridSettings())
 }

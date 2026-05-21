@@ -33,3 +33,22 @@ struct AlbumCell: View {
         }
     }
 }
+
+#Preview {
+    ScrollView {
+        VStack(spacing: 12) {
+            AlbumCell(album: AlbumModel(
+                id: "preview-1",
+                title: "Camera Roll",
+                assetCount: 256
+            ))
+            AlbumCell(album: AlbumModel(
+                id: "preview-2",
+                title: "Screenshots",
+                assetCount: 42
+            ))
+        }
+        .padding(.horizontal)
+    }
+    .background(Color.black)
+}

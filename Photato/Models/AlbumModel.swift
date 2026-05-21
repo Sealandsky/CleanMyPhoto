@@ -30,4 +30,12 @@ struct AlbumModel: Identifiable, Equatable {
     static func == (lhs: AlbumModel, rhs: AlbumModel) -> Bool {
         lhs.id == rhs.id
     }
+
+    init(id: String, title: String, assetCount: Int, coverAsset: PHAsset? = nil) {
+        self.id = id
+        self.collection = PHAssetCollection()
+        self.title = title
+        self.assetCount = assetCount
+        self.coverAsset = coverAsset
+    }
 }
