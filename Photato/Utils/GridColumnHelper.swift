@@ -29,7 +29,7 @@ enum GridColumnHelper {
     static let columnStorageKey = "gridColumnCount"
     static let ratioStorageKey = "gridAspectRatio"
     static let defaultCount = 3
-    static let defaultRatio: CGFloat = 1.0
+    static let defaultRatio: CGFloat = 3.0 / 4.0
     static let spacing: CGFloat = 4
 
     static func columns(count: Int) -> [GridItem] {

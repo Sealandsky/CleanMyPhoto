@@ -230,7 +230,7 @@ struct MembershipView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
-                            Text(String(localized: "Continue"))
+                            Text(String(localized: "Subscribe"))
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }

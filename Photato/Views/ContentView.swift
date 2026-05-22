@@ -352,7 +352,7 @@ struct ContentView: View {
             }
             .navigationDestination(for: TimelineDestination.self) { destination in
                 switch destination {
-                case .monthPhotos(let albumId):
+                case .monthPhotos(_):
                     if let monthAlbum = selectedMonthAlbum {
                         SystemMonthPhotosView(
                             monthAlbum: monthAlbum,
@@ -541,6 +541,15 @@ struct ContentView: View {
             }
         }
         .toolbar(.hidden, for: .tabBar)
+        .onChange(of: currentPhotos) { oldPhotos, newPhotos in
+            guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
+            if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {
+                let newIndex = min(oldIndex, newPhotos.count - 1)
+                currentPhotoID = newPhotos.indices.contains(newIndex) ? newPhotos[newIndex].id : newPhotos.first?.id
+            } else {
+                currentPhotoID = newPhotos.first?.id
+            }
+        }
         .onAppear {
             if let id = currentPhotoID, !currentPhotos.isEmpty {
                 if !currentPhotos.contains(where: { $0.id == id }) {

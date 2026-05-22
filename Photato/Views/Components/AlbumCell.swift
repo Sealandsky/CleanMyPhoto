@@ -36,7 +36,7 @@ struct AlbumCell: View {
 
 #Preview {
     ScrollView {
-        VStack(spacing: 12) {
+        HStack(spacing: 12) {
             AlbumCell(album: AlbumModel(
                 id: "preview-1",
                 title: "Camera Roll",

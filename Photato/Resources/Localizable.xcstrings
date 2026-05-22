@@ -639,18 +639,18 @@
         }
       }
     },
-    "Continue" : {
+    "Subscribe" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Continue"
+            "value" : "Subscribe"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "继续"
+            "value" : "订阅"
           }
         }
       }

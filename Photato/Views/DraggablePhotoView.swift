@@ -314,7 +314,9 @@ struct DraggablePhotoView: View {
         deleteID = currentDelID
 
         let photoToDelete = currentPhoto
-        let hasMore = nextPhoto != nil || previousPhoto != nil
+        let nextPhotoRef = nextPhoto
+        let prevPhotoRef = previousPhoto
+        let hasMore = nextPhotoRef != nil || prevPhotoRef != nil
 
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             offset = CGSize(width: 0, height: -screenSize.height)
@@ -326,12 +328,12 @@ struct DraggablePhotoView: View {
             onDelete?(photoToDelete)
 
             if hasMore {
-                if nextPhoto != nil {
-                    // nextPhoto 会占据删除后的 localIndex 位置，索引不变
-                } else if localIndex > 0 {
+                if let next = nextPhotoRef {
+                    onPhotoChange(next.id, localIndex)
+                } else if let prev = prevPhotoRef, localIndex > 0 {
                     localIndex -= 1
+                    onPhotoChange(prev.id, localIndex)
                 }
-                onPhotoChange(currentPhoto.id, localIndex)
             } else {
                 onDismiss()
             }

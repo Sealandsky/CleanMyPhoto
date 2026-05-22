@@ -41,8 +41,9 @@ final class PhotoSimilarityManager {
             managedObjectModel: Self.managedObjectModel
         )
 
-        let storeURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PhotoSimilarity.sqlite")
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
+        let storeURL = appSupportURL.appendingPathComponent("PhotoSimilarity.sqlite")
         let description = NSPersistentStoreDescription(url: storeURL)
         description.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
         container.persistentStoreDescriptions = [description]
@@ -416,7 +417,7 @@ final class PhotoSimilarityManager {
 
     // MARK: - dHash (Difference Hash)
 
-    private static func computeDHash(for asset: PHAsset) -> String {
+    nonisolated private static func computeDHash(for asset: PHAsset) -> String {
         let options = PHImageRequestOptions()
         options.resizeMode = .fast
         options.deliveryMode = .fastFormat

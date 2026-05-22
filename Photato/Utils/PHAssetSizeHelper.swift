@@ -12,4 +12,11 @@ enum PHAssetSizeHelper {
             }
         }
     }
+
+    static func getFileSize(_ asset: PHAsset) -> Int64 {
+        let resources = PHAssetResource.assetResources(for: asset)
+        return resources.reduce(Int64(0)) { sum, resource in
+            sum + ((resource.value(forKey: "fileSize") as? Int64) ?? 0)
+        }
+    }
 }

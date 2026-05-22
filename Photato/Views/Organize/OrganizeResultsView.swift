@@ -18,6 +18,7 @@ struct OrganizeResultsView: View {
 
     private var displayedPhotos: [PhotoAsset] {
         organizeManager.paginatedPhotos(for: category)
+            .filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
     private var displayedGroups: [OrganizeGroupDisplay] {
@@ -25,9 +26,14 @@ struct OrganizeResultsView: View {
     }
 
     private var allPhotos: [PhotoAsset] {
-        isGroupedMode
+        let photos = isGroupedMode
             ? displayedGroups.flatMap { $0.loadedPhotos }
-            : displayedPhotos
+            : organizeManager.paginatedPhotos(for: category)
+        return photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
+    }
+
+    private func filtered(_ photos: [PhotoAsset]) -> [PhotoAsset] {
+        photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
     var body: some View {
@@ -87,14 +93,15 @@ struct OrganizeResultsView: View {
     }
 
     private func groupSection(_ group: OrganizeGroupDisplay) -> some View {
-        VStack(spacing: 0) {
-            groupHeader(group)
+        let photos = filtered(group.loadedPhotos)
+        return VStack(spacing: 0) {
+            groupHeader(group, filteredCount: photos.count)
 
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 4),
                 GridItem(.flexible(), spacing: 4)
             ], spacing: 4) {
-                ForEach(group.loadedPhotos) { photo in
+                ForEach(photos) { photo in
                     groupPhotoCell(photo: photo, group: group)
                 }
             }
@@ -111,11 +118,11 @@ struct OrganizeResultsView: View {
         )
     }
 
-    private func groupHeader(_ group: OrganizeGroupDisplay) -> some View {
+    private func groupHeader(_ group: OrganizeGroupDisplay, filteredCount: Int) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(String(localized: "\(group.loadedPhotos.count) photos"))
+                    Text(String(localized: "\(filteredCount) photos"))
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -165,27 +172,29 @@ struct OrganizeResultsView: View {
         PhotoCell(
             photo: photo,
             isSelected: selectionManager.isSelected(photo.id),
-            isSelectMode: selectionManager.isSelectMode
+            isSelectMode: true
         )
         .overlay(alignment: .bottomLeading) {
             if photo.id == group.bestPhotoId {
                 bestBadge
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            FileSizeBadge(asset: photo.asset)
+        }
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectionManager.toggle(photo.id)
+                    }
+                }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
-            if selectionManager.isSelectMode {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    selectionManager.toggle(photo.id)
-                }
-            } else {
-                openFullscreen(photo)
-            }
-        }
-        .onLongPressGesture(minimumDuration: 0.3) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectionManager.toggle(photo.id)
-            }
+            openFullscreen(photo)
         }
     }
 
@@ -232,23 +241,25 @@ struct OrganizeResultsView: View {
         PhotoCell(
             photo: photo,
             isSelected: selectionManager.isSelected(photo.id),
-            isSelectMode: selectionManager.isSelectMode
+            isSelectMode: true
         )
         .id(photo.id)
+        .overlay(alignment: .bottomTrailing) {
+            FileSizeBadge(asset: photo.asset)
+        }
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectionManager.toggle(photo.id)
+                    }
+                }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
-            if selectionManager.isSelectMode {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    selectionManager.toggle(photo.id)
-                }
-            } else {
-                openFullscreen(photo)
-            }
-        }
-        .onLongPressGesture(minimumDuration: 0.3) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectionManager.toggle(photo.id)
-            }
+            openFullscreen(photo)
         }
     }
 
@@ -375,6 +386,18 @@ struct OrganizeResultsView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .onChange(of: allPhotos) { oldPhotos, newPhotos in
+            guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
+            if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {
+                let newIndex = min(oldIndex, newPhotos.count - 1)
+                currentPhotoID = newPhotos.indices.contains(newIndex) ? newPhotos[newIndex].id : newPhotos.first?.id
+            } else {
+                currentPhotoID = newPhotos.first?.id
+            }
+            if currentPhotoID == nil, !newPhotos.isEmpty {
+                isFullscreenMode = false
+            }
+        }
         .sheet(isPresented: $showTrash) {
             TrashView(photoManager: photoManager)
         }
@@ -385,6 +408,30 @@ struct OrganizeResultsView: View {
             if selectionManager.isSelected(photo.id) {
                 selectionManager.toggle(photo.id)
             }
+        }
+    }
+}
+
+// MARK: - File Size Badge
+
+private struct FileSizeBadge: View {
+    let asset: PHAsset
+    @State private var size: Int64 = 0
+
+    var body: some View {
+        Group {
+            if size > 0 {
+                Text(ByteFormatter.format(size))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding(6)
+            }
+        }
+        .onAppear {
+            size = PHAssetSizeHelper.getFileSize(asset)
         }
     }
 }

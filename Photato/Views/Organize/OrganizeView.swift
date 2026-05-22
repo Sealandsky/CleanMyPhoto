@@ -12,8 +12,6 @@ struct OrganizeView: View {
                 scanCard
                 categoryCards
             }
-            .animation(.easeInOut(duration: 0.3), value: organizeManager.isAnalyzing)
-            .animation(.easeInOut(duration: 0.3), value: organizeManager.totalGroupCount > 0)
             .padding(16)
         }
         .background(Color(UIColor.systemGroupedBackground))

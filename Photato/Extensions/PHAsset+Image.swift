@@ -76,6 +76,8 @@ struct AssetImage: View {
     }
 
     private func loadImage() {
+        guard asset.localIdentifier.contains("-") else { return }
+
         let options = PHImageRequestOptions()
         options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
         options.isNetworkAccessAllowed = true
