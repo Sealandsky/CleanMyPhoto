@@ -268,7 +268,7 @@ struct VideoPlayerView: View {
                     state.togglePlayPause()
                 } label: {
                     Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20))
+                        .font(.system(size: 20, design: .rounded))
                         .foregroundColor(.white)
                         .frame(width: 32, height: 32)
                 }
@@ -293,7 +293,7 @@ struct VideoPlayerView: View {
                     state.toggleMute()
                 } label: {
                     Image(systemName: state.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.system(size: 18))
+                        .font(.system(size: 18, design: .rounded))
                         .foregroundColor(.white)
                         .frame(width: 32, height: 32)
                 }
