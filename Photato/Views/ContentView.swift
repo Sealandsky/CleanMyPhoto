@@ -109,16 +109,16 @@ struct ContentView: View {
     private var permissionView: some View {
         VStack(spacing: 24) {
             Image(systemName: "photo.stack")
-                .font(.system(size: 80))
+                .font(.system(size: 80, design: .rounded))
                 .foregroundColor(.blue)
 
             VStack(spacing: 12) {
                 Text(String(localized: "Photo Access Required"))
-                    .font(.title)
+                    .font(.system(.title, design: .rounded))
                     .fontWeight(.bold)
 
                 Text(String(localized: "Photato needs access to your photo library to help you organize and clean up unwanted photos."))
-                    .font(.body)
+                    .font(.system(.body, design: .rounded))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -134,16 +134,16 @@ struct ContentView: View {
     private var deniedView: some View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 80))
+                .font(.system(size: 80, design: .rounded))
                 .foregroundColor(.orange)
 
             VStack(spacing: 12) {
                 Text(String(localized: "Access Denied"))
-                    .font(.title)
+                    .font(.system(.title, design: .rounded))
                     .fontWeight(.bold)
 
                 Text(String(localized: "To use Photato, please enable photo library access in Settings."))
-                    .font(.body)
+                    .font(.system(.body, design: .rounded))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -417,7 +417,7 @@ struct ContentView: View {
             selectedTab = tab
         } label: {
             Label(tab.localizedText, systemImage: tab.icon)
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .fontWeight(.medium)
                 .foregroundColor(isSelected ? .black : .white.opacity(0.6))
                 .padding(.horizontal, 18)
@@ -524,7 +524,7 @@ struct ContentView: View {
                         }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.title3)
+                            .font(.system(.title3, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                     }
@@ -574,7 +574,7 @@ struct ContentView: View {
             showTrash = true
         } label: {
             Image(systemName: "trash.fill")
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.primary)
                 .frame(width: 44, height: 44)
         }
@@ -588,7 +588,7 @@ struct ContentView: View {
             showTrash = true
         } label: {
             Image(systemName: "trash.fill")
-                .font(.title3)
+                .font(.system(.title3, design: .rounded))
                 .foregroundColor(.primary)
                 .frame(width: 44, height: 44)
         }
@@ -596,7 +596,7 @@ struct ContentView: View {
         .overlay(alignment: .topTrailing) {
             if photoManager.trashCount > 0 {
                 Text("\(photoManager.trashCount)")
-                    .font(.caption2)
+                    .font(.system(.caption2, design: .rounded))
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                     .padding(4)
@@ -613,7 +613,7 @@ struct ContentView: View {
             showMembershipPaywall = true
         } label: {
             Image(systemName: "crown.fill")
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.yellow)
                 .frame(width: 44, height: 44)
         }
@@ -628,7 +628,7 @@ struct ContentView: View {
                     .foregroundColor(.orange)
 
                 Text(membershipManager.remainingTrialText ?? String(localized: "Trial expiring"))
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, design: .rounded))
                     .foregroundColor(.white)
 
                 Spacer()
@@ -636,7 +636,7 @@ struct ContentView: View {
                 Button(String(localized: "Upgrade")) {
                     showMembershipPaywall = true
                 }
-                .font(.system(size: 13))
+                .font(.system(size: 13, design: .rounded))
                 .foregroundColor(.blue)
             }
             .padding(.horizontal, 16)
@@ -657,7 +657,7 @@ struct ContentView: View {
                 .tint(.white)
 
             Text(String(localized: "Loading photos..."))
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
                 .foregroundColor(.white)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -674,7 +674,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.left")
                     Text(String(localized: "Older"))
                 }
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.6))
@@ -685,7 +685,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.right")
                     Text(String(localized: "Newer"))
                 }
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.6))
@@ -696,7 +696,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.down")
                     Text(String(localized: "Swipe down to close"))
                 }
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.6))
@@ -707,7 +707,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.up")
                     Text(String(localized: "Swipe up to delete"))
                 }
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.6))
@@ -741,16 +741,16 @@ struct ContentView: View {
     private var emptyLibraryView: some View {
         VStack(spacing: 20) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 60))
+                .font(.system(size: 60, design: .rounded))
                 .foregroundColor(.gray)
 
             Text(String(localized: "No Photos Found"))
-                .font(.title2)
+                .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
 
             Text(String(localized: "Your photo library appears to be empty."))
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
         }
     }

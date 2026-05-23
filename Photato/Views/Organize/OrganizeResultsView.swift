@@ -123,7 +123,7 @@ struct OrganizeResultsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(String(localized: "\(filteredCount) photos"))
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
 
@@ -134,13 +134,13 @@ struct OrganizeResultsView: View {
                             .foregroundColor(.white.opacity(0.5))
                     }
                 }
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
 
                 if isGroupedMode {
                     Text(category == .duplicates
                          ? String(localized: "Identical photos")
                          : String(localized: "Similar photos"))
-                    .font(.caption2)
+                    .font(.system(.caption2, design: .rounded))
                     .foregroundColor(.white.opacity(0.4))
                 }
             }
@@ -152,7 +152,7 @@ struct OrganizeResultsView: View {
                     deselectAll(in: group)
                 } label: {
                     Text(String(localized: "Keep All"))
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .fontWeight(.medium)
                         .foregroundColor(.white.opacity(0.7))
                         .padding(.horizontal, 10)
@@ -200,7 +200,7 @@ struct OrganizeResultsView: View {
 
     private var bestBadge: some View {
         Text(String(localized: "Best"))
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -297,7 +297,7 @@ struct OrganizeResultsView: View {
         } else {
             ToolbarItem(placement: .topBarTrailing) {
                 Text("\(organizeManager.stat(for: category)) \(String(localized: "photos"))")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(.secondary)
             }
         }
@@ -348,7 +348,7 @@ struct OrganizeResultsView: View {
                         }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.title3)
+                            .font(.system(.title3, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                     }
@@ -360,7 +360,7 @@ struct OrganizeResultsView: View {
                         showTrash = true
                     } label: {
                         Image(systemName: "trash.fill")
-                            .font(.title3)
+                            .font(.system(.title3, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                     }
@@ -368,7 +368,7 @@ struct OrganizeResultsView: View {
                     .overlay(alignment: .topTrailing) {
                         if photoManager.trashCount > 0 {
                             Text("\(photoManager.trashCount)")
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                                 .padding(4)

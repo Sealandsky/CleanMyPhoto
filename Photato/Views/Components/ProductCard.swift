@@ -16,7 +16,7 @@ struct ProductCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(productType.displayName)
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: 17, weight: .medium, design: .rounded))
                             .foregroundColor(.white)
 
                         if productType.isPopular {
@@ -26,13 +26,13 @@ struct ProductCard: View {
 
                     if let subtitle = productType.subtitleText {
                         Text(subtitle)
-                            .font(.system(size: 13))
+                            .font(.system(size: 13, design: .rounded))
                             .foregroundColor(.white.opacity(0.5))
                     }
 
                     if let savings = productType.savingsText {
                         Text(savings)
-                            .font(.system(size: 13))
+                            .font(.system(size: 13, design: .rounded))
                             .foregroundColor(.green)
                             .fontWeight(.medium)
                     }
@@ -43,11 +43,11 @@ struct ProductCard: View {
                 // 右侧：价格
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(productType.priceText(from: products))
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
                     Text(productType.durationText.isEmpty ? String(localized: "One-time") : productType.durationText)
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, design: .rounded))
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
@@ -84,7 +84,7 @@ struct ProductCard: View {
     // MARK: - Popular Badge
     private var popularBadge: some View {
         Text(String(localized: "Most Popular"))
-            .font(.system(size: 11))
+            .font(.system(size: 11, design: .rounded))
             .fontWeight(.medium)
             .foregroundColor(.blue)
             .padding(.horizontal, 8)

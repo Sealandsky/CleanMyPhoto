@@ -55,11 +55,7 @@ struct MonthAlbum: Identifiable {
     }
 
     var monthName: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: Locale.current.identifier)
-        formatter.dateFormat = "MMMM"
-        let date = Calendar.current.date(from: DateComponents(year: year, month: month))!
-        return formatter.string(from: date)
+        "\(month)月"
     }
 
     var fullTitle: String {

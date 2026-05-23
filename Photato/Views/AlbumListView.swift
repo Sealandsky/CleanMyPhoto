@@ -5,10 +5,7 @@ struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     let onAlbumSelect: (AlbumModel) -> Void
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
         ScrollView {
@@ -25,7 +22,7 @@ struct AlbumListView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 12)
                 .padding(.bottom, 12)
             }
         }
@@ -46,16 +43,16 @@ struct AlbumListView: View {
     private var emptyAlbumsView: some View {
         VStack(spacing: 20) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 60))
+                .font(.system(size: 60, design: .rounded))
                 .foregroundColor(.gray)
 
             Text(String(localized: "No Albums Found"))
-                .font(.title2)
+                .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
 
             Text(String(localized: "You haven't created any albums yet."))
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
         }
     }
@@ -64,27 +61,11 @@ struct AlbumListView: View {
 // MARK: - Album Cell Skeleton
 struct AlbumCellSkeleton: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 16)
-                    .frame(maxWidth: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 12)
-                    .frame(maxWidth: 80)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-        }
-        .shimmering()
+        Rectangle()
+            .fill(Color.gray.opacity(0.3))
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .shimmering()
     }
 }
 

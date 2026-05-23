@@ -49,12 +49,12 @@ struct PhotoCardInfo: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
                 .foregroundColor(.white)
                 .lineLimit(1)
 
             Text(subtitle)
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 8)

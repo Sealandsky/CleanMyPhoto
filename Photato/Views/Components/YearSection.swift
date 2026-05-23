@@ -17,18 +17,18 @@ struct YearSectionView: View {
             } label: {
                 HStack {
                     Image(systemName: yearGroup.isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .animation(.easeInOut(duration: 0.2), value: yearGroup.isExpanded)
 
                     Text("\(yearGroup.year)")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(.white)
 
                     Spacer()
 
                     Text("\(yearGroup.totalPhotos)\(String(localized: "photos"))")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 16)

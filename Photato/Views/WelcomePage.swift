@@ -30,11 +30,11 @@ struct WelcomePage: View {
                 // 欢迎文字
                 VStack(spacing: 8) {
                     Text(String(localized: "Welcome to Photato"))
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
 
                     Text(String(localized: "Maximize Your Photo Storage"))
-                        .font(.system(size: 30, weight: .semibold))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
                         .frame(width: 260)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
@@ -50,7 +50,7 @@ struct WelcomePage: View {
             }) {
                 HStack {
                     Text(String(localized: "Try 7 Days Free"))
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)

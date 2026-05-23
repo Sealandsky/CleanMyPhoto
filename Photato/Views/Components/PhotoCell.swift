@@ -55,12 +55,12 @@ struct PhotoCell: View {
                         .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 1)
 
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 26))
+                        .font(.system(size: 26, design: .rounded))
                         .foregroundColor(.blue)
                 }
             } else {
                 Image(systemName: "circle")
-                    .font(.system(size: 26))
+                    .font(.system(size: 26, design: .rounded))
                     .foregroundColor(.white.opacity(0.8))
                     .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 1)
             }
@@ -87,7 +87,7 @@ struct PhotoCell: View {
     private var videoBadge: some View {
         HStack(spacing: 3) {
             Image(systemName: "play.fill")
-                .font(.system(size: 10))
+                .font(.system(size: 10, design: .rounded))
             if let duration = photo.videoDuration {
                 Text(duration)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -102,14 +102,14 @@ struct PhotoCell: View {
 
     private var favoriteBadge: some View {
         Image(systemName: "heart.fill")
-            .font(.system(size: 12))
+            .font(.system(size: 12, design: .rounded))
             .foregroundColor(.white)
             .padding(6)
     }
 
     private var livePhotoBadge: some View {
         Image(systemName: "livephoto")
-            .font(.system(size: 14))
+            .font(.system(size: 14, design: .rounded))
             .foregroundColor(.white)
             .padding(2)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -118,7 +118,7 @@ struct PhotoCell: View {
 
     private func iconBadge(_ iconName: String, _ color: Color) -> some View {
         Image(systemName: iconName)
-            .font(.system(size: 16))
+            .font(.system(size: 16, design: .rounded))
             .foregroundColor(.white)
             .padding(7)
             .background(color, in: RoundedRectangle(cornerRadius: 8))
@@ -127,7 +127,7 @@ struct PhotoCell: View {
 
     private func textBadge(_ text: String, _ color: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)

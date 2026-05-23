@@ -76,7 +76,7 @@ struct MembershipView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundColor(.white.opacity(0.6))
                         .frame(width: 36, height: 36)
                         .background(Color.white.opacity(0.1))
@@ -99,17 +99,17 @@ struct MembershipView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 18))
 
             Text(String(localized: "Upgrade to Pro"))
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
             if membershipManager.remainingTrialDays > 0,
                let text = membershipManager.remainingTrialText {
                 Text(text)
-                    .font(.system(size: 16))
+                    .font(.system(size: 16, design: .rounded))
                     .foregroundColor(.blue)
             } else {
                 Text(String(localized: "Unlock All Features"))
-                    .font(.system(size: 16))
+                    .font(.system(size: 16, design: .rounded))
                     .foregroundColor(.white.opacity(0.5))
             }
         }
@@ -120,7 +120,7 @@ struct MembershipView: View {
     private var benefitsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(String(localized: "Membership Benefits"))
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
                 .padding(.bottom, 2)
 
@@ -151,7 +151,7 @@ struct MembershipView: View {
     private func benefitRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundColor(.blue)
                 .frame(width: 40, height: 40)
                 .background(Color.blue.opacity(0.12))
@@ -159,17 +159,17 @@ struct MembershipView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundColor(.white)
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, design: .rounded))
                     .foregroundColor(.white.opacity(0.45))
             }
 
             Spacer()
 
             Image(systemName: "checkmark")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(.blue)
         }
     }
@@ -198,7 +198,7 @@ struct MembershipView: View {
     private var termsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(String(localized: "Subscription Terms"))
-                .font(.system(size: 13))
+                .font(.system(size: 13, design: .rounded))
                 .foregroundColor(.white.opacity(0.45))
 
             VStack(alignment: .leading, spacing: 6) {
@@ -206,7 +206,7 @@ struct MembershipView: View {
                 Text(String(localized: "• Your account will be charged for renewal within 24 hours before the current period ends."))
                 Text(String(localized: "• You can manage your subscription and turn off auto-renewal after purchase."))
             }
-            .font(.system(size: 11))
+            .font(.system(size: 11, design: .rounded))
             .foregroundColor(.white.opacity(0.35))
         }
     }
@@ -231,7 +231,7 @@ struct MembershipView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
                             Text(String(localized: "Subscribe"))
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
                         }
                     }
                     .foregroundColor(.white)
@@ -263,7 +263,7 @@ struct MembershipView: View {
                         }
                     }
                 }
-                .font(.system(size: 13))
+                .font(.system(size: 13, design: .rounded))
                 .foregroundColor(.white.opacity(0.45))
             }
             .padding(.horizontal, 24)
@@ -284,7 +284,7 @@ struct MembershipView: View {
                         .scaleEffect(1.5)
 
                     Text(String(localized: "Processing..."))
-                        .font(.system(size: 15))
+                        .font(.system(size: 15, design: .rounded))
                         .foregroundColor(.white)
                 }
             }

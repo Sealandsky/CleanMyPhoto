@@ -48,7 +48,7 @@ struct AlbumPhotoListView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 12)
                 }
             }
             .background(Color.black)
@@ -118,16 +118,17 @@ struct AlbumPhotoListView: View {
     private var albumInfoHeader: some View {
         HStack(spacing: 16) {
             Text("\(photos.count) \(String(localized: "photos"))")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .rounded))
                 .foregroundColor(.secondary)
 
             if !albumSizeText.isEmpty {
                 Text(albumSizeText)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(.secondary)
             }
+            Spacer()
         }
-        .padding(.leading, 4)
+        .padding(.leading, 12)
         .padding(.vertical, 8)
     }
 

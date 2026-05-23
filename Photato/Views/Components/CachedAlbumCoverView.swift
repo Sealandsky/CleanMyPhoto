@@ -30,7 +30,7 @@ struct CachedAlbumCoverView: View {
                     .fill(Color.gray.opacity(0.3))
                     .overlay(
                         Image(systemName: "photo")
-                            .font(.system(size: 40))
+                            .font(.system(size: 40, design: .rounded))
                             .foregroundColor(.gray)
                     )
             }
@@ -94,7 +94,7 @@ struct CachedAlbumCoverView: View {
 #Preview {
     VStack(spacing: 20) {
         Text("Cached Album Cover View")
-            .font(.headline)
+            .font(.system(.headline, design: .rounded))
 
         // 注意：这个预览需要实际的 PHAsset 才能工作
         // 在实际使用时，AlbumCell 会调用这个组件

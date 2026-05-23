@@ -77,7 +77,7 @@ struct DraggablePhotoView: View {
                 if showDeleteIndicator && onDelete != nil {
                     VStack {
                         Image(systemName: "trash.fill")
-                            .font(.system(size: 40, weight: .semibold))
+                            .font(.system(size: 40, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
                             .padding(16)
                             .background(Circle().fill(Color.red.opacity(0.8)))

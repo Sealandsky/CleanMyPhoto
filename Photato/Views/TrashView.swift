@@ -107,15 +107,15 @@ struct TrashView: View {
     private var emptyTrashView: some View {
         VStack(spacing: 20) {
             Image(systemName: "trash")
-                .font(.system(size: 60))
+                .font(.system(size: 60, design: .rounded))
                 .foregroundColor(.gray)
 
             Text(String(localized: "Trash is Empty"))
-                .font(.title2)
+                .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
 
             Text(String(localized: "Photos you swipe up to delete will appear here."))
-                .font(.body)
+                .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)

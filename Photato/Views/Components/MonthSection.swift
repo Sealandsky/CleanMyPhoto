@@ -15,19 +15,19 @@ struct MonthSectionView: View {
             } label: {
                 HStack {
                     Image(systemName: monthGroup.isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .padding(.leading, 32)
                         .animation(.easeInOut(duration: 0.2), value: monthGroup.isExpanded)
 
                     Text(monthGroup.monthName)
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .foregroundColor(.white)
 
                     Spacer()
 
                     Text("\(monthGroup.totalPhotos)\(String(localized: "photos"))")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 16)

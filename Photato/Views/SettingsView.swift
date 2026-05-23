@@ -19,18 +19,18 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "checkmark.seal.fill")
-                                .font(.title)
+                                .font(.system(.title, design: .rounded))
                                 .foregroundColor(.white)
                                 .opacity(0.85)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(String(localized: "Photato Pro"))
-                                    .font(.title3)
+                                    .font(.system(.title3, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
 
                                 Text(membershipCardSubtitle)
-                                    .font(.subheadline)
+                                    .font(.system(.subheadline, design: .rounded))
                                     .foregroundColor(.white.opacity(0.7))
                             }
 
@@ -39,10 +39,10 @@ struct SettingsView: View {
                             if membershipManager.membershipStatus.currentTier != .lifetime {
                                 HStack(spacing: 2) {
                                     Image(systemName: "arrow.up.circle.fill")
-                                        .font(.title3)
+                                        .font(.system(.title3, design: .rounded))
                                         .fontWeight(.semibold)
                                     Text(String(localized: "Upgrade"))
-                                        .font(.subheadline)
+                                        .font(.system(.subheadline, design: .rounded))
                                         .fontWeight(.semibold)
                                 }
                                 .foregroundColor(.white)
@@ -110,7 +110,7 @@ struct SettingsView: View {
                             Text("\(gridSettings.columnCount)")
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -134,7 +134,7 @@ struct SettingsView: View {
                             Text(gridSettings.aspectRatio == 1.0 ? "1:1" : "3:4")
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -162,7 +162,7 @@ struct SettingsView: View {
                             Text(String(localized: "Privacy Policy"))
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.system(.caption, design: .rounded))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -177,7 +177,7 @@ struct SettingsView: View {
                             Text(String(localized: "Terms of Use"))
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.system(.caption, design: .rounded))
                                 .foregroundColor(.secondary)
                         }
                     }

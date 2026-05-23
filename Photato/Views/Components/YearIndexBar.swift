@@ -10,7 +10,7 @@ struct YearIndexBar: View {
         VStack(spacing: 4) {
             ForEach(years, id: \.self) { year in
                 Text("\(year)")
-                    .font(.caption2)
+                    .font(.system(.caption2, design: .rounded))
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
                     .frame(width: 40, height: 20)

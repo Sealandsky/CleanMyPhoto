@@ -12,18 +12,18 @@ struct DateSectionView: View {
             // 日期标题
             HStack {
                 Text(dateGroup.dayText)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
                     .padding(.leading, 48)
 
                 Text(dateGroup.weekdayText)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
 
                 Spacer()
 
                 Text("\(dateGroup.totalPhotos)\(String(localized: "photos"))")
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)

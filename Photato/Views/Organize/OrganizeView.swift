@@ -46,11 +46,11 @@ struct OrganizeView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(String(localized: "Start Scan"))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
             }
 
@@ -63,10 +63,10 @@ struct OrganizeView: View {
             } label: {
                 HStack(spacing: 2) {
                     Image(systemName: "magnifyingglass.circle.fill")
-                        .font(.title3)
+                        .font(.system(.title3, design: .rounded))
                         .fontWeight(.semibold)
                     Text(String(localized: "Scan"))
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                 }
                 .foregroundColor(.white)
@@ -92,11 +92,11 @@ struct OrganizeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 let totalCount = OrganizeCategory.allCases.reduce(0) { $0 + organizeManager.stat(for: $1) }
                 Text(String(localized: "Found \(totalCount) items"))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Text(String(localized: "Tap a category below to review"))
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
             }
 
@@ -109,10 +109,10 @@ struct OrganizeView: View {
             } label: {
                 HStack(spacing: 2) {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.title3)
+                        .font(.system(.title3, design: .rounded))
                         .fontWeight(.semibold)
                     Text(String(localized: "Rescan"))
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                 }
                 .foregroundColor(.white)
@@ -139,7 +139,7 @@ struct OrganizeView: View {
                 Text(organizeManager.currentStep.isEmpty
                      ? String(localized: "Scanning...")
                      : organizeManager.currentStep)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 ProgressView(value: organizeManager.analysisProgress)
@@ -153,10 +153,10 @@ struct OrganizeView: View {
             } label: {
                 HStack(spacing: 2) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
+                        .font(.system(.title3, design: .rounded))
                         .fontWeight(.semibold)
                     Text(String(localized: "Cancel"))
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                 }
                 .foregroundColor(.white)
@@ -206,7 +206,7 @@ struct OrganizeView: View {
                         .foregroundColor(hasResults ? .primary : .secondary)
 
                     Text(category.localizedText)
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .foregroundColor(.secondary)
                 }
 
@@ -241,7 +241,7 @@ struct CategoryThumbnails: View {
         Group {
             if assets.isEmpty {
                 Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 28, weight: .light))
+                    .font(.system(size: 28, weight: .light, design: .rounded))
                     .foregroundColor(Color(UIColor.tertiaryLabel))
             } else {
                 ZStack {

@@ -16,7 +16,7 @@ struct PhotoGroupView: View {
                     ProgressView()
                         .tint(.white)
                     Text(String(localized: "Loading..."))
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                         .padding(.top, 8)
                     Spacer()
@@ -28,10 +28,7 @@ struct PhotoGroupView: View {
                         ForEach(albumManager.yearAlbums) { yearAlbum in
                             Section {
                                 if let months = albumManager.allMonthAlbums[yearAlbum.year], !months.isEmpty {
-                                    LazyVGrid(columns: [
-                                        GridItem(.flexible()),
-                                        GridItem(.flexible())
-                                    ], spacing: 12) {
+                                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                                         ForEach(months) { monthAlbum in
                                             MonthCardView(monthAlbum: monthAlbum)
                                                 .onTapGesture {
@@ -39,12 +36,13 @@ struct PhotoGroupView: View {
                                                 }
                                         }
                                     }
-                                    .padding(.horizontal, 4)
+                                    .padding(.horizontal, 12)
+                                    .padding(.bottom, 24)
                                 }
                             } header: {
                                 HStack {
                                     Text(verbatim: "\(yearAlbum.year)")
-                                        .font(.title2)
+                                        .font(.system(.title3, design: .rounded))
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                         .padding(.leading, 0)
@@ -56,7 +54,7 @@ struct PhotoGroupView: View {
                             }
                         }
                     }
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 80)
                 }
             }
         }
@@ -75,35 +73,63 @@ struct MonthCardView: View {
     let monthAlbum: MonthAlbum
 
     var body: some View {
-        PhotoCard {
-            PhotoCardCover {
-                if let thumbnail = monthAlbum.thumbnail {
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .scaledToFill()
-                } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
-                    AssetImage(
-                        asset: asset,
-                        targetSize: CGSize(width: 400, height: 400),
-                        contentMode: .fill
-                    )
-                    .scaledToFill()
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.system(size: 40))
-                                .foregroundColor(.gray)
+        GeometryReader { geo in
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let thumbnail = monthAlbum.thumbnail {
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .scaledToFill()
+                    } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
+                        AssetImage(
+                            asset: asset,
+                            targetSize: CGSize(width: 300, height: 400),
+                            contentMode: .fill
                         )
+                        .scaledToFill()
+                    } else {
+                        Rectangle().fill(Color.gray.opacity(0.3))
+                    }
                 }
-            }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipped()
 
-            PhotoCardInfo(
-                title: monthAlbum.monthName,
-                subtitle: "\(monthAlbum.photoCount)\(String(localized: "photos"))"
-            )
+                // 毛玻璃底部渐变
+                Rectangle()
+                    .fill(.thickMaterial)
+                     .background(Color.black.opacity(0.35)) 
+                    .frame(height: geo.size.height * 0.8)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0.0),
+                                .init(color: .black, location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(maxWidth: .infinity, alignment: .bottom)
+
+                
+
+                VStack(alignment: .leading, spacing: -1) {
+                    Text(monthAlbum.monthName)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                    Text("\(monthAlbum.photoCount)")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(6)
+            }
         }
+        .aspectRatio(3.0 / 4.0, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+        )
     }
 }
 
@@ -209,7 +235,7 @@ struct SystemMonthPhotosView: View {
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .foregroundColor(.secondary)
                 }
             }
