@@ -8,9 +8,10 @@ struct DraggablePhotoView: View {
     var currentPhotoID: String
     let onPhotoChange: (String, Int) -> Void
     var onDelete: ((PhotoAsset) -> Void)?
+    var onBlockedDelete: (() -> Void)?
     let onDismiss: () -> Void
     let screenSize: CGSize
-    let photoSpacing: CGFloat = 20
+    let photoSpacing: CGFloat = 12
 
     @State private var localIndex: Int
     @State private var offset: CGSize = .zero
@@ -19,9 +20,14 @@ struct DraggablePhotoView: View {
     @State private var navigationID: UInt = 0
     @State private var deleteID: UInt = 0
     @State private var hasTriggeredHaptic = false
+    @State private var isDeleteTransitioning = false
+    @Binding var deleteTrigger: Int
+
     // 卡片样式配置（和你截图匹配）
     private let cardCornerRadius: CGFloat = 24
-    private let cardPadding: CGFloat = 0 // 卡片和屏幕边缘的距离
+    private let cardPadding: CGFloat = 16
+    private let cardTopPadding: CGFloat = 120
+    private let cardBottomPadding: CGFloat = 120
     private let cardShadowRadius: CGFloat = 16
     private let cardShadowOpacity: CGFloat = 0.15
     private let dismissThreshold: CGFloat = 60
@@ -35,11 +41,13 @@ struct DraggablePhotoView: View {
     private var previousPhoto: PhotoAsset? { safeIndex > 0 ? photos[safeIndex - 1] : nil }
     private var nextPhoto: PhotoAsset? { safeIndex < photos.count - 1 ? photos[safeIndex + 1] : nil }
 
-    init(photos: [PhotoAsset], currentPhotoID: String, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize) {
+    init(photos: [PhotoAsset], currentPhotoID: String, deleteTrigger: Binding<Int>, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onBlockedDelete: (() -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize) {
         self.photos = photos
         self.currentPhotoID = currentPhotoID
+        self._deleteTrigger = deleteTrigger
         self.onPhotoChange = onPhotoChange
         self.onDelete = onDelete
+        self.onBlockedDelete = onBlockedDelete
         self.onDismiss = onDismiss
         self.screenSize = screenSize
         let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) ?? 0
@@ -55,7 +63,7 @@ struct DraggablePhotoView: View {
                     .ignoresSafeArea()
 
                 // Previous photo (visible when swiping right)
-                if let prev = previousPhoto {
+                if let prev = previousPhoto, !isDeleteTransitioning {
                     photoCardLayer(prev)
                         .offset(x: -screenSize.width - photoSpacing + offset.width)
                         .zIndex(0)
@@ -102,8 +110,19 @@ struct DraggablePhotoView: View {
             )
         }
         .onChange(of: currentPhotoID) { _, newID in
+            guard !isDeleteTransitioning else { return }
             if let idx = photos.firstIndex(where: { $0.id == newID }) {
                 localIndex = idx
+            }
+        }
+        .onChange(of: deleteTrigger) { oldValue, newValue in
+            guard newValue > oldValue, onDelete != nil else { return }
+            if currentPhoto.isFavorite {
+                onBlockedDelete?()
+                return
+            }
+            DispatchQueue.main.async {
+                performDeleteAnimation()
             }
         }
     }
@@ -143,48 +162,92 @@ struct DraggablePhotoView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
         }
     }
+    // MARK: - Card Size Helper
+        private func cardSize(for photoAsset: PhotoAsset, in available: CGSize) -> CGSize {
+            let ratio = CGFloat(photoAsset.asset.pixelWidth) / max(CGFloat(photoAsset.asset.pixelHeight), 1)
+            if available.width / available.height > ratio {
+                return CGSize(width: available.height * ratio, height: available.height)
+            } else {
+                return CGSize(width: available.width, height: available.width / ratio)
+            }
+        }
+
     // MARK: - Photo Card Layer（带卡片样式的前后图）
         private func photoCardLayer(_ photoAsset: PhotoAsset) -> some View {
-            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .cornerRadius(cardCornerRadius)
-                .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                .padding(cardPadding)
-                .clipped()
+            GeometryReader { geo in
+                let size = cardSize(for: photoAsset, in: geo.size)
+
+                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                    .frame(width: size.width, height: size.height)
+                    .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .padding(.horizontal, cardPadding)
+            .padding(.top, cardTopPadding)
+            .padding(.bottom, cardBottomPadding)
         }
 
         // MARK: - Current Photo Card Layer（带卡片样式的当前图）
         @ViewBuilder
         private func currentMediaCardLayer(_ photoAsset: PhotoAsset) -> some View {
-            switch photoAsset.mediaType {
-            case .video:
-                ZStack {
-                    photoCardLayer(photoAsset)
-                    VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .cornerRadius(cardCornerRadius)
-                        .padding(cardPadding)
-                        .clipped()
+            GeometryReader { geo in
+                let size = cardSize(for: photoAsset, in: geo.size)
+
+                switch photoAsset.mediaType {
+                case .video:
+                    ZStack {
+                        AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                            .frame(width: size.width, height: size.height)
+                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                            )
+                            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+
+                        VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
+                            .frame(width: size.width, height: size.height)
+                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .id(photoAsset.id)
+                case .livePhoto:
+                    ZStack {
+                        AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                            .frame(width: size.width, height: size.height)
+                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                            )
+                            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+
+                        LivePhotoPlayerView(asset: photoAsset.asset)
+                            .frame(width: size.width, height: size.height)
+                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .id(photoAsset.id)
+                default:
+                    AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                        .frame(width: size.width, height: size.height)
+                        .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+                        .frame(width: geo.size.width, height: geo.size.height)
                 }
-                .id(photoAsset.id)
-            case .livePhoto:
-                ZStack {
-                    photoCardLayer(photoAsset)
-                    LivePhotoPlayerView(asset: photoAsset.asset)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .cornerRadius(cardCornerRadius)
-                        .padding(cardPadding)
-                        .clipped()
-                }
-                .id(photoAsset.id)
-            default:
-                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .cornerRadius(cardCornerRadius)
-                    .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                    .padding(cardPadding)
-                    .clipped()
             }
+            .padding(.horizontal, cardPadding)
+            .padding(.top, cardTopPadding)
+            .padding(.bottom, cardBottomPadding)
         }
     // MARK: - Gesture Handlers
     @State private var showDeleteIndicator = false
@@ -218,7 +281,12 @@ struct DraggablePhotoView: View {
 
         // Swipe up to delete
         if vertical < -deleteThreshold && onDelete != nil {
-            performDeleteAnimation()
+            if currentPhoto.isFavorite {
+                onBlockedDelete?()
+                resetPosition()
+            } else {
+                performDeleteAnimation()
+            }
             return
         }
 
@@ -317,7 +385,9 @@ struct DraggablePhotoView: View {
         let nextPhotoRef = nextPhoto
         let prevPhotoRef = previousPhoto
         let hasMore = nextPhotoRef != nil || prevPhotoRef != nil
+        let hasForward = nextPhotoRef != nil
 
+        // Step 1: Slide current photo up
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             offset = CGSize(width: 0, height: -screenSize.height)
         }
@@ -325,25 +395,38 @@ struct DraggablePhotoView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             guard deleteID == currentDelID else { return }
 
-            onDelete?(photoToDelete)
-
             if hasMore {
-                if let next = nextPhotoRef {
-                    onPhotoChange(next.id, localIndex)
-                } else if let prev = prevPhotoRef, localIndex > 0 {
-                    localIndex -= 1
-                    onPhotoChange(prev.id, localIndex)
+                isDeleteTransitioning = true
+
+                // Step 2: Delete first, array shrinks, next photo falls into localIndex
+                onDelete?(photoToDelete)
+
+                // Step 3: Position off-screen, then slide in
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    if !hasForward, localIndex > 0 {
+                        localIndex -= 1
+                    }
+                    if localIndex >= photos.count {
+                        localIndex = max(0, photos.count - 1)
+                    }
+                    offset = CGSize(width: screenSize.width + photoSpacing, height: 0)
+                    isDragging = false
+                    showDeleteIndicator = false
+                }
+
+                onPhotoChange(currentPhoto.id, localIndex)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.95)) {
+                    offset = .zero
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    isDeleteTransitioning = false
                 }
             } else {
+                onDelete?(photoToDelete)
                 onDismiss()
-            }
-
-            var t = Transaction()
-            t.disablesAnimations = true
-            withTransaction(t) {
-                offset = .zero
-                isDragging = false
-                showDeleteIndicator = false
             }
         }
     }
@@ -385,9 +468,11 @@ struct DraggablePhotoView: View {
 
 // MARK: - Preview
 #Preview {
+    @Previewable @State var deleteTrigger = 0
     DraggablePhotoView(
         photos: [],
         currentPhotoID: "",
+        deleteTrigger: $deleteTrigger,
         onPhotoChange: { _, _ in },
         onDismiss: {},
         screenSize: CGSize(width: 393, height: 852)

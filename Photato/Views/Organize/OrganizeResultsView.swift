@@ -11,6 +11,8 @@ struct OrganizeResultsView: View {
     @State private var isFullscreenMode = false
     @State private var currentPhotoID: String? = nil
     @State private var showTrash = false
+    @State private var deleteTrigger: Int = 0
+    @State private var showFavoriteDeleteAlert: Bool = false
 
     private var isGroupedMode: Bool {
         category == .similar || category == .duplicates
@@ -30,6 +32,11 @@ struct OrganizeResultsView: View {
             ? displayedGroups.flatMap { $0.loadedPhotos }
             : organizeManager.paginatedPhotos(for: category)
         return photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
+    }
+
+    private var currentFullscreenPhoto: PhotoAsset? {
+        guard let id = currentPhotoID else { return nil }
+        return allPhotos.first { $0.id == id }
     }
 
     private func filtered(_ photos: [PhotoAsset]) -> [PhotoAsset] {
@@ -322,11 +329,15 @@ struct OrganizeResultsView: View {
                     DraggablePhotoView(
                         photos: photos,
                         currentPhotoID: currentPhotoID ?? "",
+                        deleteTrigger: $deleteTrigger,
                         onPhotoChange: { id, _ in
                             currentPhotoID = id
                         },
                         onDelete: { photo in
                             photoManager.addToTrash(photo)
+                        },
+                        onBlockedDelete: {
+                            showFavoriteDeleteAlert = true
                         },
                         onDismiss: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -343,8 +354,10 @@ struct OrganizeResultsView: View {
             VStack {
                 HStack {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isFullscreenMode = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isFullscreenMode = false
+                            }
                         }
                     } label: {
                         Image(systemName: "chevron.left")
@@ -378,14 +391,48 @@ struct OrganizeResultsView: View {
                         }
                     }
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
 
                 Spacer()
+
+                HStack(spacing: 16) {
+                    Spacer()
+
+                    Button {
+                        if let photo = currentFullscreenPhoto {
+                            photoManager.toggleFavorite(photo)
+                        }
+                    } label: {
+                        Image(systemName: (currentFullscreenPhoto?.isFavorite ?? false) ? "heart.fill" : "heart")
+                            .font(.system(.title3, design: .rounded))
+                            .foregroundColor((currentFullscreenPhoto?.isFavorite ?? false) ? .red : .primary)
+                            .frame(width: 60, height: 60)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+
+                    Button {
+                        deleteTrigger += 1
+                    } label: {
+                        Image(systemName: "trash.fill")
+                            .font(.system(.title3, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(width: 60, height: 60)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+
+                    Spacer()
+                }
+                .padding(.bottom, 8)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
+        }
         .onChange(of: allPhotos) { oldPhotos, newPhotos in
             guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
             if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {

@@ -594,6 +594,9 @@
         }
       }
     },
+    "Cannot Delete" : {
+
+    },
     "Close" : {
       "localizations" : {
         "en" : {
@@ -635,22 +638,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "连接超时，请重试。"
-          }
-        }
-      }
-    },
-    "Subscribe" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Subscribe"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "订阅"
           }
         }
       }
@@ -1850,6 +1837,22 @@
         }
       }
     },
+    "Subscribe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscribe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "订阅"
+          }
+        }
+      }
+    },
     "Subscribe or one-time purchase" : {
       "localizations" : {
         "en" : {
@@ -1961,6 +1964,9 @@
           }
         }
       }
+    },
+    "This photo is in your favorites. Remove from favorites first before deleting." : {
+
     },
     "Timeline" : {
       "localizations" : {

@@ -43,6 +43,8 @@ struct ContentView: View {
     @State private var showMembershipPaywall = false
     @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
     @State private var showGestureInstructions: Bool = false
+    @State private var deleteTrigger: Int = 0
+    @State private var showFavoriteDeleteAlert: Bool = false
 
     // 相簿相关状态
     @State private var selectedTab: MainTab = .allPhotos
@@ -468,6 +470,11 @@ struct ContentView: View {
         }
     }
 
+    private var currentFullscreenPhoto: PhotoAsset? {
+        guard let id = currentPhotoID else { return nil }
+        return currentPhotos.first { $0.id == id }
+    }
+
     // MARK: - Photo Browser
     private var photoBrowserView: some View {
         ZStack {
@@ -478,6 +485,7 @@ struct ContentView: View {
                     DraggablePhotoView(
                         photos: photos,
                         currentPhotoID: currentPhotoID ?? "",
+                        deleteTrigger: $deleteTrigger,
                         onPhotoChange: { id, index in
                             currentPhotoID = id
                             scrollToPhotoID = nil
@@ -487,6 +495,9 @@ struct ContentView: View {
                         },
                         onDelete: { photo in
                             photoManager.addToTrash(photo)
+                        },
+                        onBlockedDelete: {
+                            showFavoriteDeleteAlert = true
                         },
                         onDismiss: {
                             scrollToPhotoID = currentPhotoID
@@ -519,8 +530,10 @@ struct ContentView: View {
                 HStack {
                     Button {
                         scrollToPhotoID = currentPhotoID
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isFullscreenMode = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isFullscreenMode = false
+                            }
                         }
                     } label: {
                         Image(systemName: "chevron.left")
@@ -534,13 +547,48 @@ struct ContentView: View {
 
                     fullscreenTrashButton
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
 
                 Spacer()
+
+                HStack(spacing: 16) {
+                    Spacer()
+
+                    Button {
+                        if let photo = currentFullscreenPhoto {
+                            photoManager.toggleFavorite(photo)
+                        }
+                    } label: {
+                        Image(systemName: (currentFullscreenPhoto?.isFavorite ?? false) ? "heart.fill" : "heart")
+                            .font(.system(.title3, design: .rounded))
+                            .foregroundColor((currentFullscreenPhoto?.isFavorite ?? false) ? .red : .primary)
+                            .frame(width: 60, height: 60)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+
+
+                    Button {
+                        deleteTrigger += 1
+                    } label: {
+                        Image(systemName: "trash.fill")
+                            .font(.system(.title3, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(width: 60, height: 60)
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+
+                    Spacer()
+                }
+                .padding(.bottom, 8)
             }
         }
         .toolbar(.hidden, for: .tabBar)
+        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
+        }
         .onChange(of: currentPhotos) { oldPhotos, newPhotos in
             guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
             if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {
@@ -714,7 +762,7 @@ struct ContentView: View {
                 .foregroundColor(.white)
                 .cornerRadius(15)
             }
-            .padding(.bottom, 60)
+            .padding(.bottom, 120)
         }
         .allowsHitTesting(false)
         .transition(.opacity)

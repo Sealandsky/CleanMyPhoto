@@ -15,7 +15,7 @@ struct PhotoAsset: Identifiable, Equatable {
     let id: String
     let asset: PHAsset
     let mediaType: AssetMediaType
-    let isFavorite: Bool
+    var isFavorite: Bool
 
     init(asset: PHAsset) {
         self.id = asset.localIdentifier
@@ -25,7 +25,7 @@ struct PhotoAsset: Identifiable, Equatable {
     }
 
     static func == (lhs: PhotoAsset, rhs: PhotoAsset) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id && lhs.isFavorite == rhs.isFavorite
     }
 
     // MARK: - Media Type Detection

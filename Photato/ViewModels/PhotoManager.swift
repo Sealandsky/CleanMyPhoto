@@ -116,8 +116,11 @@ class PhotoManager: ObservableObject {
         print("✅ Loaded \(assets.count) photos from index \(startIndex) to \(endIndex) (total: \(allPhotos.count))")
         print("✅ Has more photos: \(hasMorePhotos)")
 
-        // 预加载前3张和后3张图片
-        preloadAssets()
+        // 延后预加载，让 UI 先渲染
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            preloadAssets()
+        }
 
         if allPhotos.isEmpty {
             errorMessage = "No photos found. Make sure you have photos in your photo library."
@@ -125,31 +128,25 @@ class PhotoManager: ObservableObject {
     }
 
     // MARK: - Preload Assets
+    private var lastPreloadIndex: Int = -1
+
     func preloadAssets(photoIndex: Int? = nil, count: Int = 3) {
-        // 确保数组不为空
-        guard !displayedPhotos.isEmpty else {
-            print("⚠️ No photos to preload")
-            return
-        }
+        guard !displayedPhotos.isEmpty else { return }
 
         let index = photoIndex ?? 0
+        guard index != lastPreloadIndex else { return }
+        lastPreloadIndex = index
+
         let startIndex = max(0, index - count)
         let endIndex = min(displayedPhotos.count - 1, index + count)
 
-        // 确保 startIndex <= endIndex
-        guard startIndex <= endIndex else {
-            print("⚠️ Invalid range: startIndex (\(startIndex)) > endIndex (\(endIndex))")
-            return
-        }
-
-        print("🔄 Preloading photos from \(startIndex) to \(endIndex)")
+        guard startIndex <= endIndex else { return }
 
         var assetsToPreload: [PHAsset] = []
         for i in startIndex...endIndex {
             assetsToPreload.append(displayedPhotos[i].asset)
         }
 
-        // 使用 PHCachingImageManager 预加载图片
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
@@ -158,8 +155,6 @@ class PhotoManager: ObservableObject {
         for asset in assetsToPreload {
             imageManager.startCachingImages(for: [asset], targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .aspectFit, options: options)
         }
-
-        print("✅ Started caching \(assetsToPreload.count) images")
     }
 
     // MARK: - Stop Caching
@@ -197,6 +192,28 @@ class PhotoManager: ObservableObject {
             }
         }
         updateDisplayedPhotos()
+    }
+
+    // MARK: - Favorite Management
+    func toggleFavorite(_ photo: PhotoAsset) {
+        guard let index = allPhotos.firstIndex(where: { $0.id == photo.id }) else { return }
+        let newValue = !allPhotos[index].isFavorite
+        allPhotos[index].isFavorite = newValue
+        updateDisplayedPhotos()
+
+        Task {
+            try? await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest(for: photo.asset).isFavorite = newValue
+            }
+            // Refresh PHAsset in memory so computed properties pick up the new value
+            let refreshed = PHAsset.fetchAssets(withLocalIdentifiers: [photo.asset.localIdentifier], options: nil)
+            if let refreshedAsset = refreshed.firstObject {
+                if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                    allPhotos[idx] = PhotoAsset(asset: refreshedAsset)
+                    updateDisplayedPhotos()
+                }
+            }
+        }
     }
 
     func restoreFromTrash(_ photoID: String) {
