@@ -34,4 +34,22 @@ final class SelectionManager {
         selectedIDs.removeAll()
         isSelectMode = false
     }
+
+    // MARK: - Swipe Multi-Select
+
+    /// The initial selection state when drag begins — used to determine select vs deselect
+    var swipeInitialSelected: Bool = true
+
+    func beginSwipe(for id: String) {
+        swipeInitialSelected = !selectedIDs.contains(id)
+        applySwipe(id)
+    }
+
+    func applySwipe(_ id: String) {
+        if swipeInitialSelected {
+            selectedIDs.insert(id)
+        } else {
+            selectedIDs.remove(id)
+        }
+    }
 }
