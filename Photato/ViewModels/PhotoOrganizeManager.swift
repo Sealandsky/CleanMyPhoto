@@ -14,6 +14,7 @@ final class PhotoOrganizeManager {
     var hasLoadedInitialData = false
 
     let similarityManager = PhotoSimilarityManager()
+    let qualityAnalyzer = PhotoQualityAnalyzer()
 
     private var analysisTask: Task<Void, Never>?
 
@@ -68,6 +69,14 @@ final class PhotoOrganizeManager {
             if !duplicates.isEmpty {
                 scanResults[.duplicates] = duplicates
                 categoryStats[.duplicates] = duplicates.reduce(0) { $0 + $1.localIdentifiers.count }
+            }
+            if let bl = qualityAnalyzer.blurryGroup() {
+                scanResults[.blurry] = [bl]
+                categoryStats[.blurry] = bl.localIdentifiers.count
+            }
+            if let pf = qualityAnalyzer.poorFaceGroup() {
+                scanResults[.poorFace] = [pf]
+                categoryStats[.poorFace] = pf.localIdentifiers.count
             }
         }
 
@@ -132,6 +141,9 @@ final class PhotoOrganizeManager {
                 categoryStats[.duplicates] = summary.duplicateGroups.reduce(0) { $0 + $1.count }
             }
 
+            loadFlatCategoryFromCache(.blurry, ids: summary.blurryIds)
+            loadFlatCategoryFromCache(.poorFace, ids: summary.poorFaceIds)
+
             totalPhotoCount = summary.totalPhotoCount
             return true
         } catch {
@@ -147,6 +159,8 @@ final class PhotoOrganizeManager {
         let largeFileIds = identifiers(for: .largeFiles)
         let largeFileTotalSize = scanResults[.largeFiles]?.first?.potentialSpaceSaved ?? 0
         let lowQualityIds = identifiers(for: .lowQuality)
+        let blurryIds = identifiers(for: .blurry)
+        let poorFaceIds = identifiers(for: .poorFace)
         let similarGroups = scanResults[.similar]?.map { $0.localIdentifiers } ?? []
         let duplicateGroups = scanResults[.duplicates]?.map { $0.localIdentifiers } ?? []
 
@@ -161,7 +175,9 @@ final class PhotoOrganizeManager {
             largeFileTotalSize: largeFileTotalSize,
             lowQualityIds: lowQualityIds,
             similarGroups: similarGroups,
-            duplicateGroups: duplicateGroups
+            duplicateGroups: duplicateGroups,
+            blurryIds: blurryIds,
+            poorFaceIds: poorFaceIds
         )
 
         do {
@@ -193,7 +209,7 @@ final class PhotoOrganizeManager {
                 return
             }
 
-            let totalSteps: Double = 5
+            let totalSteps: Double = 6
 
             currentStep = String(localized: "Scanning for metadata...")
             scanMetadataCategories(from: fetchResult)
@@ -222,6 +238,20 @@ final class PhotoOrganizeManager {
             categoryStats[.similar] = similar.reduce(0) { $0 + $1.localIdentifiers.count }
             scanResults[.duplicates] = duplicates
             categoryStats[.duplicates] = duplicates.reduce(0) { $0 + $1.localIdentifiers.count }
+
+            guard !Task.isCancelled else { return }
+
+            currentStep = String(localized: "Analyzing photo quality...")
+            await qualityAnalyzer.computeIfNeeded(assets: fetchResult)
+            if let bl = qualityAnalyzer.blurryGroup() {
+                scanResults[.blurry] = [bl]
+                categoryStats[.blurry] = bl.localIdentifiers.count
+            }
+            if let pf = qualityAnalyzer.poorFaceGroup() {
+                scanResults[.poorFace] = [pf]
+                categoryStats[.poorFace] = pf.localIdentifiers.count
+            }
+            analysisProgress = 5.0 / totalSteps
 
             analysisProgress = 1.0
             currentStep = ""
@@ -305,8 +335,8 @@ final class PhotoOrganizeManager {
         // Pass 2: fetch sizes for candidates only
         var sized: [(identifier: String, size: Int64)] = []
         let total = candidates.count
-        let startProgress: Double = 1.0 / 5.0
-        let endProgress: Double = 2.0 / 5.0
+        let startProgress: Double = 1.0 / 6.0
+        let endProgress: Double = 2.0 / 6.0
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
@@ -339,8 +369,8 @@ final class PhotoOrganizeManager {
         // Pass 2: filter by file size
         var lowQuality: [(identifier: String, resolution: Int)] = []
         let total = candidates.count
-        let startProgress: Double = 2.0 / 5.0
-        let endProgress: Double = 3.0 / 5.0
+        let startProgress: Double = 2.0 / 6.0
+        let endProgress: Double = 3.0 / 6.0
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }

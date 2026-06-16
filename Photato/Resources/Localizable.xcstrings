@@ -658,6 +658,70 @@
         }
       }
     },
+    "Analyzing %lld/%lld..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyzing %1$lld/%2$lld..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在分析 %1$lld/%2$lld…"
+          }
+        }
+      }
+    },
+    "Analyzing photo quality..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyzing photo quality..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在分析照片画质…"
+          }
+        }
+      }
+    },
+    "Blurry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模糊照片"
+          }
+        }
+      }
+    },
+    "Blurry Faces" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry Faces"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "闭眼/糊脸"
+          }
+        }
+      }
+    },
     "Connection timed out. Please try again." : {
       "localizations" : {
         "en" : {

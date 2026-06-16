@@ -156,13 +156,15 @@ class VideoPlayerState: ObservableObject {
         options.deliveryMode = .automatic
 
         PHImageManager.default().requestAVAsset(forVideo: phAsset, options: options) { [weak self] avAsset, _, _ in
-            guard let self, let avAsset else { return }
+            guard let avAsset, let strongSelf = self else { return }
             Task { @MainActor in
                 let item = AVPlayerItem(asset: avAsset)
                 let player = AVPlayer(playerItem: item)
 
                 let interval = CMTime(seconds: 0.1, preferredTimescale: 30)
-                self.timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+                // Inner closures weak-capture the outer weak self to avoid a retain
+                // cycle (self -> player -> observer closure -> self).
+                strongSelf.timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
                     Task { @MainActor in
                         self?.currentTime = time.seconds
                         if let dur = player.currentItem?.duration, dur.isValid, !dur.isIndefinite {
@@ -171,7 +173,7 @@ class VideoPlayerState: ObservableObject {
                     }
                 }
 
-                self.endObserver = NotificationCenter.default.addObserver(
+                strongSelf.endObserver = NotificationCenter.default.addObserver(
                     forName: .AVPlayerItemDidPlayToEndTime,
                     object: item, queue: .main
                 ) { [weak self] _ in
@@ -182,9 +184,9 @@ class VideoPlayerState: ObservableObject {
                     }
                 }
 
-                self.player = player
+                strongSelf.player = player
                 player.isMuted = true
-                self.isPlaying = false
+                strongSelf.isPlaying = false
             }
         }
     }

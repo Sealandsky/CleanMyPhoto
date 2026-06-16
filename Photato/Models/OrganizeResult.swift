@@ -11,6 +11,8 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
     case videos
     case lowQuality
     case largeFiles
+    case blurry
+    case poorFace
 
     var id: String { rawValue }
 
@@ -30,6 +32,10 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
             return String(localized: "Low Quality")
         case .largeFiles:
             return String(localized: "Large Files")
+        case .blurry:
+            return String(localized: "Blurry")
+        case .poorFace:
+            return String(localized: "Blurry Faces")
         }
     }
 
@@ -49,6 +55,10 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
             return "exclamationmark.triangle"
         case .largeFiles:
             return "externaldrive"
+        case .blurry:
+            return "water.waves"
+        case .poorFace:
+            return "face.dashed"
         }
     }
 }
@@ -116,8 +126,10 @@ struct OrganizeCacheSummary: Codable {
     let lowQualityIds: [String]
     let similarGroups: [[String]]
     let duplicateGroups: [[String]]
+    let blurryIds: [String]
+    let poorFaceIds: [String]
 
-    static let currentVersion = 2
+    static let currentVersion = 3
     static let fileName = "OrganizeCache.json"
 }
 
