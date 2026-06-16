@@ -73,7 +73,7 @@ final class PhotoOrganizeManager {
 
         let fetchResult = fetchSystemPHAssets()
         totalPhotoCount = fetchResult.count
-        scanScreenshots(from: fetchResult)
+        scanMetadataCategories(from: fetchResult)
 
         // Save cache for next launch
         if totalGroupCount > 0 {
@@ -104,33 +104,11 @@ final class PhotoOrganizeManager {
                 return false
             }
 
-            if !summary.screenshotIds.isEmpty {
-                scanResults[.screenshots] = [OrganizeScanGroup(
-                    category: .screenshots,
-                    title: String(localized: "Screenshots"),
-                    localIdentifiers: summary.screenshotIds
-                )]
-                categoryStats[.screenshots] = summary.screenshotIds.count
-            }
-
-            if !summary.largeFileIds.isEmpty {
-                scanResults[.largeFiles] = [OrganizeScanGroup(
-                    category: .largeFiles,
-                    title: String(localized: "Large Files"),
-                    localIdentifiers: summary.largeFileIds,
-                    potentialSpaceSaved: summary.largeFileTotalSize
-                )]
-                categoryStats[.largeFiles] = summary.largeFileIds.count
-            }
-
-            if !summary.lowQualityIds.isEmpty {
-                scanResults[.lowQuality] = [OrganizeScanGroup(
-                    category: .lowQuality,
-                    title: String(localized: "Low Quality"),
-                    localIdentifiers: summary.lowQualityIds
-                )]
-                categoryStats[.lowQuality] = summary.lowQualityIds.count
-            }
+            loadFlatCategoryFromCache(.screenshots, ids: summary.screenshotIds)
+            loadFlatCategoryFromCache(.livePhotos, ids: summary.livePhotoIds)
+            loadFlatCategoryFromCache(.videos, ids: summary.videoIds)
+            loadFlatCategoryFromCache(.largeFiles, ids: summary.largeFileIds, potentialSpaceSaved: summary.largeFileTotalSize)
+            loadFlatCategoryFromCache(.lowQuality, ids: summary.lowQualityIds)
 
             if !summary.similarGroups.isEmpty {
                 scanResults[.similar] = summary.similarGroups.map { ids in
@@ -163,10 +141,12 @@ final class PhotoOrganizeManager {
     }
 
     private func saveCacheSummary(totalPhotoCount: Int) {
-        let screenshotIds = scanResults[.screenshots]?.flatMap { $0.localIdentifiers } ?? []
-        let largeFileIds = scanResults[.largeFiles]?.flatMap { $0.localIdentifiers } ?? []
+        let screenshotIds = identifiers(for: .screenshots)
+        let livePhotoIds = identifiers(for: .livePhotos)
+        let videoIds = identifiers(for: .videos)
+        let largeFileIds = identifiers(for: .largeFiles)
         let largeFileTotalSize = scanResults[.largeFiles]?.first?.potentialSpaceSaved ?? 0
-        let lowQualityIds = scanResults[.lowQuality]?.flatMap { $0.localIdentifiers } ?? []
+        let lowQualityIds = identifiers(for: .lowQuality)
         let similarGroups = scanResults[.similar]?.map { $0.localIdentifiers } ?? []
         let duplicateGroups = scanResults[.duplicates]?.map { $0.localIdentifiers } ?? []
 
@@ -175,6 +155,8 @@ final class PhotoOrganizeManager {
             timestamp: Date(),
             totalPhotoCount: totalPhotoCount,
             screenshotIds: screenshotIds,
+            livePhotoIds: livePhotoIds,
+            videoIds: videoIds,
             largeFileIds: largeFileIds,
             largeFileTotalSize: largeFileTotalSize,
             lowQualityIds: lowQualityIds,
@@ -213,8 +195,8 @@ final class PhotoOrganizeManager {
 
             let totalSteps: Double = 5
 
-            currentStep = String(localized: "Scanning for screenshots...")
-            scanScreenshots(from: fetchResult)
+            currentStep = String(localized: "Scanning for metadata...")
+            scanMetadataCategories(from: fetchResult)
             analysisProgress = 1.0 / totalSteps
 
             guard !Task.isCancelled else { return }
@@ -256,24 +238,55 @@ final class PhotoOrganizeManager {
         currentStep = ""
     }
 
-    // MARK: - Scan: Screenshots (metadata only)
+    // MARK: - Scan: Metadata Categories (single pass)
 
-    private func scanScreenshots(from fetchResult: PHFetchResult<PHAsset>) {
-        var identifiers: [String] = []
+    private func scanMetadataCategories(from fetchResult: PHFetchResult<PHAsset>) {
+        var screenshotIds: [String] = []
+        var livePhotoIds: [String] = []
+        var videoIds: [String] = []
+
         fetchResult.enumerateObjects { asset, _, _ in
             if asset.mediaSubtypes.contains(.photoScreenshot) {
-                identifiers.append(asset.localIdentifier)
+                screenshotIds.append(asset.localIdentifier)
+            } else if asset.mediaType == .image && asset.mediaSubtypes.contains(.photoLive) {
+                livePhotoIds.append(asset.localIdentifier)
+            } else if asset.mediaType == .video {
+                videoIds.append(asset.localIdentifier)
             }
         }
-        categoryStats[.screenshots] = identifiers.count
 
+        storeFlatCategory(.screenshots, identifiers: screenshotIds)
+        storeFlatCategory(.livePhotos, identifiers: livePhotoIds)
+        storeFlatCategory(.videos, identifiers: videoIds)
+    }
+
+    // MARK: - Shared Helpers
+
+    private func storeFlatCategory(_ category: OrganizeCategory, identifiers: [String], potentialSpaceSaved: Int64 = 0) {
+        categoryStats[category] = identifiers.count
         if !identifiers.isEmpty {
-            scanResults[.screenshots] = [OrganizeScanGroup(
-                category: .screenshots,
-                title: String(localized: "Screenshots"),
-                localIdentifiers: identifiers
+            scanResults[category] = [OrganizeScanGroup(
+                category: category,
+                title: category.localizedText,
+                localIdentifiers: identifiers,
+                potentialSpaceSaved: potentialSpaceSaved
             )]
         }
+    }
+
+    private func loadFlatCategoryFromCache(_ category: OrganizeCategory, ids: [String], potentialSpaceSaved: Int64 = 0) {
+        guard !ids.isEmpty else { return }
+        scanResults[category] = [OrganizeScanGroup(
+            category: category,
+            title: category.localizedText,
+            localIdentifiers: ids,
+            potentialSpaceSaved: potentialSpaceSaved
+        )]
+        categoryStats[category] = ids.count
+    }
+
+    private func identifiers(for category: OrganizeCategory) -> [String] {
+        scanResults[category]?.flatMap { $0.localIdentifiers } ?? []
     }
 
     // MARK: - Scan: Large Files (two-pass: metadata filter → size check)
@@ -304,16 +317,7 @@ final class PhotoOrganizeManager {
 
         let sorted = sized.sorted { $0.size > $1.size }
         let totalSize = sorted.reduce(Int64(0)) { $0 + $1.size }
-        categoryStats[.largeFiles] = sorted.count
-
-        if !sorted.isEmpty {
-            scanResults[.largeFiles] = [OrganizeScanGroup(
-                category: .largeFiles,
-                title: String(localized: "Large Files"),
-                localIdentifiers: sorted.map(\.identifier),
-                potentialSpaceSaved: totalSize
-            )]
-        }
+        storeFlatCategory(.largeFiles, identifiers: sorted.map(\.identifier), potentialSpaceSaved: totalSize)
     }
 
     // MARK: - Scan: Low Quality (two-pass: metadata filter → size check)
@@ -347,16 +351,8 @@ final class PhotoOrganizeManager {
             }
         }
 
-        categoryStats[.lowQuality] = lowQuality.count
-
-        if !lowQuality.isEmpty {
-            let sorted = lowQuality.sorted { $0.resolution < $1.resolution }
-            scanResults[.lowQuality] = [OrganizeScanGroup(
-                category: .lowQuality,
-                title: String(localized: "Low Quality"),
-                localIdentifiers: sorted.map(\.identifier)
-            )]
-        }
+        let sorted = lowQuality.sorted { $0.resolution < $1.resolution }
+        storeFlatCategory(.lowQuality, identifiers: sorted.map(\.identifier))
     }
 
     // MARK: - Paginated Category Loading
@@ -368,7 +364,7 @@ final class PhotoOrganizeManager {
 
         var state = OrganizeCategoryPageState()
         let groups = scanResults[category] ?? []
-        state.allIdentifiers = groups.flatMap { $0.localIdentifiers }
+        state.allIdentifiers = identifiers(for: category)
 
         if category == .similar || category == .duplicates {
             state.groups = groups.map { group in

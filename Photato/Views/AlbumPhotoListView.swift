@@ -21,8 +21,17 @@ struct AlbumPhotoListView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    albumInfoHeader
-
+                    if !selectionManager.isSelectMode {
+                        HStack {
+                            Text(albumSubtitle)
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                        .padding(.bottom, 8)
+                    }
                     LazyVGrid(columns: columns, spacing: GridColumnHelper.spacing) {
                         ForEach(photos) { photo in
                             PhotoCell(
@@ -64,6 +73,7 @@ struct AlbumPhotoListView: View {
                 }
             }
             .onAppear {
+                albumSizeText = SizeCache.load("album_\(album.id)") ?? ""
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         withTransaction(Transaction(animation: nil)) {
@@ -115,21 +125,12 @@ struct AlbumPhotoListView: View {
 
     // MARK: - Album Info Header
 
-    private var albumInfoHeader: some View {
-        HStack(spacing: 16) {
-            Text("\(photos.count) \(String(localized: "photos"))")
-                .font(.system(.subheadline, design: .rounded))
-                .foregroundColor(.secondary)
-
-            if !albumSizeText.isEmpty {
-                Text(albumSizeText)
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
+    private var albumSubtitle: String {
+        let countText = String(localized: "\(album.assetCount) Photos")
+        if albumSizeText.isEmpty {
+            return countText
         }
-        .padding(.leading, 12)
-        .padding(.vertical, 8)
+        return "\(countText) · \(albumSizeText)"
     }
 
     // MARK: - Album Size Calculation
@@ -148,7 +149,9 @@ struct AlbumPhotoListView: View {
                 }
                 return total
             }
-            albumSizeText = ByteFormatter.format(totalSize)
+            SizeCache.save("album_\(album.id)", size: totalSize)
+            let newText = ByteFormatter.format(totalSize)
+            if newText != albumSizeText { albumSizeText = newText }
         }
     }
 }

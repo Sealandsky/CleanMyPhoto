@@ -516,7 +516,7 @@ struct ContentView: View {
                 } else if photos.isEmpty {
                     emptyLibraryView
                 } else {
-                    Text("No photo selected")
+                    Text(String(localized: "No photo selected"))
                         .foregroundColor(.white)
                 }
             }
@@ -571,7 +571,7 @@ struct ContentView: View {
                     Button {
                         deleteTrigger += 1
                     } label: {
-                        Image(systemName: "trash.fill")
+                        Image(systemName: "trash")
                             .font(.system(.title3, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 60, height: 60)

@@ -39,16 +39,6 @@
     "%lld" : {
 
     },
-    "%lld %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld %2$@"
-          }
-        }
-      }
-    },
     "%lld days left in trial" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -101,6 +91,22 @@
     },
     "%lld photos" : {
 
+    },
+    "%lld Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 张照片"
+          }
+        }
+      }
     },
     "%lld Selected" : {
       "localizations" : {
@@ -595,7 +601,20 @@
       }
     },
     "Cannot Delete" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot Delete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法删除"
+          }
+        }
+      }
     },
     "Close" : {
       "localizations" : {
@@ -614,7 +633,20 @@
       }
     },
     "Computing fingerprints..." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computing fingerprints..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在计算指纹..."
+          }
+        }
+      }
     },
     "Computing photo %lld/%lld..." : {
       "localizations" : {
@@ -750,6 +782,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "错误"
+          }
+        }
+      }
+    },
+    "Failed to delete photos: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to delete photos: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除照片失败：%@"
           }
         }
       }
@@ -959,6 +1007,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "终身会员"
+          }
+        }
+      }
+    },
+    "Live Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实况照片"
           }
         }
       }
@@ -1221,6 +1285,22 @@
         }
       }
     },
+    "No photos found. Make sure you have photos in your photo library." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photos found. Make sure you have photos in your photo library."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到照片。请确保相册中有照片。"
+          }
+        }
+      }
+    },
     "Notice" : {
       "localizations" : {
         "en" : {
@@ -1380,6 +1460,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要照片访问权限"
+          }
+        }
+      }
+    },
+    "Photo library access is required to use this app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo library access is required to use this app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要相册访问权限才能使用此应用。"
           }
         }
       }
@@ -1674,7 +1770,24 @@
         }
       }
     },
+    "Scanning for metadata..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanning for metadata..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在扫描元数据..."
+          }
+        }
+      }
+    },
     "Scanning for screenshots..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1707,7 +1820,20 @@
       }
     },
     "Scanning..." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanning..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫描中..."
+          }
+        }
+      }
     },
     "Screenshots" : {
       "localizations" : {
@@ -1966,7 +2092,20 @@
       }
     },
     "This photo is in your favorites. Remove from favorites first before deleting." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This photo is in your favorites. Remove from favorites first before deleting."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此照片已在收藏中。请先取消收藏再删除。"
+          }
+        }
+      }
     },
     "Timeline" : {
       "localizations" : {
@@ -2173,6 +2312,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本"
+          }
+        }
+      }
+    },
+    "Videos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频"
           }
         }
       }

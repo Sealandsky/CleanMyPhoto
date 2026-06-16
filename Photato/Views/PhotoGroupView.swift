@@ -141,6 +141,7 @@ struct SystemMonthPhotosView: View {
     var scrollToPhotoID: String? = nil
     @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
+    @State private var monthSizeText: String = ""
 
     private var columns: [GridItem] {
         GridColumnHelper.columns(count: gridSettings.columnCount)
@@ -153,6 +154,17 @@ struct SystemMonthPhotosView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                if !selectionManager.isSelectMode {
+                    HStack {
+                        Text(monthSubtitle)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                }
                 LazyVGrid(columns: columns, spacing: GridColumnHelper.spacing) {
                     ForEach(photos) { photo in
                         PhotoCell(
@@ -182,9 +194,11 @@ struct SystemMonthPhotosView: View {
             }
             .background(Color.black)
             .onAppear {
+                monthSizeText = SizeCache.load("month_\(monthAlbum.id)") ?? ""
                 if let photoID = scrollToPhotoID {
                     proxy.scrollTo(photoID, anchor: .center)
                 }
+                calculateMonthSize()
             }
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
@@ -232,15 +246,37 @@ struct SystemMonthPhotosView: View {
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
                 }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text("\(monthAlbum.photoCount) \(String(localized: "photos"))")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
+    }
+
+    private var monthSubtitle: String {
+        let countText = String(localized: "\(monthAlbum.photoCount) Photos")
+        if monthSizeText.isEmpty {
+            return countText
+        }
+        return "\(countText) · \(monthSizeText)"
+    }
+
+    private func calculateMonthSize() {
+        Task {
+            let totalSize = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                for photo in photos {
+                    group.addTask {
+                        await PHAssetSizeHelper.getAssetSize(photo.asset)
+                    }
+                }
+                var total: Int64 = 0
+                for await size in group {
+                    total += size
+                }
+                return total
+            }
+            SizeCache.save("month_\(monthAlbum.id)", size: totalSize)
+            let newText = ByteFormatter.format(totalSize)
+            if newText != monthSizeText { monthSizeText = newText }
+        }
     }
 }
 

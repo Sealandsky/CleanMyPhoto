@@ -43,7 +43,7 @@ class PhotoManager: ObservableObject {
         if status == .authorized || status == .limited {
             await fetchAllPhotos()
         } else {
-            errorMessage = "Photo library access is required to use this app."
+            errorMessage = String(localized: "Photo library access is required to use this app.")
         }
     }
 
@@ -123,7 +123,7 @@ class PhotoManager: ObservableObject {
         }
 
         if allPhotos.isEmpty {
-            errorMessage = "No photos found. Make sure you have photos in your photo library."
+            errorMessage = String(localized: "No photos found. Make sure you have photos in your photo library.")
         }
     }
 
@@ -263,7 +263,7 @@ class PhotoManager: ObservableObject {
             cleanupStaleDeletionIDs()
             updateDisplayedPhotos()
         } catch {
-            errorMessage = "Failed to delete photos: \(error.localizedDescription)"
+            errorMessage = String(localized: "Failed to delete photos: \(error.localizedDescription)")
         }
     }
 

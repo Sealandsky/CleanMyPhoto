@@ -18,6 +18,29 @@ struct OrganizeResultsView: View {
         category == .similar || category == .duplicates
     }
 
+    @State private var categorySizeText: String = ""
+
+    private var subtitleText: String {
+        let count = organizeManager.stat(for: category)
+        let countText = String(localized: "\(count) Photos")
+        if categorySizeText.isEmpty {
+            return countText
+        }
+        return "\(countText) · \(categorySizeText)"
+    }
+
+    private var subtitleView: some View {
+        HStack {
+            Text(subtitleText)
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+    }
+
     private var displayedPhotos: [PhotoAsset] {
         organizeManager.paginatedPhotos(for: category)
             .filter { !photoManager.pendingDeletionIDs.contains($0.id) }
@@ -72,10 +95,12 @@ struct OrganizeResultsView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
         .task {
+            categorySizeText = SizeCache.load(category.rawValue) ?? ""
             if !hasInitialized {
                 hasInitialized = true
                 await organizeManager.loadCategory(category)
             }
+            await calculateCategorySize()
         }
     }
 
@@ -83,6 +108,7 @@ struct OrganizeResultsView: View {
 
     private var groupedBody: some View {
         ScrollView {
+            subtitleView
             if organizeManager.isLoadingPhotos(for: category) {
                 ProgressView()
                     .tint(.white)
@@ -222,6 +248,7 @@ struct OrganizeResultsView: View {
 
     private var flatBody: some View {
         ScrollView {
+            subtitleView
             photoGrid
         }
     }
@@ -301,12 +328,6 @@ struct OrganizeResultsView: View {
                 .tint(.red)
                 .disabled(selectionManager.isEmpty)
             }
-        } else {
-            ToolbarItem(placement: .topBarTrailing) {
-                Text("\(organizeManager.stat(for: category)) \(String(localized: "photos"))")
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
         }
     }
 
@@ -317,6 +338,34 @@ struct OrganizeResultsView: View {
         withAnimation(.easeInOut(duration: 0.3)) {
             isFullscreenMode = true
         }
+    }
+
+    private func calculateCategorySize() async {
+        // Use pre-computed size for largeFiles
+        if let potentialSize = organizeManager.scanResults[category]?.first?.potentialSpaceSaved, potentialSize > 0 {
+            SizeCache.save(category.rawValue, size: potentialSize)
+            let newText = ByteFormatter.format(potentialSize)
+            if newText != categorySizeText { categorySizeText = newText }
+            return
+        }
+        // Compute size for other categories from loaded photos
+        let photos = organizeManager.paginatedPhotos(for: category)
+        guard !photos.isEmpty else { return }
+        let totalSize = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+            for photo in photos {
+                group.addTask {
+                    await PHAssetSizeHelper.getAssetSize(photo.asset)
+                }
+            }
+            var total: Int64 = 0
+            for await size in group {
+                total += size
+            }
+            return total
+        }
+        SizeCache.save(category.rawValue, size: totalSize)
+        let newText = ByteFormatter.format(totalSize)
+        if newText != categorySizeText { categorySizeText = newText }
     }
 
     // MARK: - Fullscreen View
@@ -414,7 +463,7 @@ struct OrganizeResultsView: View {
                     Button {
                         deleteTrigger += 1
                     } label: {
-                        Image(systemName: "trash.fill")
+                        Image(systemName: "trash")
                             .font(.system(.title3, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 60, height: 60)

@@ -7,6 +7,8 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
     case similar
     case duplicates
     case screenshots
+    case livePhotos
+    case videos
     case lowQuality
     case largeFiles
 
@@ -20,6 +22,10 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
             return String(localized: "Similar")
         case .screenshots:
             return String(localized: "Screenshots")
+        case .livePhotos:
+            return String(localized: "Live Photos")
+        case .videos:
+            return String(localized: "Videos")
         case .lowQuality:
             return String(localized: "Low Quality")
         case .largeFiles:
@@ -35,6 +41,10 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
             return "photo.stack"
         case .screenshots:
             return "iphone"
+        case .livePhotos:
+            return "livephoto"
+        case .videos:
+            return "video"
         case .lowQuality:
             return "exclamationmark.triangle"
         case .largeFiles:
@@ -99,13 +109,15 @@ struct OrganizeCacheSummary: Codable {
     let timestamp: Date
     let totalPhotoCount: Int
     let screenshotIds: [String]
+    let livePhotoIds: [String]
+    let videoIds: [String]
     let largeFileIds: [String]
     let largeFileTotalSize: Int64
     let lowQualityIds: [String]
     let similarGroups: [[String]]
     let duplicateGroups: [[String]]
 
-    static let currentVersion = 1
+    static let currentVersion = 2
     static let fileName = "OrganizeCache.json"
 }
 
