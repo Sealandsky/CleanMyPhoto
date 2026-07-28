@@ -541,7 +541,7 @@ struct ContentView: View {
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                     }
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
 
                     Spacer()
 
@@ -565,7 +565,7 @@ struct ContentView: View {
                             .foregroundColor((currentFullscreenPhoto?.isFavorite ?? false) ? .red : .primary)
                             .frame(width: 60, height: 60)
                     }
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
 
 
                     Button {
@@ -576,7 +576,7 @@ struct ContentView: View {
                             .foregroundColor(.primary)
                             .frame(width: 60, height: 60)
                     }
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
 
                     Spacer()
                 }
@@ -640,7 +640,7 @@ struct ContentView: View {
                 .foregroundColor(.primary)
                 .frame(width: 44, height: 44)
         }
-        .glassEffect(.regular.interactive(), in: Circle())
+        .background(.ultraThinMaterial, in: Circle())
         .overlay(alignment: .topTrailing) {
             if photoManager.trashCount > 0 {
                 Text("\(photoManager.trashCount)")
