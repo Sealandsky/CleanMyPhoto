@@ -123,6 +123,7 @@ struct OrganizeResultsView: View {
                 .padding(.bottom, 16)
             }
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
     private func groupSection(_ group: OrganizeGroupDisplay) -> some View {
@@ -251,6 +252,7 @@ struct OrganizeResultsView: View {
             subtitleView
             photoGrid
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
     private var photoGrid: some View {

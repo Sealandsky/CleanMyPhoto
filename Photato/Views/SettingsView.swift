@@ -210,6 +210,7 @@ struct SettingsView: View {
                         .listRowInsets(EdgeInsets())
                 }
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
             .navigationTitle(String(localized: "Settings"))
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(.hidden, for: .navigationBar)

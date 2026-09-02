@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import UIKit
 import Combine
 
 // MARK: - Discover Manager
@@ -161,12 +162,139 @@ struct DiscoverView: View {
         // 否则 app 启动即会执行全库枚举
     }
 
+    // MARK: - 自绘下拉刷新（DragGesture 驱动，替代系统 refreshable）
+    /// 方案说明：系统 refreshable 的转圈会"扣住"滚动偏移，其弹簧归位在
+    /// 大标题 + 整批数据替换的竞争下偶发失效（页面停在下拉位置）。
+    /// 自绘方案：ScrollView 叠加 simultaneous DragGesture 直接跟踪手指，
+    /// 松手（onEnded）即触发刷新；归位交给 ScrollView 原生 bounce
+    /// （原生回弹从不出错，且自带平滑动画）。
+    /// 注意：不使用 GeometryReader 偏移驱动——overscroll 的负偏移在部分
+    /// 系统上不触发 preference 上报（真机已验证指示器完全无响应），
+    /// 手势直读是唯一可靠的探测层。
+    @State private var isRefreshing = false
+    /// 下拉进度（0 ~ 1.3，1 = 达到触发阈值）
+    @State private var pullProgress: CGFloat = 0
+    /// 已越过阈值（拉满），松手时触发刷新
+    @State private var pullArmed = false
+    /// 页面是否处于顶部区域：由懒容器内首个 cell 的 onAppear/onDisappear 驱动
+    /// （与分页加载同机制；非懒内容的 appear 不随滚动触发、preference 偏移
+    /// 上报在本机滚动中不更新，两者均不可用）
+    @State private var isAtTop = true
+    /// 本轮手势是否允许下拉刷新：在手势首个事件时按"当时是否在顶部"锁定。
+    /// 防止从深处上滑回顶途中经过顶部、门控中途打开（此刻手指累计位移巨大，
+    /// 会被误判为拉满武装，松手即触发刷新）
+    @State private var gestureAllowsPull = false
+    /// 是否已收到本轮手势的首个事件
+    @State private var sawFirstGestureEvent = false
+
+    private static let refreshThreshold: CGFloat = 80
+
+    /// 下拉刷新手势：与滚动共存（simultaneous）。
+    /// 仅"手势开始时页面就在顶部"的一次手势才可能触发下拉刷新
+    private var pullGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                // 手势首个事件（位移接近 0 视为新手势）时锁定门控：
+                // 开始时不在顶部 → 整轮手势让位于正常滚动
+                if !sawFirstGestureEvent || abs(value.translation.height) < 3 {
+                    sawFirstGestureEvent = true
+                    gestureAllowsPull = isAtTop && !isRefreshing
+                }
+                guard gestureAllowsPull else {
+                    if pullProgress > 0 {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            pullProgress = 0
+                            pullArmed = false
+                        }
+                    }
+                    return
+                }
+                guard !isRefreshing else { return }
+                let dy = value.translation.height
+                if dy > 0 {
+                    // 进度 = 手指下拉距离 / 阈值（跟随手指实时增减）
+                    pullProgress = min(1.3, CGFloat(dy) / Self.refreshThreshold)
+                    if !pullArmed && pullProgress >= 1 {
+                        withAnimation(.easeOut(duration: 0.12)) { pullArmed = true }
+                        // 拉到阈值：震动反馈提示"松手即可刷新"
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                    // 滞后解除武装：拉过后又推回阈值以下（0.7），
+                    // 松手不再触发（对齐系统"回到阈值内即取消"的行为）
+                    if pullArmed && pullProgress < 0.7 {
+                        withAnimation(.easeOut(duration: 0.12)) { pullArmed = false }
+                    }
+                } else if pullProgress > 0 {
+                    // 手指回推至起点：进度清零
+                    pullProgress = 0
+                    pullArmed = false
+                }
+            }
+            .onEnded { _ in
+                sawFirstGestureEvent = false
+                if gestureAllowsPull && pullArmed && !isRefreshing {
+                    triggerRefresh()
+                } else {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        pullProgress = 0
+                        pullArmed = false
+                    }
+                }
+                gestureAllowsPull = false
+            }
+    }
+
+    private func triggerRefresh() {
+        // 触发即解除武装：若不复位，下一次任意小拖动松手都会带着
+        // 残留的 armed=true 再次触发（"下拉一点点就刷新"的根因）
+        pullArmed = false
+        isRefreshing = true
+        Task {
+            await runRefresh()
+            withAnimation(.easeOut(duration: 0.25)) {
+                isRefreshing = false
+                pullProgress = 0
+                pullArmed = false
+            }
+        }
+    }
+
+    // MARK: - 下拉指示器（从屏幕顶部跟手滑入，刷新完成后上移消失）
+    @ViewBuilder
+    private var refreshIndicator: some View {
+        if isRefreshing || pullProgress > 0.02 {
+            Group {
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .tint(.primary)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(pullArmed ? .white : .primary)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .background(.ultraThinMaterial, in: Circle())
+            // 位置：下拉时从顶部上方跟手滑入，刷新中停驻，完成后上移淡出
+            .offset(y: indicatorOffsetY)
+            .opacity(Double(min(1, pullProgress * 1.6)))
+            .transition(.opacity)
+        }
+    }
+
+    /// 指示器纵向位置：progress 0 → 隐藏在顶部上方（-58），1 → 就位（+10）；
+    /// 刷新中固定停驻在 +10
+    private var indicatorOffsetY: CGFloat {
+        if isRefreshing { return 10 }
+        return -58 + min(pullProgress, 1) * 68
+    }
+
     // MARK: - Grid
     private var gridView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // 顶部归位锚点：下拉刷新完成后显式滚回此处，
-                // 规避 SwiftUI refreshable 偶发的"页面停在下拉位置不回弹"缺陷
+                // 顶部锚点：Tab 重选滚顶信号的目标位置
                 Color.clear
                     .frame(height: 0)
                     .id(DiscoverView.topAnchorID)
@@ -181,29 +309,39 @@ struct DiscoverView: View {
                             onPhotoSelect(photo)
                         }
                         .onAppear {
+                            // 首个 cell 可见 ⇔ 页面处于顶部区域：
+                            // 懒容器内 cell 的 appear/disappear 按视口可见性触发
+                            // （与下方分页加载同机制，真机验证可靠；此前哨兵
+                            // 放在懒容器外，onDisappear 不会随滚动触发）
+                            if photo.id == manager.photos.first?.id {
+                                isAtTop = true
+                            }
                             // 与图库页相同：滚到最后一张时加载下一批
                             if photo.id == manager.photos.last?.id {
                                 Task { await manager.loadMorePhotos() }
                             }
                         }
+                        .onDisappear {
+                            if photo.id == manager.photos.first?.id {
+                                isAtTop = false
+                            }
+                        }
                 }
                 .padding(.horizontal, 12)
             }
-            // 下拉刷新：refreshable 在手指释放后才执行（松手前不会触发采样），
-            // 刷新期间显示系统转圈；重新抽取一批全新的图片替换当前批次
-            .refreshable {
-                await runRefresh()
-                // 刷新完成后强制归位（带回弹动画），
-                // 双保险规避 refreshable 回弹动画丢失的问题
-                withAnimation(.easeOut(duration: 0.25)) {
-                    proxy.scrollTo(DiscoverView.topAnchorID, anchor: .top)
-                }
-            }
-            // 外部滚顶信号：平滑滚回顶部锚点
+            .scrollIndicators(.hidden)  // 隐藏滚动条
+            // 自绘下拉刷新手势（与滚动共存）+ 指示器浮层
+            .simultaneousGesture(pullGesture)
+            .overlay(alignment: .top) { refreshIndicator }
+            // 外部滚顶信号（双击「重温」Tab）：滚回页面最顶部，大标题完全展开
             .onChange(of: scrollToTopSignal) { _, newValue in
                 guard newValue > 0 else { return }
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(DiscoverView.topAnchorID, anchor: .top)
+                // scrollTo(anchor: .top) 在标题折叠时，顶部锚点位于导航栏后方
+                // 被判"已可见"→ 零位移，大标题不展开；
+                // 改用 anchor: .bottom 把锚点对齐到视口底部，迫使偏移压向负值、
+                // 被钳制在真正的 offset 0——标题随之完全展开
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    proxy.scrollTo(DiscoverView.topAnchorID, anchor: .bottom)
                 }
             }
         }
@@ -226,7 +364,7 @@ struct DiscoverView: View {
     }
 
     private static let minRefreshDuration: Double = 0.6
-    /// 网格顶部归位锚点 id（下拉刷新后强制滚回）
+    /// 网格顶部归位锚点 id（Tab 重选滚顶信号的目标）
     private static let topAnchorID = "discover_top_anchor"
 
     // MARK: - Empty State
@@ -249,10 +387,10 @@ struct DiscoverView: View {
             .frame(maxWidth: .infinity)
             .frame(minHeight: UIScreen.main.bounds.height * 0.7)
         }
-        // 空状态下保留下拉刷新：用户在系统相册添加照片后可直接下拉重试
-        .refreshable {
-            await runRefresh()
-        }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
+        // 空状态下拉刷新：同一套手势与指示器（内容不满屏，哨兵恒可见=恒在顶部）
+        .simultaneousGesture(pullGesture)
+        .overlay(alignment: .top) { refreshIndicator }
     }
 
     // MARK: - Loading

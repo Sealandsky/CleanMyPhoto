@@ -57,8 +57,10 @@ struct MainTabView: View {
     @State private var timelinePath = NavigationPath()
     @State private var albumsPath = NavigationPath()
 
-    // 「重温」Tab 再次点击的滚顶信号（递增触发发现页滚回顶部）
+    // 「重温」Tab 双击的滚顶信号（递增触发发现页滚回顶部）
     @State private var discoverScrollToTop = 0
+    // 上次点击已选中「重温」Tab 的时间，用于双击窗口判定
+    @State private var lastDiscoverTapAt: Date?
 
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @State private var albumManager: AlbumManager?
@@ -92,10 +94,17 @@ struct MainTabView: View {
                             accessorySystemImage: "trash",
                             // iOS 26+ 启用 Liquid Glass 背景；iOS 18 自动回退 systemBackground
                             prefersLiquidGlass: true,
-                            // 再次点击已选中的「重温」Tab：滚回发现页顶部
+                            // 双击已选中的「重温」Tab：滚回发现页最顶部
+                            // （单击不再触发；两次点击间隔 0.35s 内视为双击）
                             onReselect: { id in
-                                if id == AppTab.photos.rawValue {
+                                guard id == AppTab.photos.rawValue else { return }
+                                let now = Date()
+                                if let last = lastDiscoverTapAt,
+                                   now.timeIntervalSince(last) < 0.35 {
+                                    lastDiscoverTapAt = nil
                                     discoverScrollToTop += 1
+                                } else {
+                                    lastDiscoverTapAt = now
                                 }
                             },
                             onAccessoryTap: { showTrash = true }

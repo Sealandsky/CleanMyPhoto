@@ -60,6 +60,7 @@ struct MembershipView: View {
             .padding(.bottom, 24)
             .padding(.horizontal, 24)
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
         }

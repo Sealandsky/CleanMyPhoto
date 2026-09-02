@@ -55,6 +55,7 @@ struct AlbumPhotoListView: View {
                     .padding(.horizontal, 12)
                 }
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
             .background(Color.black)
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }

@@ -56,6 +56,7 @@ struct PhotoGroupView: View {
                     }
                     .padding(.bottom, 80)
                 }
+                .scrollIndicators(.hidden)  // 隐藏滚动条
             }
         }
         .background(Color.black)
@@ -187,6 +188,7 @@ struct SystemMonthPhotosView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
             .background(Color.black)
             .onAppear {
                 monthSizeText = SizeCache.load("month_\(monthAlbum.id)") ?? ""

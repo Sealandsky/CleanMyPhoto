@@ -6,18 +6,37 @@ struct OrganizeView: View {
     @ObservedObject var photoManager: PhotoManager
     let onCategorySelect: (OrganizeCategory) -> Void
 
+    /// 系统照片库资源总数（扫描卡片的分母展示；惰性 count 查询，开销极小）
+    @State private var totalLibraryCount = 0
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(spacing: 24) {
                 scanCard
-                categoryCards
+
+                // 功能类型分组：标题 + 一行两项的紧凑功能卡网格
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(String(localized: "Categories"))
+                        .font(.system(size: 17, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.systemGray))
+
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                        GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                        categoryCards
+                    }
+                }
             }
             .padding(16)
             // 尾部高度占位：滚动到底时最后一个卡片不被悬浮底栏遮挡
             .padding(.bottom, 74)
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
         .background(Color(UIColor.systemGroupedBackground))
         .task {
+            let options = PHFetchOptions()
+            options.includeHiddenAssets = false
+            totalLibraryCount = PHAsset.fetchAssets(with: options).count
+
             if organizeManager.totalGroupCount == 0 && !organizeManager.isAnalyzing {
                 await performInitialScan()
             }
@@ -28,159 +47,130 @@ struct OrganizeView: View {
         await organizeManager.quickAnalysis()
     }
 
-    // MARK: - Scan Card
+    // MARK: - 废片数量（各分类计数之和，扫描卡大数字的分子）
+    private var junkCount: Int {
+        OrganizeCategory.allCases.reduce(0) { $0 + organizeManager.stat(for: $1) }
+    }
 
+    // MARK: - Scan Card（Figma 597:196：黑色大卡 + 大数字 废片数/总数）
+    /// 结构：上行为标题 + 操作胶囊按钮，下行为装饰图标 + 「废片数 / 总数」大数字；
+    /// 扫描中替换为进度条 + 取消按钮。三种状态共用同一卡片容器。
     @ViewBuilder
     private var scanCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 上行：标题 + 操作按钮
+            HStack(spacing: 6) {
+                Text(scanTitleText)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                scanActionButton
+            }
+            Spacer()
+            // 下行：大数字（废片数 / 总数）或扫描进度
+            if organizeManager.isAnalyzing {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(organizeManager.currentStep.isEmpty
+                         ? String(localized: "Scanning...")
+                         : organizeManager.currentStep)
+                        .font(.system(size: 13, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+
+                    ProgressView(value: organizeManager.analysisProgress)
+                        .tint(.blue)
+                }
+                .padding(.top, 8)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    // 装饰图标：双圆重叠（对齐设计稿 Ellipse 7/8）
+                    ZStack {
+                        Circle().fill(Color(white: 0.85))
+                        Circle().fill(Color.white)
+                            .offset(x: 6, y: 2)
+                    }
+                    .frame(width: 20, height: 20)
+                    .padding(.trailing, 8)
+
+                    Text("\(junkCount)")
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("/")
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.5))
+
+                    Text("\(totalLibraryCount)")
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 146, alignment: .topLeading)
+        // 设计稿：黑色 80% 卡面 + 12pt 圆角；深浅模式下均为深色卡、白字
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
+    }
+
+    /// 扫描卡标题与操作按钮（按扫描状态切换）
+    private var scanTitleText: String {
         if organizeManager.isAnalyzing {
-            scanningCard
-                .transition(.opacity.combined(with: .move(edge: .top)))
-        } else if organizeManager.totalGroupCount > 0 {
-            rescanCard
-                .transition(.opacity.combined(with: .move(edge: .top)))
-        } else if organizeManager.hasLoadedInitialData {
-            startScanCard
-                .transition(.opacity.combined(with: .move(edge: .top)))
+            return String(localized: "Scanning...")
         }
+        return organizeManager.hasLoadedInitialData
+            ? String(localized: "Junk Items")
+            : String(localized: "Start Scan")
     }
 
-    private var startScanCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Start Scan"))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
-
-                Text(String(localized: "Find duplicates, similar photos, screenshots and more"))
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    organizeManager.startFullAnalysis()
-                }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "magnifyingglass.circle.fill")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.semibold)
-                    Text(String(localized: "Scan"))
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                )
-                .background(Color.white.opacity(0.1))
-                .clipShape(Capsule())
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
-        )
-    }
-
-    private var rescanCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                let totalCount = OrganizeCategory.allCases.reduce(0) { $0 + organizeManager.stat(for: $1) }
-                Text(String(localized: "Found \(totalCount) items"))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
-
-                Text(String(localized: "Tap a category below to review"))
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    organizeManager.startFullAnalysis()
-                }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.semibold)
-                    Text(String(localized: "Rescan"))
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                )
-                .background(Color.white.opacity(0.1))
-                .clipShape(Capsule())
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
-        )
-    }
-
-    private var scanningCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(organizeManager.currentStep.isEmpty
-                     ? String(localized: "Scanning...")
-                     : organizeManager.currentStep)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
-
-                ProgressView(value: organizeManager.analysisProgress)
-                    .tint(.blue)
-            }
-
-            Spacer()
-
-            Button {
+    @ViewBuilder
+    private var scanActionButton: some View {
+        if organizeManager.isAnalyzing {
+            scanPillButton(title: String(localized: "Cancel"), icon: "xmark.circle.fill") {
                 organizeManager.cancelAnalysis()
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.semibold)
-                    Text(String(localized: "Cancel"))
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
+            }
+        } else if organizeManager.hasLoadedInitialData {
+            scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise") {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    organizeManager.startFullAnalysis()
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                )
-                .background(Color.white.opacity(0.1))
-                .clipShape(Capsule())
+            }
+        } else {
+            scanPillButton(title: String(localized: "Scan"), icon: "magnifyingglass") {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    organizeManager.startFullAnalysis()
+                }
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
-        )
     }
 
-    // MARK: - Category Cards
+    private func scanPillButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+            )
+            .background(Color.white.opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
 
+    // MARK: - Category Cards（Figma：一行两项的紧凑功能卡）
     private var categoryCards: some View {
         ForEach(OrganizeCategory.allCases) { category in
             categoryCard(for: category)
@@ -190,9 +180,6 @@ struct OrganizeView: View {
     private func categoryCard(for category: OrganizeCategory) -> some View {
         let count = organizeManager.stat(for: category)
         let hasResults = count > 0
-        let identifiers = Array((organizeManager.scanResults[category] ?? [])
-            .flatMap { $0.localIdentifiers }
-            .prefix(2))
 
         return Button {
             if hasResults {
@@ -201,92 +188,33 @@ struct OrganizeView: View {
                 organizeManager.startFullAnalysis()
             }
         } label: {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(hasResults ? "\(count)" : "0")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(hasResults ? .primary : .secondary)
+            HStack(spacing: 8) {
+                Image(systemName: category.icon)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(.white)
 
-                    Text(category.localizedText)
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
+                Text(category.localizedText)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                CategoryThumbnails(identifiers: identifiers)
-                    .padding(.trailing, -4)
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(.systemGray))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color(UIColor.secondarySystemGroupedBackground))
             )
         }
         .buttonStyle(.plain)
         .disabled(organizeManager.isAnalyzing)
         .opacity(organizeManager.isAnalyzing ? 0.5 : 1)
-    }
-}
-
-// MARK: - Category Thumbnails
-
-struct CategoryThumbnails: View {
-    let identifiers: [String]
-    @State private var assets: [PHAsset] = []
-
-    private let thumbWidth: CGFloat = 52
-    private let thumbRatio: CGFloat = 4.0 / 3.0 // 3:4 portrait (height / width)
-
-    var body: some View {
-        Group {
-            if assets.isEmpty {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 28, weight: .light, design: .rounded))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
-            } else {
-                ZStack {
-                    ForEach(Array(assets.prefix(2).enumerated()), id: \.offset) { index, asset in
-                        thumbView(for: asset)
-                            .rotationEffect(.degrees(index == 0 ? -8 : 6))
-                            .offset(x: index == 0 ? -8 : 10, y: index == 0 ? 2 : -2)
-                            .zIndex(index == 0 ? 0 : 1)
-                    }
-                }
-                .frame(
-                    width: thumbWidth * 2 + 10,
-                    height: thumbWidth * thumbRatio + 8
-                )
-            }
-        }
-        .onAppear { loadAssets() }
-        .onChange(of: identifiers) { _, _ in loadAssets() }
-    }
-
-    private func thumbView(for asset: PHAsset) -> some View {
-        let height = thumbWidth * thumbRatio
-        return AssetImage(asset: asset, targetSize: CGSize(width: 200, height: 280), contentMode: .fill)
-            .aspectRatio(3.0 / 4.0, contentMode: .fill)
-            .frame(width: thumbWidth, height: height)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.white, lineWidth: 2)
-            )
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-    }
-
-    private func loadAssets() {
-        guard !identifiers.isEmpty else { return }
-        let result = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
-        var loaded: [PHAsset] = []
-        result.enumerateObjects { asset, _, _ in
-            loaded.append(asset)
-        }
-        assets = identifiers.compactMap { id in
-            loaded.first { $0.localIdentifier == id }
-        }
     }
 }

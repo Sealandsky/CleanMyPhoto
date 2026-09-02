@@ -29,6 +29,7 @@ struct AlbumListView: View {
                 .padding(.bottom, 90)
             }
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
         .background(Color.black)
     }
 
