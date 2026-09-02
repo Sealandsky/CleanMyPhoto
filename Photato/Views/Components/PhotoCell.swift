@@ -8,6 +8,12 @@ struct PhotoCell: View {
     @Environment(GridSettings.self) private var gridSettings
     @State private var imageLoaded = false
 
+    /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
+    /// 否则用用户设置的固定比例。
+    private var cardAspectRatio: CGFloat {
+        gridSettings.isOriginalRatio ? photo.pixelAspectRatio : gridSettings.aspectRatio
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomTrailing) {
@@ -41,7 +47,7 @@ struct PhotoCell: View {
                 }
             }
         }
-        .aspectRatio(gridSettings.aspectRatio, contentMode: .fit)
+        .aspectRatio(cardAspectRatio, contentMode: .fit)
         .animation(.easeIn(duration: 0.2), value: imageLoaded)
     }
 

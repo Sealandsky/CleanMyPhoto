@@ -8,6 +8,14 @@ struct SettingsView: View {
     @State private var showMembership = false
     @Environment(GridSettings.self) private var gridSettings
 
+    /// 比例选项的当前显示文案（原比例 / 1:1 / 3:4）
+    private var ratioDisplayText: String {
+        if gridSettings.isOriginalRatio {
+            return String(localized: "Original")
+        }
+        return gridSettings.aspectRatio == 1.0 ? "1:1" : "3:4"
+    }
+
     var body: some View {
         @Bindable var gridSettings = gridSettings
         NavigationView {
@@ -124,14 +132,24 @@ struct SettingsView: View {
                         Spacer()
 
                         Menu {
-                            Button { gridSettings.aspectRatio = 1.0 } label: {
+                            // 原比例：瀑布流按图片真实宽高比展示
+                            Button { gridSettings.isOriginalRatio = true } label: {
+                                Label(String(localized: "Original"), systemImage: "rectangle.on.rectangle")
+                            }
+                            Button {
+                                gridSettings.isOriginalRatio = false
+                                gridSettings.aspectRatio = 1.0
+                            } label: {
                                 Label("1:1", systemImage: "square")
                             }
-                            Button { gridSettings.aspectRatio = 3.0 / 4.0 } label: {
+                            Button {
+                                gridSettings.isOriginalRatio = false
+                                gridSettings.aspectRatio = 3.0 / 4.0
+                            } label: {
                                 Label("3:4", systemImage: "rectangle.portrait")
                             }
                         } label: {
-                            Text(gridSettings.aspectRatio == 1.0 ? "1:1" : "3:4")
+                            Text(ratioDisplayText)
                                 .foregroundColor(.secondary)
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(.caption2, design: .rounded))
@@ -183,9 +201,21 @@ struct SettingsView: View {
                     }
                     .foregroundColor(.primary)
                 }
+
+                // 尾部高度占位：滚动到底时最后一行不被悬浮底栏遮挡
+                Section {
+                    Color.clear
+                        .frame(height: 74)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                }
             }
             .navigationTitle(String(localized: "Settings"))
-            .navigationBarTitleDisplayMode(.automatic)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .background(alignment: .top) {
+                TopBlurFadeBackground(height: 200)
+            }
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)

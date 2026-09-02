@@ -254,11 +254,10 @@ struct OrganizeResultsView: View {
     }
 
     private var photoGrid: some View {
-        LazyVGrid(columns: GridColumnHelper.columns(count: gridSettings.columnCount), spacing: GridColumnHelper.spacing) {
-            ForEach(displayedPhotos) { photo in
-                flatPhotoCell(photo: photo)
-            }
-
+        // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
+        AdaptivePhotoGrid(photos: displayedPhotos) { photo in
+            flatPhotoCell(photo: photo)
+        } footer: {
             if organizeManager.hasMorePhotos(for: category) {
                 ProgressView()
                     .tint(.white)

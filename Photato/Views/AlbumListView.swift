@@ -1,11 +1,12 @@
 
 import SwiftUI
+import Photos
 
 struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     let onAlbumSelect: (AlbumModel) -> Void
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
 
     var body: some View {
         ScrollView {
@@ -16,14 +17,16 @@ struct AlbumListView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(albumManager.albums) { album in
-                        AlbumCell(album: album)
+                        // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
+                        AlbumStackCell(album: album)
                             .onTapGesture {
                                 onAlbumSelect(album)
                             }
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                // 尾部高度占位：滚动到底时最后一行不被悬浮底栏遮挡
+                .padding(.bottom, 90)
             }
         }
         .background(Color.black)
@@ -61,11 +64,20 @@ struct AlbumListView: View {
 // MARK: - Album Cell Skeleton
 struct AlbumCellSkeleton: View {
     var body: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.3))
-            .aspectRatio(3.0 / 4.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .shimmering()
+        VStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.gray.opacity(0.3))
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            VStack(spacing: 4) {
+                Rectangle().fill(Color.gray.opacity(0.3))
+                    .frame(height: 12)
+                    .padding(.horizontal, 24)
+                Rectangle().fill(Color.gray.opacity(0.2))
+                    .frame(height: 10)
+                    .padding(.horizontal, 40)
+            }
+        }
+        .shimmering()
     }
 }
 

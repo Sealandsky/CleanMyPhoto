@@ -13,6 +13,8 @@ struct OrganizeView: View {
                 categoryCards
             }
             .padding(16)
+            // 尾部高度占位：滚动到底时最后一个卡片不被悬浮底栏遮挡
+            .padding(.bottom, 74)
         }
         .background(Color(UIColor.systemGroupedBackground))
         .task {

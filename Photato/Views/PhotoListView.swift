@@ -32,10 +32,6 @@ struct PhotoListView: View {
         photoManager.displayedPhotos
     }
 
-    private var columns: [GridItem] {
-        GridColumnHelper.columns(count: gridSettings.columnCount)
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -47,47 +43,52 @@ struct PhotoListView: View {
                     }
                     .frame(height: 0)
 
-                    LazyVGrid(columns: columns, spacing: GridColumnHelper.spacing) {
-                        ForEach(photos) { photo in
-                            PhotoCell(
-                                photo: photo,
-                                isSelected: selectionManager.isSelected(photo.id),
-                                isSelectMode: selectionManager.isSelectMode
-                            )
-                            .id(photo.id)
-                            .contentShape(Rectangle())
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear
-                                        .onAppear {
-                                            cellFrames[photo.id] = geo.frame(in: .named("scrollView"))
-                                        }
-                                        .onChange(of: geo.frame(in: .named("scrollView"))) { _, frame in
-                                            cellFrames[photo.id] = frame
-                                        }
-                                }
-                            )
-                            .onTapGesture {
-                                if selectionManager.isSelectMode {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        selectionManager.toggle(photo.id)
+                    // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流（设置-显示-图片比例）
+                    AdaptivePhotoGrid(photos: photos) { photo in
+                        PhotoCell(
+                            photo: photo,
+                            isSelected: selectionManager.isSelected(photo.id),
+                            isSelectMode: selectionManager.isSelectMode
+                        )
+                        .id(photo.id)
+                        .contentShape(Rectangle())
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .onAppear {
+                                        cellFrames[photo.id] = geo.frame(in: .named("scrollView"))
                                     }
-                                } else {
-                                    onPhotoSelect(photo)
-                                }
+                                    .onChange(of: geo.frame(in: .named("scrollView"))) { _, frame in
+                                        cellFrames[photo.id] = frame
+                                    }
                             }
-                            .onLongPressGesture(minimumDuration: 0.3) {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                        )
+                        .onTapGesture {
+                            if selectionManager.isSelectMode {
+                                withAnimation(.easeInOut(duration: 0.15)) {
                                     selectionManager.toggle(photo.id)
                                 }
+                            } else {
+                                onPhotoSelect(photo)
                             }
-                            .onAppear {
-                                if photo.id == photos.last?.id {
-                                    Task {
-                                        await photoManager.fetchMorePhotos()
-                                    }
+                        }
+                        .onLongPressGesture(minimumDuration: 0.3) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectionManager.toggle(photo.id)
+                            }
+                        }
+                        .onAppear {
+                            if photo.id == photos.last?.id {
+                                Task {
+                                    await photoManager.fetchMorePhotos()
                                 }
                             }
+                        }
+                    } footer: {
+                        if photoManager.isLoadingMore {
+                            ProgressView()
+                                .foregroundColor(.white)
+                                .padding()
                         }
                     }
                     .padding(.horizontal, 12)

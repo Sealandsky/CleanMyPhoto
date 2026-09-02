@@ -143,10 +143,6 @@ struct SystemMonthPhotosView: View {
     @State private var selectionManager = SelectionManager()
     @State private var monthSizeText: String = ""
 
-    private var columns: [GridItem] {
-        GridColumnHelper.columns(count: gridSettings.columnCount)
-    }
-
     private var photos: [PhotoAsset] {
         monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
@@ -165,28 +161,27 @@ struct SystemMonthPhotosView: View {
                     .padding(.top, 4)
                     .padding(.bottom, 8)
                 }
-                LazyVGrid(columns: columns, spacing: GridColumnHelper.spacing) {
-                    ForEach(photos) { photo in
-                        PhotoCell(
-                            photo: photo,
-                            isSelected: selectionManager.isSelected(photo.id),
-                            isSelectMode: selectionManager.isSelectMode
-                        )
-                        .id(photo.id)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if selectionManager.isSelectMode {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    selectionManager.toggle(photo.id)
-                                }
-                            } else {
-                                onPhotoSelect(photo)
-                            }
-                        }
-                        .onLongPressGesture(minimumDuration: 0.3) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
+                AdaptivePhotoGrid(photos: photos) { photo in
+                    PhotoCell(
+                        photo: photo,
+                        isSelected: selectionManager.isSelected(photo.id),
+                        isSelectMode: selectionManager.isSelectMode
+                    )
+                    .id(photo.id)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectionManager.isSelectMode {
+                            withAnimation(.easeInOut(duration: 0.15)) {
                                 selectionManager.toggle(photo.id)
                             }
+                        } else {
+                            onPhotoSelect(photo)
+                        }
+                    }
+                    .onLongPressGesture(minimumDuration: 0.3) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectionManager.toggle(photo.id)
                         }
                     }
                 }

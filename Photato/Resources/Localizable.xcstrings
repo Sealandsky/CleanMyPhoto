@@ -1,9 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "·" : {
-
-    },
+    "·" : {},
     "/month" : {
       "localizations" : {
         "en" : {
@@ -36,9 +34,7 @@
         }
       }
     },
-    "%lld" : {
-
-    },
+    "%lld" : {},
     "%lld days left in trial" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -89,9 +85,7 @@
         }
       }
     },
-    "%lld photos" : {
-
-    },
+    "%lld photos" : {},
     "%lld Photos" : {
       "localizations" : {
         "en" : {
@@ -246,24 +240,12 @@
         }
       }
     },
-    "0" : {
-
-    },
-    "1:1" : {
-
-    },
-    "2" : {
-
-    },
-    "3" : {
-
-    },
-    "3:4" : {
-
-    },
-    "4" : {
-
-    },
+    "0" : {},
+    "1:1" : {},
+    "2" : {},
+    "3" : {},
+    "3:4" : {},
+    "4" : {},
     "About" : {
       "localizations" : {
         "en" : {
@@ -308,6 +290,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相簿"
+          }
+        }
+      }
+    },
+    "Analyzing %lld/%lld..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyzing %1$lld/%2$lld..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在分析 %1$lld/%2$lld…"
+          }
+        }
+      }
+    },
+    "Analyzing photo quality..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyzing photo quality..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在分析照片画质…"
           }
         }
       }
@@ -552,6 +566,38 @@
         }
       }
     },
+    "Blurry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模糊照片"
+          }
+        }
+      }
+    },
+    "Blurry Faces" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry Faces"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "闭眼/糊脸"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "en" : {
@@ -658,70 +704,6 @@
         }
       }
     },
-    "Analyzing %lld/%lld..." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Analyzing %1$lld/%2$lld..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在分析 %1$lld/%2$lld…"
-          }
-        }
-      }
-    },
-    "Analyzing photo quality..." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Analyzing photo quality..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在分析照片画质…"
-          }
-        }
-      }
-    },
-    "Blurry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blurry"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模糊照片"
-          }
-        }
-      }
-    },
-    "Blurry Faces" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blurry Faces"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "闭眼/糊脸"
-          }
-        }
-      }
-    },
     "Connection timed out. Please try again." : {
       "localizations" : {
         "en" : {
@@ -782,6 +764,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已删除照片"
+          }
+        }
+      }
+    },
+    "Discover" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重温"
           }
         }
       }
@@ -1318,6 +1316,7 @@
       }
     },
     "No photo selected" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1477,6 +1476,22 @@
         }
       }
     },
+    "Original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原比例"
+          }
+        }
+      }
+    },
     "Permanently delete %lld photos? This cannot be undone." : {
       "localizations" : {
         "en" : {
@@ -1509,9 +1524,7 @@
         }
       }
     },
-    "Photato Pro" : {
-
-    },
+    "Photato Pro" : {},
     "Photo Access Required" : {
       "localizations" : {
         "en" : {
@@ -1931,6 +1944,38 @@
         }
       }
     },
+    "Share failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享失败"
+          }
+        }
+      }
+    },
+    "Shared successfully" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared successfully"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享成功"
+          }
+        }
+      }
+    },
     "Similar" : {
       "localizations" : {
         "en" : {
@@ -2269,6 +2314,7 @@
       }
     },
     "Trial expiring" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2296,6 +2342,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免费试用 7 天"
+          }
+        }
+      }
+    },
+    "Unknown date" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown date"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知日期"
+          }
+        }
+      }
+    },
+    "Unknown time" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知时间"
           }
         }
       }

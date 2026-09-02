@@ -4,18 +4,18 @@ import SwiftUI
 import Photos
 
 enum MainTab: String, CaseIterable {
+    case discover
     case allPhotos
-    case albums
     case timeline
 
     var localizedText: String {
         switch self {
         case .allPhotos:
             return String(localized: "Library")
-        case .albums:
-            return String(localized: "Albums")
         case .timeline:
             return String(localized: "Timeline")
+        case .discover:
+            return String(localized: "Discover")
         }
     }
 
@@ -23,39 +23,37 @@ enum MainTab: String, CaseIterable {
         switch self {
         case .allPhotos:
             return "photo.on.rectangle.angled"
-        case .albums:
-            return "photo.stack"
         case .timeline:
             return "calendar"
+        case .discover:
+            return "sparkle.magnifyingglass"
         }
     }
 }
 
 struct ContentView: View {
     @EnvironmentObject var photoManager: PhotoManager
-    @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
 
-    @State private var showTrash = false
-    @State private var currentPhotoID: String? = nil
-    @State private var isFullscreenMode = false
-    @State private var scrollToPhotoID: String? = nil
-    @State private var showMembershipPaywall = false
-    @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
-    @State private var showGestureInstructions: Bool = false
-    @State private var deleteTrigger: Int = 0
-    @State private var showFavoriteDeleteAlert: Bool = false
+    // 由 MainTabView 持有：全屏态控制底部栏显隐；showTrash 供全屏页内入口打开回收站；
+    // timelinePath 为时间线子页的导航路径
+    @Binding var isFullscreenMode: Bool
+    @Binding var showTrash: Bool
+    @Binding var timelinePath: NavigationPath
 
-    // 相簿相关状态
-    @State private var selectedTab: MainTab = .allPhotos
-    @State private var selectedAlbum: AlbumModel? = nil
-    @State private var albumManager: AlbumManager?
+    // 「重温」Tab 再次点击的滚顶信号（MainTabView 递增传入）
+    @Binding var discoverScrollToTop: Int
+
+    @State private var currentPhotoID: String? = nil
+    @State private var scrollToPhotoID: String? = nil
+
+    // 相簿相关状态（相簿已抽离为独立底部 Tab，见 MainTabView）
+    @State private var selectedTab: MainTab = .discover // 发现为首个 Tab，默认选中
     @State private var systemAlbumManager: SystemAlbumManager?
     @State private var selectedMonthAlbum: MonthAlbum? = nil
-
-    // 导航路径
-    @State private var albumsPath = NavigationPath()
-    @State private var timelinePath = NavigationPath()
+    @StateObject private var discoverManager = DiscoverManager()
+    // 发现页滚顶信号：递增驱动 DiscoverView 滚回顶部
+    @State private var discoverScrollSignal = 0
 
     // 滚动偏移状态
     @State private var scrollOffset: CGFloat = 0
@@ -79,19 +77,15 @@ struct ContentView: View {
                 await photoManager.fetchAllPhotos()
             }
 
-            if albumManager == nil {
-                albumManager = AlbumManager(photoManager: photoManager)
-            }
-
             if systemAlbumManager == nil {
                 systemAlbumManager = SystemAlbumManager()
             }
-        }
-        .sheet(isPresented: $showTrash) {
-            TrashView(photoManager: photoManager)
-        }
-        .sheet(isPresented: $showMembershipPaywall) {
-            MembershipView(isMandatory: true)
+
+            // 「发现」为默认首位 Tab：启动时若正处于发现页则立即采样
+            // （onChange 仅在 Tab 变化时触发，覆盖不了默认选中的首次进入）
+            if selectedTab == .discover, !discoverManager.hasLoadedOnce {
+                await discoverManager.refresh()
+            }
         }
         .alert(String(localized: "Error"), isPresented: .constant(photoManager.errorMessage != nil)) {
             Button(String(localized: "OK")) {
@@ -102,9 +96,33 @@ struct ContentView: View {
                 Text(errorMessage)
             }
         }
-        .toolbar(photoManager.isSelectMode || isFullscreenMode ? .hidden : .visible, for: .tabBar)
         .animation(.easeInOut(duration: 0.2), value: photoManager.isSelectMode)
         .animation(.easeInOut(duration: 0.2), value: isFullscreenMode)
+        // 页面切换时的状态重置与懒加载（原挂载在顶部 Tab 栏视图上，
+        // 改造为下拉选择器后迁至 body 层，逻辑保持不变）
+        // 「重温」Tab 再次点击：先切回发现子页，再触发滚顶
+        .onChange(of: discoverScrollToTop) { _, _ in
+            if selectedTab != .discover {
+                selectedTab = .discover
+            }
+            discoverScrollSignal += 1
+        }
+        .onChange(of: selectedTab) { oldValue, newValue in
+            selectedTabBeforeSwitch = oldValue
+            scrollToPhotoID = nil
+            isFullscreenMode = false
+            currentPhotoID = nil
+
+            timelinePath = NavigationPath()
+            selectedMonthAlbum = nil
+
+            // 发现页懒加载：首次切到该 Tab 才随机采样（与相簿页策略一致）
+            if newValue == .discover, !discoverManager.hasLoadedOnce {
+                Task {
+                    await discoverManager.refresh()
+                }
+            }
+        }
     }
 
     // MARK: - Permission View
@@ -166,7 +184,7 @@ struct ContentView: View {
         ZStack {
             contentViews
         }
-        .background(Color.black)
+        .background(Color("AccentBg"))
     }
 
     // MARK: - Content Views
@@ -180,13 +198,14 @@ struct ContentView: View {
                 .opacity(selectedTab == .allPhotos && !isFullscreenMode ? 1 : 0)
                 .allowsHitTesting(selectedTab == .allPhotos && !isFullscreenMode)
 
-            albumsNavigationView
-                .opacity(selectedTab == .albums && !isFullscreenMode ? 1 : 0)
-                .allowsHitTesting(selectedTab == .albums && !isFullscreenMode)
-
             timelineNavigationView
                 .opacity(selectedTab == .timeline && !isFullscreenMode ? 1 : 0)
                 .allowsHitTesting(selectedTab == .timeline && !isFullscreenMode)
+
+            // 发现 Tab：与其他页相同的 opacity + hitTest 切换方式，零样式改动
+            discoverNavigationView
+                .opacity(selectedTab == .discover && !isFullscreenMode ? 1 : 0)
+                .allowsHitTesting(selectedTab == .discover && !isFullscreenMode)
         }
         .background(Color(.systemBackground)) // 固定背景，防止露黑
     }
@@ -196,26 +215,7 @@ struct ContentView: View {
     // MARK: - Library Navigation
     private var libraryNavigationView: some View {
         NavigationStack {
-            photoListView
-                .navigationTitle(appTitle)
-                .navigationBarTitleDisplayMode(photoManager.isSelectMode ? .inline : .large)
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        if !photoManager.isSelectMode {
-                            topSegmentedControl
-                        }
-                    }
-                    if !photoManager.isSelectMode {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            HStack(spacing: 12) {
-                                if !membershipManager.isPremiumMember {
-                                    membershipButton
-                                }
-                                trashButton
-                            }
-                        }
-                    }
-                }
+            applySharedTitleBar(to: photoListView)
         }
     }
 
@@ -224,10 +224,10 @@ struct ContentView: View {
         switch selectedTab {
         case .allPhotos:
             return true
-        case .albums:
-            return albumsPath.isEmpty
         case .timeline:
             return timelinePath.isEmpty
+        case .discover:
+            return true
         }
     }
 
@@ -236,90 +236,17 @@ struct ContentView: View {
         switch selectedTab {
         case .allPhotos:
             return String(localized: "Library")
-        case .albums:
-            return String(localized: "Albums")
         case .timeline:
             return String(localized: "Timeline")
-        }
-    }
-
-    // MARK: - Albums Navigation
-    private var albumsNavigationView: some View {
-        NavigationStack(path: $albumsPath) {
-            Group {
-                if let albumMgr = albumManager {
-                    AlbumListView(albumManager: albumMgr) { album in
-                        selectedAlbum = album
-                        Task { [album] in
-                            await albumMgr.fetchPhotos(in: album)
-                            guard selectedAlbum?.id == album.id else { return }
-                            albumsPath.append(AlbumsDestination.albumPhotos(album.id))
-                        }
-                    }
-                } else {
-                    loadingView
-                }
-            }
-            .navigationTitle(appTitle)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if !photoManager.isSelectMode {
-                        topSegmentedControl
-                    }
-                }
-                if !photoManager.isSelectMode {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 12) {
-                            if !membershipManager.isPremiumMember {
-                                membershipButton
-                            }
-                            trashButton
-                        }
-                    }
-                }
-            }
-            .task {
-                if let albumMgr = albumManager, albumMgr.albums.isEmpty {
-                    await albumMgr.fetchUserAlbums()
-                }
-            }
-            .navigationDestination(for: AlbumsDestination.self) { destination in
-                switch destination {
-                case .albumPhotos(let albumId):
-                    if let album = albumManager?.albums.first(where: { $0.id == albumId }),
-                       let albumMgr = albumManager {
-                        AlbumPhotoListView(
-                            albumManager: albumMgr,
-                            photoManager: photoManager,
-                            album: album,
-                            onPhotoSelect: { photo in
-                                currentPhotoID = photo.id
-                                scrollToPhotoID = nil
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    isFullscreenMode = true
-                                }
-                            },
-                            scrollToPhotoID: scrollToPhotoID
-                        )
-                    }
-                }
-            }
-        }
-        .onChange(of: albumsPath) { oldValue, newValue in
-            if newValue.isEmpty {
-                selectedAlbum = nil
-                if !oldValue.isEmpty, let albumMgr = albumManager {
-                    Task { await albumMgr.fetchUserAlbums() }
-                }
-            }
+        case .discover:
+            return String(localized: "Discover")
         }
     }
 
     // MARK: - Timeline Navigation
     private var timelineNavigationView: some View {
         NavigationStack(path: $timelinePath) {
-            Group {
+            applySharedTitleBar(to: Group {
                 if let systemAlbumMgr = systemAlbumManager {
                     PhotoGroupView(
                         albumManager: systemAlbumMgr,
@@ -332,26 +259,7 @@ struct ContentView: View {
                 } else {
                     loadingView
                 }
-            }
-            .navigationTitle(appTitle)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if !photoManager.isSelectMode {
-                        topSegmentedControl
-                    }
-                }
-                if !photoManager.isSelectMode {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 12) {
-                            if !membershipManager.isPremiumMember {
-                                membershipButton
-                            }
-                            trashButton
-                        }
-                    }
-                }
-            }
+            })
             .navigationDestination(for: TimelineDestination.self) { destination in
                 switch destination {
                 case .monthPhotos(_):
@@ -385,61 +293,79 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Top Tab Bar
-    private var topSegmentedControl: some View {
-        HStack(spacing: 8) {
-            ForEach(MainTab.allCases, id: \.self) { tab in
-                tabButton(for: tab)
-            }
-        }
-        .padding(.vertical, 4)
-        .onChange(of: selectedTab) { oldValue, newValue in
-            selectedTabBeforeSwitch = oldValue
-            scrollToPhotoID = nil
-            isFullscreenMode = false
-            currentPhotoID = nil
-
-            albumsPath = NavigationPath()
-            timelinePath = NavigationPath()
-            selectedAlbum = nil
-            selectedMonthAlbum = nil
-
-            if newValue == .albums, let albumMgr = albumManager, albumMgr.albums.isEmpty {
-                albumMgr.isLoadingAlbums = true
-                Task {
-                    await albumMgr.fetchUserAlbums()
-                }
-            }
+    // MARK: - Discover Navigation
+    // 发现页：独立 NavigationStack，标题栏与其他三页共用（见 applySharedTitleBar）。
+    // 点击照片通过 onPhotoSelect 打开共用的全屏浏览器（DraggablePhotoView），
+    // 与图库页交互完全一致。
+    private var discoverNavigationView: some View {
+        NavigationStack {
+            applySharedTitleBar(to: DiscoverView(
+                manager: discoverManager,
+                onPhotoSelect: { photo in
+                    currentPhotoID = photo.id
+                    scrollToPhotoID = nil
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isFullscreenMode = true
+                    }
+                },
+                scrollToTopSignal: discoverScrollSignal
+            ))
         }
     }
 
-    private func tabButton(for tab: MainTab) -> some View {
-        let isSelected = selectedTab == tab
-        return Button {
-            selectedTab = tab
+    // MARK: - 共享标题栏（发现/图库/时间线三个子页共用）
+    /// 标题栏结构：标题居左大字号（滚动时系统自动收缩为 inline）+
+    /// 右侧操作按钮组（Liquid Glass 质感）。
+    /// 背景隐藏系统导航栏的硬分界模糊，改用 TopBlurFadeBackground 的
+    /// 垂直渐变遮罩——模糊效果自上而下逐步衰减、柔和淡出
+    private func applySharedTitleBar<V: View>(to content: V) -> some View {
+        content
+            .navigationTitle(appTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .background(alignment: .top) {
+                TopBlurFadeBackground(height: 200)
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    tabSelectorMenu
+                }
+            }
+    }
+
+    // MARK: - 页面下拉选择器（四个子页共用）
+    /// 替代原顶部 Tab 栏的页面切换控件（系统 Menu，不做自定义样式）：
+    /// - 保留原有全部 Tab 选项，当前选中项带 checkmark 回显
+    /// - 点击外部区域由系统自动关闭菜单；重复点击/快速切换由系统防抖处理
+    /// - 选项点击直接写 selectedTab，切换即完成页面切换，
+    ///   原有 onChange 懒加载/状态重置逻辑完全复用（见 tabContent.onChange）
+    private var tabSelectorMenu: some View {
+        Menu {
+            ForEach(MainTab.allCases, id: \.self) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    // 当前选中项带 checkmark 回显
+                    if selectedTab == tab {
+                        Label(tab.localizedText, systemImage: "checkmark")
+                    } else {
+                        Text(tab.localizedText)
+                    }
+                }
+            }
         } label: {
-            Label(tab.localizedText, systemImage: tab.icon)
-                .font(.system(.body, design: .rounded))
-                .fontWeight(.medium)
-                .foregroundColor(isSelected ? .black : .white.opacity(0.6))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .opacity(isSelected ? 0 : 1)
-                )
-                .background(
-                    Capsule()
-                        .fill(Color.white)
-                        .opacity(isSelected ? 1 : 0)
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-                )
+            if #available(iOS 26.0, *) {
+                // iOS 26+：toolbar 按钮由系统自动呈现 Liquid Glass 磨砂质感
+                Image(systemName: "line.3.horizontal.decrease")
+            } else {
+                // iOS 18：磨砂圆钮回退
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Photo List View
@@ -461,10 +387,11 @@ struct ContentView: View {
     }
 
     private var currentPhotos: [PhotoAsset] {
-        if let monthAlbum = selectedMonthAlbum {
+        // 发现页批次优先：全屏浏览器直接使用发现页的随机批次
+        if selectedTab == .discover {
+            return discoverManager.photos
+        } else if let monthAlbum = selectedMonthAlbum {
             return monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
-        } else if let albumMgr = albumManager, selectedAlbum != nil {
-            return albumMgr.displayedAlbumPhotos
         } else {
             return photoManager.displayedPhotos
         }
@@ -476,225 +403,40 @@ struct ContentView: View {
     }
 
     // MARK: - Photo Browser
+    // 全屏浏览器已提取为共享组件 FullscreenPhotoBrowser（相簿 Tab 等数据源共用），
+    // 这里仅负责注入图库/发现页的数据源回调
     private var photoBrowserView: some View {
-        ZStack {
-            Group {
-                let photos = currentPhotos
-
-                if !photos.isEmpty, currentPhotoID != nil {
-                    DraggablePhotoView(
-                        photos: photos,
-                        currentPhotoID: currentPhotoID ?? "",
-                        deleteTrigger: $deleteTrigger,
-                        onPhotoChange: { id, index in
-                            currentPhotoID = id
-                            scrollToPhotoID = nil
-                            if selectedAlbum == nil {
-                                photoManager.preloadAssets(photoIndex: index)
-                            }
-                        },
-                        onDelete: { photo in
-                            photoManager.addToTrash(photo)
-                        },
-                        onBlockedDelete: {
-                            showFavoriteDeleteAlert = true
-                        },
-                        onDismiss: {
-                            scrollToPhotoID = currentPhotoID
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                    isFullscreenMode = false
-                                }
-                            }
-                        },
-                        screenSize: ScreenSizeHelper.screenSize
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onAppear {
-                        showGestureInstructionsIfNeeded()
+        FullscreenPhotoBrowser(
+            photos: currentPhotos,
+            initialPhotoID: currentPhotoID ?? "",
+            onDelete: { photo in
+                photoManager.addToTrash(photo)
+                // 同步移出发现页批次：DraggablePhotoView 依赖外部数组收缩滑向下一张
+                discoverManager.removePhoto(photo)
+            },
+            onFavoriteToggled: { photo, isFavorite in
+                // 同步发现页批次内的心形状态（其他页来源时 id 不在批次中，无副作用）
+                discoverManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
+            },
+            onActivePhotoChange: { _, index in
+                scrollToPhotoID = nil
+                // 发现页批次顺序与 photoManager.allPhotos 不同，索引预加载无意义，跳过
+                if selectedTab != .discover {
+                    photoManager.preloadAssets(photoIndex: index)
+                }
+            },
+            onOpenTrash: {
+                showTrash = true
+            },
+            onDismiss: {
+                scrollToPhotoID = currentPhotoID
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        isFullscreenMode = false
                     }
-                } else if photos.isEmpty {
-                    emptyLibraryView
-                } else {
-                    Text(String(localized: "No photo selected"))
-                        .foregroundColor(.white)
                 }
             }
-            .ignoresSafeArea()
-
-            if showGestureInstructions {
-                gestureInstructionsOverlay
-            }
-
-            VStack {
-                HStack {
-                    Button {
-                        scrollToPhotoID = currentPhotoID
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isFullscreenMode = false
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-                    Spacer()
-
-                    fullscreenTrashButton
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-                Spacer()
-
-                HStack(spacing: 16) {
-                    Spacer()
-
-                    Button {
-                        if let photo = currentFullscreenPhoto {
-                            photoManager.toggleFavorite(photo)
-                        }
-                    } label: {
-                        Image(systemName: (currentFullscreenPhoto?.isFavorite ?? false) ? "heart.fill" : "heart")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor((currentFullscreenPhoto?.isFavorite ?? false) ? .red : .primary)
-                            .frame(width: 60, height: 60)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-
-                    Button {
-                        deleteTrigger += 1
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 60, height: 60)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-                    Spacer()
-                }
-                .padding(.bottom, 8)
-            }
-        }
-        .toolbar(.hidden, for: .tabBar)
-        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
-            Button(String(localized: "OK"), role: .cancel) {}
-        } message: {
-            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
-        }
-        .onChange(of: currentPhotos) { oldPhotos, newPhotos in
-            guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
-            if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {
-                let newIndex = min(oldIndex, newPhotos.count - 1)
-                currentPhotoID = newPhotos.indices.contains(newIndex) ? newPhotos[newIndex].id : newPhotos.first?.id
-            } else {
-                currentPhotoID = newPhotos.first?.id
-            }
-        }
-        .onAppear {
-            if let id = currentPhotoID, !currentPhotos.isEmpty {
-                if !currentPhotos.contains(where: { $0.id == id }) {
-                    currentPhotoID = currentPhotos.first?.id
-                }
-            } else if currentPhotoID == nil {
-                initializeCurrentPhoto()
-            }
-        }
-    }
-
-    // MARK: - Initialize Current Photo
-    private func initializeCurrentPhoto() {
-        if currentPhotoID == nil, let firstPhoto = photoManager.displayedPhotos.first {
-            currentPhotoID = firstPhoto.id
-        }
-    }
-
-    // MARK: - Trash Button
-    private var trashButton: some View {
-        Button {
-            showTrash = true
-        } label: {
-            Image(systemName: "trash.fill")
-                .font(.system(.body, design: .rounded))
-                .foregroundColor(.primary)
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain)
-        .badge(photoManager.trashCount)
-    }
-
-    // MARK: - Fullscreen Trash Button
-    private var fullscreenTrashButton: some View {
-        Button {
-            showTrash = true
-        } label: {
-            Image(systemName: "trash.fill")
-                .font(.system(.title3, design: .rounded))
-                .foregroundColor(.primary)
-                .frame(width: 44, height: 44)
-        }
-        .background(.ultraThinMaterial, in: Circle())
-        .overlay(alignment: .topTrailing) {
-            if photoManager.trashCount > 0 {
-                Text("\(photoManager.trashCount)")
-                    .font(.system(.caption2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .padding(4)
-                    .background(Color.red)
-                    .clipShape(Circle())
-                    .offset(x: 4, y: -2)
-            }
-        }
-    }
-
-    // MARK: - Membership Button
-    private var membershipButton: some View {
-        Button {
-            showMembershipPaywall = true
-        } label: {
-            Image(systemName: "crown.fill")
-                .font(.system(.body, design: .rounded))
-                .foregroundColor(.yellow)
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Trial Warning Banner
-    private var trialWarningBanner: some View {
-        VStack {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-
-                Text(membershipManager.remainingTrialText ?? String(localized: "Trial expiring"))
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                Button(String(localized: "Upgrade")) {
-                    showMembershipPaywall = true
-                }
-                .font(.system(size: 13, design: .rounded))
-                .foregroundColor(.blue)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.orange.opacity(0.2))
-            .cornerRadius(12)
-            .padding(.horizontal, 16)
-
-            Spacer()
-        }
+        )
     }
 
     // MARK: - Loading View
@@ -712,98 +454,13 @@ struct ContentView: View {
         .background(Color.black)
         .ignoresSafeArea()
     }
-
-    // MARK: - Gesture Instructions Overlay
-    private var gestureInstructionsOverlay: some View {
-        VStack {
-            Spacer()
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.left")
-                    Text(String(localized: "Older"))
-                }
-                .font(.system(.caption, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.right")
-                    Text(String(localized: "Newer"))
-                }
-                .font(.system(.caption, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down")
-                    Text(String(localized: "Swipe down to close"))
-                }
-                .font(.system(.caption, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up")
-                    Text(String(localized: "Swipe up to delete"))
-                }
-                .font(.system(.caption, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.6))
-                .foregroundColor(.white)
-                .cornerRadius(15)
-            }
-            .padding(.bottom, 120)
-        }
-        .allowsHitTesting(false)
-        .transition(.opacity)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showGestureInstructions = false
-                    hasShownGestureInstructions = true
-                }
-            }
-        }
-    }
-
-    // MARK: - Show Gesture Instructions If Needed
-    private func showGestureInstructionsIfNeeded() {
-        if !hasShownGestureInstructions && !showGestureInstructions {
-            withAnimation(.easeIn(duration: 0.3)) {
-                showGestureInstructions = true
-            }
-        }
-    }
-
-    // MARK: - Empty Library View
-    private var emptyLibraryView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 60, design: .rounded))
-                .foregroundColor(.gray)
-
-            Text(String(localized: "No Photos Found"))
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-
-            Text(String(localized: "Your photo library appears to be empty."))
-                .font(.system(.body, design: .rounded))
-                .foregroundColor(.secondary)
-        }
-    }
 }
 
 #Preview {
-    ContentView()
+    ContentView(
+        isFullscreenMode: .constant(false),
+        showTrash: .constant(false),
+        timelinePath: .constant(NavigationPath()),
+        discoverScrollToTop: .constant(0)
+    )
 }
