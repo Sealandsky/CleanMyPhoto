@@ -681,7 +681,20 @@
       }
     },
     "Categories" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categories"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "功能类型"
+          }
+        }
+      }
     },
     "Close" : {
       "localizations" : {
@@ -1001,7 +1014,20 @@
       }
     },
     "Junk Items" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Junk Items"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "废片数量"
+          }
+        }
+      }
     },
     "Keep All" : {
       "localizations" : {
