@@ -13,6 +13,21 @@ struct DraggablePhotoView: View {
     let screenSize: CGSize
     let photoSpacing: CGFloat = 12
 
+    /// 卡片版式：fullScreen = 独立全屏页（默认，上下各留 120pt 给页面操作栏）；
+    /// embeddedSection = 作为详情页垂直版式中的预览区嵌入，上下不留白让大图占满区块
+    enum CardPresentation {
+        case fullScreen
+        case embeddedSection
+    }
+    var cardPresentation: CardPresentation = .fullScreen
+
+    private var effectiveCardTopPadding: CGFloat {
+        cardPresentation == .embeddedSection ? 0 : cardTopPadding
+    }
+    private var effectiveCardBottomPadding: CGFloat {
+        cardPresentation == .embeddedSection ? 0 : cardBottomPadding
+    }
+
     @State private var localIndex: Int
     @State private var offset: CGSize = .zero
     @State private var isDragging = false
@@ -41,7 +56,7 @@ struct DraggablePhotoView: View {
     private var previousPhoto: PhotoAsset? { safeIndex > 0 ? photos[safeIndex - 1] : nil }
     private var nextPhoto: PhotoAsset? { safeIndex < photos.count - 1 ? photos[safeIndex + 1] : nil }
 
-    init(photos: [PhotoAsset], currentPhotoID: String, deleteTrigger: Binding<Int>, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onBlockedDelete: (() -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize) {
+    init(photos: [PhotoAsset], currentPhotoID: String, deleteTrigger: Binding<Int>, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onBlockedDelete: (() -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize, cardPresentation: CardPresentation = .fullScreen) {
         self.photos = photos
         self.currentPhotoID = currentPhotoID
         self._deleteTrigger = deleteTrigger
@@ -50,17 +65,42 @@ struct DraggablePhotoView: View {
         self.onBlockedDelete = onBlockedDelete
         self.onDismiss = onDismiss
         self.screenSize = screenSize
+        self.cardPresentation = cardPresentation
         let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) ?? 0
         _localIndex = State(initialValue: idx)
     }
 
     var body: some View {
+        gestureContainer
+    }
+
+    /// 手势挂载：全屏版式独占拖动；垂直流式嵌入版式用 simultaneousGesture
+    /// 与页面 ScrollView 共存——垂直滑动滚页面，水平滑动切换素材
+    @ViewBuilder
+    private var gestureContainer: some View {
+        if cardPresentation == .embeddedSection {
+            cardStack.simultaneousGesture(dragGesture)
+        } else {
+            cardStack.gesture(dragGesture)
+        }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(coordinateSpace: .global)
+            .onChanged { value in
+                handleDragChanged(value)
+            }
+            .onEnded { value in
+                handleDragEnded(value)
+            }
+    }
+
+    private var cardStack: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(.systemBackground)
+                backgroundLayer
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .contentShape(Rectangle())
-                    .ignoresSafeArea()
 
                 // Previous photo (visible when swiping right)
                 if let prev = previousPhoto, !isDeleteTransitioning {
@@ -99,15 +139,6 @@ struct DraggablePhotoView: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .gesture(
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        handleDragChanged(value)
-                    }
-                    .onEnded { value in
-                        handleDragEnded(value)
-                    }
-            )
         }
         .onChange(of: currentPhotoID) { _, newID in
             guard !isDeleteTransitioning else { return }
@@ -124,6 +155,18 @@ struct DraggablePhotoView: View {
             DispatchQueue.main.async {
                 performDeleteAnimation()
             }
+        }
+    }
+
+    /// 区块底色：全屏版式白色底（历史行为，OrganizeResultsView 共用）；
+    /// 垂直流式嵌入版式不绘制底色，透出详情页统一页面底色（systemGray6）
+    @ViewBuilder
+    private var backgroundLayer: some View {
+        if cardPresentation == .embeddedSection {
+            Color.clear
+        } else {
+            Color(.systemBackground)
+                .ignoresSafeArea()
         }
     }
 
@@ -188,8 +231,8 @@ struct DraggablePhotoView: View {
                     .frame(width: geo.size.width, height: geo.size.height)
             }
             .padding(.horizontal, cardPadding)
-            .padding(.top, cardTopPadding)
-            .padding(.bottom, cardBottomPadding)
+            .padding(.top, effectiveCardTopPadding)
+            .padding(.bottom, effectiveCardBottomPadding)
         }
 
         // MARK: - Current Photo Card Layer（带卡片样式的当前图）
@@ -246,8 +289,8 @@ struct DraggablePhotoView: View {
                 }
             }
             .padding(.horizontal, cardPadding)
-            .padding(.top, cardTopPadding)
-            .padding(.bottom, cardBottomPadding)
+            .padding(.top, effectiveCardTopPadding)
+            .padding(.bottom, effectiveCardBottomPadding)
         }
     // MARK: - Gesture Handlers
     @State private var showDeleteIndicator = false
@@ -255,8 +298,19 @@ struct DraggablePhotoView: View {
     private func handleDragChanged(_ value: DragGesture.Value) {
         if isNavigating { return }
 
-        isDragging = true
         let translation = value.translation
+
+        // 垂直流式版式：垂直滑动交给页面滚动，仅水平拖动驱动素材切换
+        if cardPresentation == .embeddedSection {
+            guard abs(translation.width) > abs(translation.height) else { return }
+            isDragging = true
+            withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
+                offset = CGSize(width: translation.width, height: 0)
+            }
+            return
+        }
+
+        isDragging = true
 
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
             if abs(translation.width) > abs(translation.height) {
@@ -279,24 +333,31 @@ struct DraggablePhotoView: View {
         let vertical = value.translation.height
         let velocity = value.velocity.width
 
-        // Swipe up to delete
-        if vertical < -deleteThreshold && onDelete != nil {
-            if currentPhoto.isFavorite {
-                onBlockedDelete?()
-                resetPosition()
-            } else {
-                performDeleteAnimation()
+        // 垂直流式版式：无上滑删除/下滑退出，垂直滑动由页面滚动接管
+        if cardPresentation != .embeddedSection {
+            // Swipe up to delete
+            if vertical < -deleteThreshold && onDelete != nil {
+                if currentPhoto.isFavorite {
+                    onBlockedDelete?()
+                    resetPosition()
+                } else {
+                    performDeleteAnimation()
+                }
+                return
             }
-            return
+
+            // Swipe down to dismiss
+            if vertical > dismissThreshold {
+                performDismissAnimation()
+                return
+            }
         }
 
-        // Swipe down to dismiss
-        if vertical > dismissThreshold {
-            performDismissAnimation()
-            return
-        }
+        horizontalNavigate(horizontal: horizontal, vertical: vertical, velocity: velocity)
+    }
 
-        // Horizontal navigation with velocity + distance
+    /// 水平滑动切换素材（速度 + 距离双阈值），未达阈值回弹复位
+    private func horizontalNavigate(horizontal: CGFloat, vertical: CGFloat, velocity: CGFloat) {
         if abs(horizontal) > abs(vertical) {
             let distanceThreshold = screenSize.width * 0.35
             let velocityThreshold: CGFloat = 500

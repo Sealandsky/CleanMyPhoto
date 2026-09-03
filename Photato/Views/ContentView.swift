@@ -35,10 +35,8 @@ struct ContentView: View {
     @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var statisticsManager: StatisticsManager
 
-    // 由 MainTabView 持有：全屏态控制底部栏显隐；showTrash 供全屏页内入口打开回收站；
-    // timelinePath 为时间线子页的导航路径
+    // 由 MainTabView 持有：全屏态控制底部栏显隐；timelinePath 为时间线子页的导航路径
     @Binding var isFullscreenMode: Bool
-    @Binding var showTrash: Bool
     @Binding var timelinePath: NavigationPath
 
     // 「重温」Tab 再次点击的滚顶信号（MainTabView 递增传入）
@@ -425,9 +423,6 @@ struct ContentView: View {
                     photoManager.preloadAssets(photoIndex: index)
                 }
             },
-            onOpenTrash: {
-                showTrash = true
-            },
             onDismiss: {
                 scrollToPhotoID = currentPhotoID
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -456,11 +451,10 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    ContentView(
-        isFullscreenMode: .constant(false),
-        showTrash: .constant(false),
-        timelinePath: .constant(NavigationPath()),
-        discoverScrollToTop: .constant(0)
-    )
-}
+    #Preview {
+        ContentView(
+            isFullscreenMode: .constant(false),
+            timelinePath: .constant(NavigationPath()),
+            discoverScrollToTop: .constant(0)
+        )
+    }
