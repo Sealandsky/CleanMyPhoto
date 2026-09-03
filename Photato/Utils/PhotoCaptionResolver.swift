@@ -20,19 +20,16 @@ final class PhotoCaptionResolver {
 
     // MARK: - 拍摄日期 / 时间
 
-    /// 拍摄日期（如"2026年8月29日"）；元数据缺失时返回占位文案
-    func shootingDate(of asset: PHAsset) -> String {
-        guard let date = asset.creationDate else {
-            return String(localized: "Unknown date")
-        }
+    /// 拍摄日期（如"2026年8月29日"）；拍摄时间元数据缺失时返回 nil，
+    /// 由调用方决定置空兜底（不渲染"未知日期"类占位文案）
+    func shootingDate(of asset: PHAsset) -> String? {
+        guard let date = asset.creationDate else { return nil }
         return date.formatted(date: .long, time: .omitted)
     }
 
-    /// 拍摄时间（如"14:30"）；元数据缺失时返回占位文案
-    func shootingTime(of asset: PHAsset) -> String {
-        guard let date = asset.creationDate else {
-            return String(localized: "Unknown time")
-        }
+    /// 拍摄时间（如"14:30"）；拍摄时间元数据缺失时返回 nil
+    func shootingTime(of asset: PHAsset) -> String? {
+        guard let date = asset.creationDate else { return nil }
         return date.formatted(date: .omitted, time: .shortened)
     }
 

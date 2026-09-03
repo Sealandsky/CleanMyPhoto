@@ -75,6 +75,11 @@ struct MainTabView: View {
             // 底栏视觉下沉量：控件距屏底约 14pt（系统 TabBar 标准位置）
             let sink = max(0, bottomInset - 8)
             tabContent
+                .task {
+                    // 启动预热：提前把相似照片特征库载入内存，
+                    // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
+                    PhotoSimilarityMatcher.shared.prewarm()
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !shouldHideBottomBar {
                         // 底栏：胶囊分段 Tab 组 + 完全独立的圆形回收站按钮
@@ -129,7 +134,6 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             ContentView(
                 isFullscreenMode: $isFullscreenMode,
-                showTrash: $showTrash,
                 timelinePath: $timelinePath,
                 discoverScrollToTop: $discoverScrollToTop
             )

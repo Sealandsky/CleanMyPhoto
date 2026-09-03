@@ -680,6 +680,9 @@
         }
       }
     },
+    "Cannot extract features from the base photo" : {
+
+    },
     "Categories" : {
       "localizations" : {
         "en" : {
@@ -1206,6 +1209,9 @@
         }
       }
     },
+    "Matching cancelled" : {
+
+    },
     "Maximize Your Photo Storage" : {
       "localizations" : {
         "en" : {
@@ -1283,6 +1289,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "月度会员"
+          }
+        }
+      }
+    },
+    "More like this photo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More like this photo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多类似照片"
           }
         }
       }
@@ -1412,6 +1435,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到照片。请确保相册中有照片。"
+          }
+        }
+      }
+    },
+    "No similar photos yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No similar photos yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无相似照片"
           }
         }
       }
@@ -1610,6 +1650,9 @@
           }
         }
       }
+    },
+    "Photo library access unavailable (%lld)" : {
+
     },
     "Photo Ratio" : {
       "localizations" : {
@@ -2175,6 +2218,7 @@
       }
     },
     "Swipe down to close" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2191,6 +2235,7 @@
       }
     },
     "Swipe up to delete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2402,6 +2447,7 @@
       }
     },
     "Unknown date" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2418,6 +2464,7 @@
       }
     },
     "Unknown time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
