@@ -100,6 +100,7 @@ struct PhotoListView: View {
                     }
                 }
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
             .background(
                 GeometryReader { geo in
                     Color.clear
