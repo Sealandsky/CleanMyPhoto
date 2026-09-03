@@ -31,12 +31,12 @@ struct WelcomePage: View {
                 VStack(spacing: 8) {
                     Text(String(localized: "Welcome to Photato"))
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     Text(String(localized: "Maximize Your Photo Storage"))
                         .font(.system(size: 30, weight: .semibold, design: .rounded))
                         .frame(width: 260)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }
@@ -52,7 +52,7 @@ struct WelcomePage: View {
                     Text(String(localized: "Try 7 Days Free"))
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
                 }
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 72)
                 .background(Color("PrimaryBtn"))
@@ -60,7 +60,7 @@ struct WelcomePage: View {
             }
             .padding(.horizontal, 32)
         }
-        .background(Color.black)
+        .background(Color(UIColor.systemBackground))
     }
 }
 

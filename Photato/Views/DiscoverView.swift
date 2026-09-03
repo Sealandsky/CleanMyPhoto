@@ -1,6 +1,5 @@
 import SwiftUI
 import Photos
-import UIKit
 import Combine
 
 // MARK: - Discover Manager
@@ -134,51 +133,24 @@ final class DiscoverManager: ObservableObject {
 struct DiscoverView: View {
     @ObservedObject var manager: DiscoverManager
     var onPhotoSelect: (PhotoAsset) -> Void
-    /// 滚顶信号：外部递增时网格滚回顶部（如再次点击「重温」Tab）
+    /// 滚顶信号：外部递增时网格滚回顶部（如双击「重温」Tab）
     var scrollToTopSignal: Int = 0
     @EnvironmentObject var photoManager: PhotoManager
-
-    // 权限校验：延续现有方案，直接读取 PhotoManager.authorizationStatus。
-    // ContentView 外层已做权限分流，此处为防御性兜底（如权限在后台被收回）。
-    private var isAuthorized: Bool {
-        photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited
-    }
-
-    var body: some View {
-        Group {
-            if !isAuthorized {
-                permissionHint
-            } else if !manager.hasLoadedOnce {
-                loadingView
-            } else if manager.totalCount == 0 {
-                emptyStateView
-            } else {
-                gridView
-            }
-        }
-        .background(Color.black)
-        // 首次采样由 ContentView 切换到「发现」Tab 时触发（topSegmentedControl.onChange），
-        // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
-        // 否则 app 启动即会执行全库枚举
-    }
 
     // MARK: - 自绘下拉刷新（DragGesture 驱动，替代系统 refreshable）
     /// 方案说明：系统 refreshable 的转圈会"扣住"滚动偏移，其弹簧归位在
     /// 大标题 + 整批数据替换的竞争下偶发失效（页面停在下拉位置）。
     /// 自绘方案：ScrollView 叠加 simultaneous DragGesture 直接跟踪手指，
-    /// 松手（onEnded）即触发刷新；归位交给 ScrollView 原生 bounce
-    /// （原生回弹从不出错，且自带平滑动画）。
-    /// 注意：不使用 GeometryReader 偏移驱动——overscroll 的负偏移在部分
-    /// 系统上不触发 preference 上报（真机已验证指示器完全无响应），
-    /// 手势直读是唯一可靠的探测层。
+    /// 松手（onEnded）即触发刷新；归位交给 ScrollView 原生 bounce。
+    /// 注意：不使用 GeometryReader 偏移驱动——overscroll 的负偏移与滚动中
+    /// 的 preference 上报在本机均不可靠，手势直读是唯一可靠探测层。
     @State private var isRefreshing = false
     /// 下拉进度（0 ~ 1.3，1 = 达到触发阈值）
     @State private var pullProgress: CGFloat = 0
     /// 已越过阈值（拉满），松手时触发刷新
     @State private var pullArmed = false
     /// 页面是否处于顶部区域：由懒容器内首个 cell 的 onAppear/onDisappear 驱动
-    /// （与分页加载同机制；非懒内容的 appear 不随滚动触发、preference 偏移
-    /// 上报在本机滚动中不更新，两者均不可用）
+    /// （与分页加载同机制；非懒内容的 appear 不随滚动触发，不可用）
     @State private var isAtTop = true
     /// 本轮手势是否允许下拉刷新：在手势首个事件时按"当时是否在顶部"锁定。
     /// 防止从深处上滑回顶途中经过顶部、门控中途打开（此刻手指累计位移巨大，
@@ -186,7 +158,10 @@ struct DiscoverView: View {
     @State private var gestureAllowsPull = false
     /// 是否已收到本轮手势的首个事件
     @State private var sawFirstGestureEvent = false
-
+    /// 滚动位置（iOS 18 ScrollPosition）：双击回顶时按"边缘"滚到真正的
+    /// offset 0——大标题完全展开且带平滑动画。锚点式 scrollTo 在本机
+    /// 落位停在标题折叠处、重建令牌有闪动，边缘滚动是两者的正解
+    @State private var scrollPosition = ScrollPosition(edge: .top)
     private static let refreshThreshold: CGFloat = 80
 
     /// 下拉刷新手势：与滚动共存（simultaneous）。
@@ -271,7 +246,7 @@ struct DiscoverView: View {
                 } else {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
-                        .foregroundColor(pullArmed ? .white : .primary)
+                        .foregroundColor(pullArmed ? .blue : .primary)
                 }
             }
             .frame(width: 48, height: 48)
@@ -290,16 +265,34 @@ struct DiscoverView: View {
         return -58 + min(pullProgress, 1) * 68
     }
 
+    // 权限校验：延续现有方案，直接读取 PhotoManager.authorizationStatus。
+    // ContentView 外层已做权限分流，此处为防御性兜底（如权限在后台被收回）。
+    private var isAuthorized: Bool {
+        photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited
+    }
+
+    var body: some View {
+        Group {
+            if !isAuthorized {
+                permissionHint
+            } else if !manager.hasLoadedOnce {
+                loadingView
+            } else if manager.totalCount == 0 {
+                emptyStateView
+            } else {
+                gridView
+            }
+        }
+        .background(Color(UIColor.systemBackground))
+        // 首次采样由 ContentView 切换到「发现」Tab 时触发，
+        // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
+        // 否则 app 启动即会执行全库枚举
+    }
+
     // MARK: - Grid
     private var gridView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                // 顶部锚点：Tab 重选滚顶信号的目标位置
-                Color.clear
-                    .frame(height: 0)
-                    .id(DiscoverView.topAnchorID)
-
-                // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
+        ScrollView {
+            // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
                 AdaptivePhotoGrid(photos: manager.photos) { photo in
                     PhotoCell(photo: photo)
                         .id(photo.id)
@@ -311,8 +304,7 @@ struct DiscoverView: View {
                         .onAppear {
                             // 首个 cell 可见 ⇔ 页面处于顶部区域：
                             // 懒容器内 cell 的 appear/disappear 按视口可见性触发
-                            // （与下方分页加载同机制，真机验证可靠；此前哨兵
-                            // 放在懒容器外，onDisappear 不会随滚动触发）
+                            // （与下方分页加载同机制，真机验证可靠）
                             if photo.id == manager.photos.first?.id {
                                 isAtTop = true
                             }
@@ -329,30 +321,24 @@ struct DiscoverView: View {
                 }
                 .padding(.horizontal, 12)
             }
-            .scrollIndicators(.hidden)  // 隐藏滚动条
+            // 滚动位置绑定：支持按边缘滚到真正的顶部（offset 0）
+            .scrollPosition($scrollPosition)
             // 自绘下拉刷新手势（与滚动共存）+ 指示器浮层
             .simultaneousGesture(pullGesture)
             .overlay(alignment: .top) { refreshIndicator }
-            // 外部滚顶信号（双击「重温」Tab）：滚回页面最顶部，大标题完全展开
+            .scrollIndicators(.hidden)  // 隐藏滚动条
+            // 外部滚顶信号（双击「重温」Tab）：平滑滚动回最顶部，
+            // edge 滚动落位 offset 0 → 大标题完全展开，无闪动
             .onChange(of: scrollToTopSignal) { _, newValue in
                 guard newValue > 0 else { return }
-                // scrollTo(anchor: .top) 在标题折叠时，顶部锚点位于导航栏后方
-                // 被判"已可见"→ 零位移，大标题不展开；
-                // 改用 anchor: .bottom 把锚点对齐到视口底部，迫使偏移压向负值、
-                // 被钳制在真正的 offset 0——标题随之完全展开
                 withAnimation(.easeInOut(duration: 0.35)) {
-                    proxy.scrollTo(DiscoverView.topAnchorID, anchor: .bottom)
+                    scrollPosition.scrollTo(edge: .top)
                 }
             }
-        }
     }
 
     // MARK: - 下拉刷新（含最小时长保障）
-    /// SwiftUI 已知缺陷：refreshable 闭包极快返回时（本地采样仅几十毫秒），
-    /// 数据替换会与 ScrollView 的回弹动画竞争，偶发导致页面（含大标题）
-    /// 停在被下拉的位置不回弹。
-    /// 规避方式：补足最小刷新时长（0.6s），让系统转圈先完整呈现、
-    /// 数据稳定后闭包再返回，回弹动画即可正常执行。
+    /// 补足最小刷新时长（0.6s），让自绘转圈完整呈现后再收尾
     private func runRefresh() async {
         let start = Date()
         await manager.refresh()
@@ -364,8 +350,6 @@ struct DiscoverView: View {
     }
 
     private static let minRefreshDuration: Double = 0.6
-    /// 网格顶部归位锚点 id（Tab 重选滚顶信号的目标）
-    private static let topAnchorID = "discover_top_anchor"
 
     // MARK: - Empty State
     private var emptyStateView: some View {
@@ -378,7 +362,7 @@ struct DiscoverView: View {
                 Text(String(localized: "No Photos Found"))
                     .font(.system(.title2, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
 
                 Text(String(localized: "Your photo library appears to be empty."))
                     .font(.system(.body, design: .rounded))
@@ -387,10 +371,10 @@ struct DiscoverView: View {
             .frame(maxWidth: .infinity)
             .frame(minHeight: UIScreen.main.bounds.height * 0.7)
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
         // 空状态下拉刷新：同一套手势与指示器（内容不满屏，哨兵恒可见=恒在顶部）
         .simultaneousGesture(pullGesture)
         .overlay(alignment: .top) { refreshIndicator }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
     // MARK: - Loading
@@ -398,10 +382,10 @@ struct DiscoverView: View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
-                .tint(.white)
+                .tint(.primary)
             Text(String(localized: "Loading photos..."))
                 .font(.system(.headline, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
         }
     }
 
@@ -415,6 +399,7 @@ struct DiscoverView: View {
             Text(String(localized: "Photo Access Required"))
                 .font(.system(.title, design: .rounded))
                 .fontWeight(.bold)
+                .foregroundColor(.primary)
 
             Text(String(localized: "Photato needs access to your photo library to help you organize and clean up unwanted photos."))
                 .font(.system(.body, design: .rounded))

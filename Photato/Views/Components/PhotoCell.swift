@@ -99,7 +99,7 @@ struct PhotoCell: View {
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
             }
         }
-        .foregroundColor(.white)
+        .foregroundColor(.primary)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -116,7 +116,7 @@ struct PhotoCell: View {
     private var livePhotoBadge: some View {
         Image(systemName: "livephoto")
             .font(.system(size: 14, design: .rounded))
-            .foregroundColor(.white)
+            .foregroundColor(.primary)
             .padding(2)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding(6)

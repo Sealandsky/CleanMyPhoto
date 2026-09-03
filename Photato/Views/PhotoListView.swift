@@ -87,7 +87,7 @@ struct PhotoListView: View {
                     } footer: {
                         if photoManager.isLoadingMore {
                             ProgressView()
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .padding()
                         }
                     }
@@ -95,7 +95,7 @@ struct PhotoListView: View {
 
                     if photoManager.isLoadingMore {
                         ProgressView()
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .padding()
                     }
                 }
@@ -108,7 +108,7 @@ struct PhotoListView: View {
                         .onChange(of: geo.size.height) { _, h in scrollViewHeight = h }
                 }
             )
-            .background(Color.black)
+            .background(Color(UIColor.systemBackground))
             .coordinateSpace(name: "scrollView")
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
                 scrollOffset = offset
@@ -137,6 +137,7 @@ struct PhotoListView: View {
                     }
                 }
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue

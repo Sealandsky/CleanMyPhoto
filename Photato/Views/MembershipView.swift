@@ -11,7 +11,7 @@ struct MembershipView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.06)
+            Color(UIColor.systemBackground)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -64,6 +64,7 @@ struct MembershipView: View {
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
     // MARK: - Close Button
@@ -78,9 +79,9 @@ struct MembershipView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.secondary)
                         .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.1))
+                        .background(Color.primary.opacity(0.06))
                         .clipShape(Circle())
                 }
                 .padding(.trailing, 20)
@@ -101,7 +102,7 @@ struct MembershipView: View {
 
             Text(String(localized: "Upgrade to Pro"))
                 .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
 
             if membershipManager.remainingTrialDays > 0,
                let text = membershipManager.remainingTrialText {
@@ -111,7 +112,7 @@ struct MembershipView: View {
             } else {
                 Text(String(localized: "Unlock All Features"))
                     .font(.system(size: 16, design: .rounded))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -122,7 +123,7 @@ struct MembershipView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(String(localized: "Membership Benefits"))
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .padding(.bottom, 2)
 
             benefitRow(icon: "doc.on.doc",
@@ -161,10 +162,10 @@ struct MembershipView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text(subtitle)
                     .font(.system(size: 12, design: .rounded))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
@@ -200,7 +201,7 @@ struct MembershipView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(String(localized: "Subscription Terms"))
                 .font(.system(size: 13, design: .rounded))
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(.secondary)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(String(localized: "• Subscription will auto-renew unless turned off at least 24 hours before the current period ends."))
@@ -208,7 +209,7 @@ struct MembershipView: View {
                 Text(String(localized: "• You can manage your subscription and turn off auto-renewal after purchase."))
             }
             .font(.system(size: 11, design: .rounded))
-            .foregroundColor(.white.opacity(0.35))
+            .foregroundColor(Color(.tertiaryLabel))
         }
     }
 
@@ -217,7 +218,7 @@ struct MembershipView: View {
     private var bottomActionBar: some View {
         VStack(spacing: 0) {
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.primary.opacity(0.08))
                 .frame(height: 0.5)
 
             VStack(spacing: 12) {
@@ -254,7 +255,7 @@ struct MembershipView: View {
 
                     if !isMandatory {
                         Text("·")
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundColor(.secondary)
 
                         Button {
                             hasShownMembership = true
@@ -265,28 +266,28 @@ struct MembershipView: View {
                     }
                 }
                 .font(.system(size: 13, design: .rounded))
-                .foregroundColor(.white.opacity(0.45))
+                .foregroundColor(.blue)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
-        .background(Color(white: 0.08))
+        .background(Color(UIColor.systemBackground))
     }
 
     // MARK: - Loading Overlay
 
     private var loadingOverlay: some View {
-        Color.black.opacity(0.8)
+        Color.black.opacity(0.15)
             .ignoresSafeArea()
             .overlay {
                 VStack(spacing: 16) {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .primary))
                         .scaleEffect(1.5)
 
                     Text(String(localized: "Processing..."))
                         .font(.system(size: 15, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                 }
             }
     }

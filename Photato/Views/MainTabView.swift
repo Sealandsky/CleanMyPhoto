@@ -120,7 +120,6 @@ struct MainTabView: View {
                         // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
                         .presentationDetents([.medium, .large])
                 }
-                .tint(.white)
         }
     }
 
@@ -262,14 +261,14 @@ struct MainTabView: View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
-                .tint(.white)
+                .tint(.primary)
 
             Text(String(localized: "Loading photos..."))
                 .font(.system(.headline, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
+        .background(Color(UIColor.systemBackground))
         .ignoresSafeArea()
     }
 

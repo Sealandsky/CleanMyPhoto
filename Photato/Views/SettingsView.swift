@@ -162,7 +162,7 @@ struct SettingsView: View {
                 Section(String(localized: "About")) {
                     HStack {
                         Image(systemName: "info.circle")
-                            .foregroundColor(.white)
+                            .foregroundColor(.blue)
                             .frame(width: 30)
 
                         Text(String(localized: "Version"))
@@ -174,7 +174,7 @@ struct SettingsView: View {
                     Link(destination: URL(string: "https://sealandsky.github.io/privacy/privacy.html")!) {
                         HStack {
                             Image(systemName: "hand.raised")
-                                .foregroundColor(.white)
+                                .foregroundColor(.blue)
                                 .frame(width: 30)
 
                             Text(String(localized: "Privacy Policy"))
@@ -189,7 +189,7 @@ struct SettingsView: View {
                     Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
                         HStack {
                             Image(systemName: "doc.text")
-                                .foregroundColor(.white)
+                                .foregroundColor(.blue)
                                 .frame(width: 30)
 
                             Text(String(localized: "Terms of Use"))
@@ -217,6 +217,7 @@ struct SettingsView: View {
             .background(alignment: .top) {
                 TopBlurFadeBackground(height: 200)
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)
@@ -280,7 +281,7 @@ struct StatRow: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .foregroundColor(.white)
+                .foregroundColor(.blue)
                 .frame(width: 30)
 
             Text(title)

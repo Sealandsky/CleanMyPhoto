@@ -80,7 +80,7 @@ struct OrganizeResultsView: View {
                 fullscreenView
             }
         }
-        .background(Color.black)
+        .background(Color(UIColor.systemBackground))
         .toolbar {
             toolbarContent
         }
@@ -111,7 +111,7 @@ struct OrganizeResultsView: View {
             subtitleView
             if organizeManager.isLoadingPhotos(for: category) {
                 ProgressView()
-                    .tint(.white)
+                    .tint(.primary)
                     .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 LazyVStack(spacing: 16) {
@@ -159,13 +159,13 @@ struct OrganizeResultsView: View {
                     Text(String(localized: "\(filteredCount) photos"))
                         .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     if group.totalSize > 0 {
                         Text("·")
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.secondary)
                         Text(ByteFormatter.format(group.totalSize))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(.secondary)
                     }
                 }
                 .font(.system(.caption, design: .rounded))
@@ -175,7 +175,7 @@ struct OrganizeResultsView: View {
                          ? String(localized: "Identical photos")
                          : String(localized: "Similar photos"))
                     .font(.system(.caption2, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(.secondary)
                 }
             }
 
@@ -188,7 +188,7 @@ struct OrganizeResultsView: View {
                     Text(String(localized: "Keep All"))
                         .font(.system(.caption, design: .rounded))
                         .fontWeight(.medium)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.secondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
@@ -520,7 +520,7 @@ private struct FileSizeBadge: View {
             if size > 0 {
                 Text(ByteFormatter.format(size))
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))

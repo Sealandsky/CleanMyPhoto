@@ -29,8 +29,8 @@ struct AlbumListView: View {
                 .padding(.bottom, 90)
             }
         }
+        .background(Color(UIColor.systemBackground))
         .scrollIndicators(.hidden)  // 隐藏滚动条
-        .background(Color.black)
     }
 
     // MARK: - Skeleton Grid
@@ -53,7 +53,7 @@ struct AlbumListView: View {
             Text(String(localized: "No Albums Found"))
                 .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
 
             Text(String(localized: "You haven't created any albums yet."))
                 .font(.system(.body, design: .rounded))

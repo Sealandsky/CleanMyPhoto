@@ -14,7 +14,7 @@ struct PhotoGroupView: View {
                 VStack {
                     Spacer()
                     ProgressView()
-                        .tint(.white)
+                        .tint(.primary)
                     Text(String(localized: "Loading..."))
                         .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
@@ -59,7 +59,7 @@ struct PhotoGroupView: View {
                 .scrollIndicators(.hidden)  // 隐藏滚动条
             }
         }
-        .background(Color.black)
+        .background(Color(UIColor.systemBackground))
         .task {
             if albumManager.yearAlbums.isEmpty {
                 await albumManager.fetchYearAlbums()
@@ -188,8 +188,7 @@ struct SystemMonthPhotosView: View {
                 }
                 .padding(.horizontal, 4)
             }
-            .scrollIndicators(.hidden)  // 隐藏滚动条
-            .background(Color.black)
+            .background(Color(UIColor.systemBackground))
             .onAppear {
                 monthSizeText = SizeCache.load("month_\(monthAlbum.id)") ?? ""
                 if let photoID = scrollToPhotoID {
@@ -208,6 +207,7 @@ struct SystemMonthPhotosView: View {
                     }
                 }
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue

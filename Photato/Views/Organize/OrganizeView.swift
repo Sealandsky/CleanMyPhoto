@@ -11,7 +11,7 @@ struct OrganizeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 8) {
                 scanCard
 
                 // 功能类型分组：标题 + 一行两项的紧凑功能卡网格
@@ -30,8 +30,8 @@ struct OrganizeView: View {
             // 尾部高度占位：滚动到底时最后一个卡片不被悬浮底栏遮挡
             .padding(.bottom, 74)
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
         .background(Color(UIColor.systemGroupedBackground))
+        .scrollIndicators(.hidden)  // 隐藏滚动条
         .task {
             let options = PHFetchOptions()
             options.includeHiddenAssets = false
@@ -55,6 +55,7 @@ struct OrganizeView: View {
     // MARK: - Scan Card（Figma 597:196：黑色大卡 + 大数字 废片数/总数）
     /// 结构：上行为标题 + 操作胶囊按钮，下行为装饰图标 + 「废片数 / 总数」大数字；
     /// 扫描中替换为进度条 + 取消按钮。三种状态共用同一卡片容器。
+    /// 卡面为深色特例组件（不随浅色主题变化），文字固定白色
     @ViewBuilder
     private var scanCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -69,7 +70,7 @@ struct OrganizeView: View {
 
                 scanActionButton
             }
-            Spacer()
+
             // 下行：大数字（废片数 / 总数）或扫描进度
             if organizeManager.isAnalyzing {
                 VStack(alignment: .leading, spacing: 6) {
@@ -110,11 +111,15 @@ struct OrganizeView: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 146, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
         // 设计稿：黑色 80% 卡面 + 12pt 圆角；深浅模式下均为深色卡、白字
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.black.opacity(0.8))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -191,7 +196,7 @@ struct OrganizeView: View {
             HStack(spacing: 8) {
                 Image(systemName: category.icon)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(.blue)
 
                 Text(category.localizedText)
                     .font(.system(.subheadline, design: .rounded))
