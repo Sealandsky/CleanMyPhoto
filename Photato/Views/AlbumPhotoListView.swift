@@ -55,7 +55,7 @@ struct AlbumPhotoListView: View {
                     .padding(.horizontal, 12)
                 }
             }
-            .background(Color.black)
+            .background(Color(UIColor.systemBackground))
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
                 let photoExists = photos.contains(where: { $0.id == photoID })
@@ -78,6 +78,7 @@ struct AlbumPhotoListView: View {
                 }
                 calculateAlbumSize()
             }
+            .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue

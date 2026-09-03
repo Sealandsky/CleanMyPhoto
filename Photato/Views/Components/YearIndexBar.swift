@@ -38,5 +38,5 @@ struct YearIndexBar: View {
         Spacer()
         YearIndexBar(years: [2026, 2025, 2024, 2023, 2022], scrollToYear: .constant(nil))
     }
-    .background(Color.black)
+    .background(.ultraThinMaterial, in: Capsule())
 }

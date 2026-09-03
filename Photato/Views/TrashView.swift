@@ -157,6 +157,7 @@ struct TrashView: View {
                 }
             }
         }
+        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 }
 

@@ -17,7 +17,7 @@ struct ProductCard: View {
                     HStack(spacing: 8) {
                         Text(productType.displayName)
                             .font(.system(size: 17, weight: .medium, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
 
                         if productType.isPopular {
                             popularBadge
@@ -27,7 +27,7 @@ struct ProductCard: View {
                     if let subtitle = productType.subtitleText {
                         Text(subtitle)
                             .font(.system(size: 13, design: .rounded))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(.secondary)
                     }
 
                     if let savings = productType.savingsText {
@@ -44,11 +44,11 @@ struct ProductCard: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(productType.priceText(from: products))
                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
 
                     Text(productType.durationText.isEmpty ? String(localized: "One-time") : productType.durationText)
                         .font(.system(size: 13, design: .rounded))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(20)
@@ -61,7 +61,7 @@ struct ProductCard: View {
     // MARK: - Card Background
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 22)
-            .fill(isSelected ? Color.white.opacity(0.15) : Color.white.opacity(0.08))
+            .fill(isSelected ? Color.blue.opacity(0.08) : Color(UIColor.systemGray6))
     }
 
     // MARK: - Border Overlay
@@ -72,10 +72,9 @@ struct ProductCard: View {
 
     // MARK: - Stroke Color
     private var strokeColor: Color {
-        if isSelected && productType.isPopular {
+        // 浅色卡片：选中统一蓝色描边（热门徽章本身即为蓝色系）
+        if isSelected {
             return Color.blue
-        } else if isSelected {
-            return Color.white.opacity(0.3)
         } else {
             return Color.clear
         }

@@ -1,7 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "·" : {},
+    "·" : {
+
+    },
+    "/" : {
+
+    },
     "/month" : {
       "localizations" : {
         "en" : {
@@ -34,7 +39,9 @@
         }
       }
     },
-    "%lld" : {},
+    "%lld" : {
+
+    },
     "%lld days left in trial" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -85,7 +92,9 @@
         }
       }
     },
-    "%lld photos" : {},
+    "%lld photos" : {
+
+    },
     "%lld Photos" : {
       "localizations" : {
         "en" : {
@@ -240,12 +249,21 @@
         }
       }
     },
-    "0" : {},
-    "1:1" : {},
-    "2" : {},
-    "3" : {},
-    "3:4" : {},
-    "4" : {},
+    "1:1" : {
+
+    },
+    "2" : {
+
+    },
+    "3" : {
+
+    },
+    "3:4" : {
+
+    },
+    "4" : {
+
+    },
     "About" : {
       "localizations" : {
         "en" : {
@@ -662,6 +680,9 @@
         }
       }
     },
+    "Categories" : {
+
+    },
     "Close" : {
       "localizations" : {
         "en" : {
@@ -865,6 +886,7 @@
       }
     },
     "Find duplicates, similar photos, screenshots and more" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -881,6 +903,7 @@
       }
     },
     "Found %lld items" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -976,6 +999,9 @@
           }
         }
       }
+    },
+    "Junk Items" : {
+
     },
     "Keep All" : {
       "localizations" : {
@@ -1524,7 +1550,9 @@
         }
       }
     },
-    "Photato Pro" : {},
+    "Photato Pro" : {
+
+    },
     "Photo Access Required" : {
       "localizations" : {
         "en" : {
@@ -2153,6 +2181,7 @@
       }
     },
     "Tap a category below to review" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
