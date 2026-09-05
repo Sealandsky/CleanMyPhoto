@@ -44,9 +44,9 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
         case .duplicates:
             return "doc.on.doc"
         case .similar:
-            return "photo.stack"
+            return "app.background.dotted"
         case .screenshots:
-            return "iphone"
+            return "camera.viewfinder"
         case .livePhotos:
             return "livephoto"
         case .videos:
@@ -104,6 +104,7 @@ struct OrganizeCategoryPageState {
     var groups: [OrganizeGroupDisplay] = []
 
     static let pageSize = 50
+    static let groupBatchSize = 10
 }
 
 // MARK: - Organize Destination
@@ -129,7 +130,7 @@ struct OrganizeCacheSummary: Codable {
     let blurryIds: [String]
     let poorFaceIds: [String]
 
-    static let currentVersion = 3
+    static let currentVersion = 5
     static let fileName = "OrganizeCache.json"
 }
 

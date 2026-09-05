@@ -10,6 +10,9 @@ struct AlbumPhotoListView: View {
     @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
     @State private var albumSizeText: String = ""
+    @State private var isFullscreenMode = false
+    @State private var currentPhotoID: String? = nil
+    @State private var targetScrollPhotoID: String? = nil
 
     private var photos: [PhotoAsset] { albumManager.displayedAlbumPhotos }
 
@@ -43,6 +46,9 @@ struct AlbumPhotoListView: View {
                                     selectionManager.toggle(photo.id)
                                 }
                             } else {
+                                currentPhotoID = photo.id
+                                targetScrollPhotoID = photo.id
+                                isFullscreenMode = true
                                 onPhotoSelect(photo)
                             }
                         }
@@ -55,7 +61,7 @@ struct AlbumPhotoListView: View {
                     .padding(.horizontal, 12)
                 }
             }
-            .background(Color(UIColor.systemBackground))
+            .background(Color(UIColor.systemGroupedBackground))
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
                 let photoExists = photos.contains(where: { $0.id == photoID })
@@ -78,6 +84,15 @@ struct AlbumPhotoListView: View {
                 }
                 calculateAlbumSize()
             }
+            .onChange(of: isFullscreenMode) { oldValue, newValue in
+                if oldValue && !newValue, let photoID = targetScrollPhotoID ?? currentPhotoID {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withTransaction(Transaction(animation: nil)) {
+                            proxy.scrollTo(photoID, anchor: .center)
+                        }
+                    }
+                }
+            }
             .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
@@ -87,8 +102,30 @@ struct AlbumPhotoListView: View {
         .navigationBarTitleDisplayMode(selectionManager.isSelectMode ? .inline : .large)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .navigationDestination(isPresented: $isFullscreenMode) {
+            if let photoID = currentPhotoID {
+                FullscreenPhotoBrowser(
+                    photos: photos,
+                    initialPhotoID: photoID,
+                    onDelete: { photo in
+                        photoManager.addToTrash(photo)
+                    },
+                    onFavoriteToggled: { photo, isFavorite in
+                        albumManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
+                    },
+                    onActivePhotoChange: { photo, index in
+                        currentPhotoID = photo.id
+                        targetScrollPhotoID = photo.id
+                    },
+                    onDismiss: {
+                        targetScrollPhotoID = currentPhotoID
+                        isFullscreenMode = false
+                    }
+                )
+                .environmentObject(photoManager)
+            }
+        }
         .toolbar {
             if selectionManager.isSelectMode {
                 ToolbarItem(placement: .topBarLeading) {

@@ -10,6 +10,7 @@ class PhotoManager: ObservableObject {
     @Published var displayedPhotos: [PhotoAsset] = []
     @Published var pendingDeletionIDs: Set<String> = []
     @Published var trashedAssets: [PhotoAsset] = []  // 存储被删除的照片对象
+    @Published var favoriteOverrides: [String: Bool] = [:]
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
@@ -195,21 +196,44 @@ class PhotoManager: ObservableObject {
     }
 
     // MARK: - Favorite Management
+    func isFavorite(_ photo: PhotoAsset) -> Bool {
+        if let override = favoriteOverrides[photo.id] {
+            return override
+        }
+        if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+            return allPhotos[index].isFavorite
+        }
+        return photo.isFavorite
+    }
+
     func toggleFavorite(_ photo: PhotoAsset) {
-        guard let index = allPhotos.firstIndex(where: { $0.id == photo.id }) else { return }
-        let newValue = !allPhotos[index].isFavorite
-        allPhotos[index].isFavorite = newValue
-        updateDisplayedPhotos()
+        let currentStatus = isFavorite(photo)
+        let newValue = !currentStatus
+        favoriteOverrides[photo.id] = newValue
+
+        if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+            allPhotos[index].isFavorite = newValue
+            updateDisplayedPhotos()
+        }
 
         Task {
-            try? await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest(for: photo.asset).isFavorite = newValue
-            }
-            // Refresh PHAsset in memory so computed properties pick up the new value
-            let refreshed = PHAsset.fetchAssets(withLocalIdentifiers: [photo.asset.localIdentifier], options: nil)
-            if let refreshedAsset = refreshed.firstObject {
+            do {
+                try await PHPhotoLibrary.shared().performChanges {
+                    PHAssetChangeRequest(for: photo.asset).isFavorite = newValue
+                }
+                // Refresh PHAsset in memory so computed properties pick up the new value
+                let refreshed = PHAsset.fetchAssets(withLocalIdentifiers: [photo.asset.localIdentifier], options: nil)
+                if let refreshedAsset = refreshed.firstObject {
+                    if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                        allPhotos[idx] = PhotoAsset(asset: refreshedAsset)
+                        updateDisplayedPhotos()
+                    }
+                }
+            } catch {
+                print("Failed to toggle favorite for \(photo.id): \(error)")
+                favoriteOverrides[photo.id] = currentStatus
                 if let idx = allPhotos.firstIndex(where: { $0.id == photo.id }) {
-                    allPhotos[idx] = PhotoAsset(asset: refreshedAsset)
+                    allPhotos[idx].isFavorite = currentStatus
                     updateDisplayedPhotos()
                 }
             }

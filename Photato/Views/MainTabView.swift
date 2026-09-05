@@ -65,8 +65,6 @@ struct MainTabView: View {
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
-    @State private var albumFullscreenPhotoID: String?   // 相簿照片全屏浏览
-    @State private var albumsScrollToPhotoID: String?    // 全屏关闭后列表滚回该照片
 
     var body: some View {
         GeometryReader { geo in
@@ -200,33 +198,11 @@ struct MainTabView: View {
                                 albumManager: albumMgr,
                                 photoManager: photoManager,
                                 album: album,
-                                onPhotoSelect: { photo in
-                                    // 点击照片：在本 Tab 内打开共享全屏浏览器
-                                    albumFullscreenPhotoID = photo.id
-                                },
-                                scrollToPhotoID: albumsScrollToPhotoID
+                                onPhotoSelect: { _ in }
                             )
                         }
                     }
                 }
-            }
-
-            // 相簿照片全屏浏览层：交互与图库全屏完全一致（共享组件）
-            if let albumMgr = albumManager, let photoID = albumFullscreenPhotoID {
-                FullscreenPhotoBrowser(
-                    photos: albumMgr.displayedAlbumPhotos,
-                    initialPhotoID: photoID,
-                    onDelete: { photo in
-                        // 删除经 photoManager 落回收站；列表随 displayedAlbumPhotos 自动收缩
-                        photoManager.addToTrash(photo)
-                    },
-                    onDismiss: {
-                        // 关闭后列表滚动定位到刚浏览的照片
-                        albumsScrollToPhotoID = albumFullscreenPhotoID
-                        albumFullscreenPhotoID = nil
-                    }
-                )
-                .transition(.opacity)
             }
         }
     }
@@ -272,7 +248,7 @@ struct MainTabView: View {
                 .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         .ignoresSafeArea()
     }
 
@@ -281,7 +257,6 @@ struct MainTabView: View {
     /// 时间线月视图 / 整理结果）中隐藏底部栏
     private var shouldHideBottomBar: Bool {
         isFullscreenMode ||
-        albumFullscreenPhotoID != nil ||
         photoManager.isSelectMode ||
         !albumsPath.isEmpty ||
         !timelinePath.isEmpty ||

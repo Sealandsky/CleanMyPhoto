@@ -2,39 +2,73 @@ import SwiftUI
 import Photos
 
 struct OrganizeResultsView: View {
-    @Bindable var organizeManager: PhotoOrganizeManager
+    var organizeManager: PhotoOrganizeManager
     let category: OrganizeCategory
     @ObservedObject var photoManager: PhotoManager
-    @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
-    @State private var hasInitialized = false
+    @State private var showDeleteConfirm = false
+    @State private var selectedSizeText = ByteFormatter.format(0)
+    @State private var categorySizeText = ""
+
+    // 日期分节：相似/重复簇按天细分；平铺分类按天分组、无日期按月归类
+    @State private var dateSections: [DateSection] = []
+    @State private var sectionSizes: [String: Int64] = [:]
+
+    // 详情页（大图浏览：复用共享组件 FullscreenPhotoBrowser）
     @State private var isFullscreenMode = false
     @State private var currentPhotoID: String? = nil
-    @State private var showTrash = false
-    @State private var deleteTrigger: Int = 0
-    @State private var showFavoriteDeleteAlert: Bool = false
+
+    init(organizeManager: PhotoOrganizeManager, category: OrganizeCategory, photoManager: PhotoManager) {
+        self.organizeManager = organizeManager
+        self.category = category
+        self.photoManager = photoManager
+
+        let initialSections = Self.buildDateSections(
+            category: category,
+            groups: organizeManager.groups(for: category),
+            photos: organizeManager.paginatedPhotos(for: category),
+            pendingDeletionIDs: photoManager.pendingDeletionIDs
+        )
+        self._dateSections = State(initialValue: initialSections)
+    }
 
     private var isGroupedMode: Bool {
         category == .similar || category == .duplicates
     }
 
-    @State private var categorySizeText: String = ""
-
     private var subtitleText: String {
         let count = organizeManager.stat(for: category)
-        let countText = String(localized: "\(count) Photos")
         if categorySizeText.isEmpty {
-            return countText
+            return String(localized: "\(count) Photos")
         }
-        return "\(countText) · \(categorySizeText)"
+        return String(localized: "Total \(count) photos, \(categorySizeText)")
     }
 
+
     private var subtitleView: some View {
-        HStack {
+        HStack(alignment: .center) {
             Text(subtitleText)
                 .font(.system(.subheadline, design: .rounded))
                 .foregroundColor(.secondary)
+
             Spacer()
+
+            if isGroupedMode {
+                Button {
+                    aiAutoSelect()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(String(localized: "AI Select"))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .tint(.primary)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -57,17 +91,16 @@ struct OrganizeResultsView: View {
         return photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
-    private var currentFullscreenPhoto: PhotoAsset? {
-        guard let id = currentPhotoID else { return nil }
-        return allPhotos.first { $0.id == id }
-    }
-
     private func filtered(_ photos: [PhotoAsset]) -> [PhotoAsset] {
         photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
+    private var isDeleteButtonVisible: Bool {
+        !selectionManager.isEmpty && !isFullscreenMode
+    }
+
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             Group {
                 if isGroupedMode {
                     groupedBody
@@ -76,31 +109,59 @@ struct OrganizeResultsView: View {
                 }
             }
 
-            if isFullscreenMode {
-                fullscreenView
-            }
+            deleteFloatingButton
+                .offset(y: isDeleteButtonVisible ? 0 : 130)
+                .opacity(isDeleteButtonVisible ? 1 : 0)
+                .allowsHitTesting(isDeleteButtonVisible)
+                .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
             toolbarContent
         }
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationTitle(category.localizedText)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
-        .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : category.localizedText)
-        .navigationBarTitleDisplayMode(selectionManager.isSelectMode ? .inline : .large)
-        .navigationBarBackButtonHidden(selectionManager.isSelectMode)
-        .onChange(of: selectionManager.isSelectMode) { _, newValue in
-            photoManager.isSelectMode = newValue
+        .navigationDestination(isPresented: $isFullscreenMode) {
+            fullscreenBrowserDestination
         }
-        .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
+        .confirmationDialog(
+            String(localized: "Delete \(selectionManager.count) photos?"),
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Delete \(selectionManager.count) Photos"), role: .destructive) {
+                deleteSelected()
+            }
+            Button(String(localized: "Cancel"), role: .cancel) { }
+        } message: {
+            Text(String(localized: "\(selectionManager.count) photos will be permanently deleted and cannot be recovered. Total \(selectedSizeText)"))
+        }
+        .onAppear {
+            if dateSections.isEmpty {
+                rebuildDateSections()
+            }
+        }
         .task {
             categorySizeText = SizeCache.load(category.rawValue) ?? ""
-            if !hasInitialized {
-                hasInitialized = true
+            if !organizeManager.isCategoryLoaded(category) {
                 await organizeManager.loadCategory(category)
+                rebuildDateSections()
             }
-            await calculateCategorySize()
+            Task(priority: .utility) {
+                await calculateCategorySize()
+            }
+        }
+        .onChange(of: allPhotos) { _, newPhotos in
+            // 分页加载/删除后分节跟随重建（尺寸缓存按键复用，不重复计算）
+            rebuildDateSections()
+            if newPhotos.isEmpty && isFullscreenMode {
+                isFullscreenMode = false
+            }
+        }
+        .onChange(of: selectionManager.count) { _, _ in
+            updateSelectedSize()
         }
     }
 
@@ -109,140 +170,49 @@ struct OrganizeResultsView: View {
     private var groupedBody: some View {
         ScrollView {
             subtitleView
-            if organizeManager.isLoadingPhotos(for: category) {
-                ProgressView()
-                    .tint(.primary)
-                    .frame(maxWidth: .infinity, minHeight: 200)
+            if dateSections.isEmpty && allPhotos.isEmpty {
+                if organizeManager.isLoadingPhotos(for: category) {
+                    ProgressView()
+                        .tint(.primary)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else {
+                    groupedEmptyView
+                }
             } else {
-                LazyVStack(spacing: 16) {
-                    ForEach(displayedGroups) { group in
-                        groupSection(group)
+                LazyVStack(alignment: .leading, spacing: 28) {
+                    ForEach(dateSections) { section in
+                        dateSectionView(section)
+                    }
+                    // 分组分批按需追加（首批 10 组瞬时上屏，到底自动追加）
+                    if organizeManager.hasMoreGroups(for: category) {
+                        ProgressView()
+                            .tint(.primary)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .task {
+                                await organizeManager.loadMoreGroups(for: category)
+                                rebuildDateSections()
+                            }
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, isDeleteButtonVisible ? 80 : 20)
+                .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
             }
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollIndicators(.hidden)
     }
 
-    private func groupSection(_ group: OrganizeGroupDisplay) -> some View {
-        let photos = filtered(group.loadedPhotos)
-        return VStack(spacing: 0) {
-            groupHeader(group, filteredCount: photos.count)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 4),
-                GridItem(.flexible(), spacing: 4)
-            ], spacing: 4) {
-                ForEach(photos) { photo in
-                    groupPhotoCell(photo: photo, group: group)
-                }
-            }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 4)
+    private var groupedEmptyView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 26, design: .rounded))
+                .foregroundColor(Color(.tertiaryLabel))
+            Text(String(localized: "No similar photos yet"))
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundColor(.secondary)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
-        )
-    }
-
-    private func groupHeader(_ group: OrganizeGroupDisplay, filteredCount: Int) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(String(localized: "\(filteredCount) photos"))
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-
-                    if group.totalSize > 0 {
-                        Text("·")
-                            .foregroundColor(.secondary)
-                        Text(ByteFormatter.format(group.totalSize))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .font(.system(.caption, design: .rounded))
-
-                if isGroupedMode {
-                    Text(category == .duplicates
-                         ? String(localized: "Identical photos")
-                         : String(localized: "Similar photos"))
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            if selectionManager.isSelectMode {
-                Button {
-                    deselectAll(in: group)
-                } label: {
-                    Text(String(localized: "Keep All"))
-                        .font(.system(.caption, design: .rounded))
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.15))
-                        )
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
-
-    private func groupPhotoCell(photo: PhotoAsset, group: OrganizeGroupDisplay) -> some View {
-        PhotoCell(
-            photo: photo,
-            isSelected: selectionManager.isSelected(photo.id),
-            isSelectMode: true
-        )
-        .overlay(alignment: .bottomLeading) {
-            if photo.id == group.bestPhotoId {
-                bestBadge
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            FileSizeBadge(asset: photo.asset)
-        }
-        .overlay(alignment: .topLeading) {
-            Color.clear
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            openFullscreen(photo)
-        }
-    }
-
-    private var bestBadge: some View {
-        Text(String(localized: "Best"))
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
-            .foregroundColor(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                Capsule()
-                    .fill(Color.blue.opacity(0.85))
-            )
-            .padding(4)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
     }
 
     // MARK: - Flat Body (screenshots, large files, low quality)
@@ -250,94 +220,393 @@ struct OrganizeResultsView: View {
     private var flatBody: some View {
         ScrollView {
             subtitleView
-            photoGrid
-        }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
-    }
-
-    private var photoGrid: some View {
-        // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
-        AdaptivePhotoGrid(photos: displayedPhotos) { photo in
-            flatPhotoCell(photo: photo)
-        } footer: {
-            if organizeManager.hasMorePhotos(for: category) {
-                ProgressView()
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .task {
-                        await organizeManager.loadMorePhotos(for: category)
+            if dateSections.isEmpty && allPhotos.isEmpty {
+                if organizeManager.isLoadingPhotos(for: category) {
+                    ProgressView()
+                        .tint(.primary)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else {
+                    flatEmptyView
+                }
+            } else {
+                LazyVStack(alignment: .leading, spacing: 28) {
+                    ForEach(dateSections) { section in
+                        dateSectionView(section)
                     }
+                    // 图库页同款：滚动到尾部继续分页加载
+                    if organizeManager.hasMorePhotos(for: category) {
+                        ProgressView()
+                            .tint(.primary)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .task {
+                                await organizeManager.loadMorePhotos(for: category)
+                                rebuildDateSections()
+                            }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, isDeleteButtonVisible ? 80 : 20)
+                .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
             }
         }
-        .padding(.horizontal, 4)
+        .scrollIndicators(.hidden)
     }
 
-    private func flatPhotoCell(photo: PhotoAsset) -> some View {
-        PhotoCell(
-            photo: photo,
-            isSelected: selectionManager.isSelected(photo.id),
-            isSelectMode: true
-        )
-        .id(photo.id)
-        .overlay(alignment: .bottomTrailing) {
-            FileSizeBadge(asset: photo.asset)
+    private var flatEmptyView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 26, design: .rounded))
+                .foregroundColor(Color(.tertiaryLabel))
+            Text(String(localized: "No photos in this category"))
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundColor(.secondary)
         }
-        .overlay(alignment: .topLeading) {
-            Color.clear
-                .frame(width: 44, height: 44)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+    }
+
+    // MARK: - 日期分节
+
+    /// 分节头：左侧日期（粗体），右侧张数 + 合计大小（灰，异步补齐）+ 全选/反选复选框
+    private func dateSectionView(_ section: DateSection) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(section.title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                Text(String(localized: "\(section.photos.count) Photos"))
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundColor(.secondary)
+
+                if section.totalSize > 0 {
+                    Text(ByteFormatter.format(section.totalSize))
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+
+                Button {
+                    toggleSectionSelection(section)
+                } label: {
+                    if isSectionAllSelected(section) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .blue)
+                    } else {
+                        Image(systemName: "circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+            }
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 6),
+                GridItem(.flexible(), spacing: 6),
+                GridItem(.flexible(), spacing: 6)
+            ], spacing: 6) {
+                ForEach(section.photos) { photo in
+                    organizePhotoCell(photo)
+                }
+            }
+        }
+    }
+
+    private func isSectionAllSelected(_ section: DateSection) -> Bool {
+        guard !section.photos.isEmpty else { return false }
+        return section.photos.allSatisfy { selectionManager.isSelected($0.id) }
+    }
+
+    private func toggleSectionSelection(_ section: DateSection) {
+        let allSelected = isSectionAllSelected(section)
+        withAnimation(.easeInOut(duration: 0.15)) {
+            if allSelected {
+                for photo in section.photos {
+                    if selectionManager.isSelected(photo.id) {
                         selectionManager.toggle(photo.id)
                     }
                 }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            openFullscreen(photo)
-        }
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if selectionManager.isSelectMode {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(String(localized: "Cancel")) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectionManager.clearSelection()
+            } else {
+                for photo in section.photos {
+                    if !selectionManager.isSelected(photo.id) {
+                        selectionManager.toggle(photo.id)
                     }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    let selected = (isGroupedMode
-                        ? displayedGroups.flatMap { $0.loadedPhotos }
-                        : displayedPhotos)
-                        .filter { selectionManager.isSelected($0.id) }
-                    for photo in selected {
-                        photoManager.addToTrash(photo)
+        }
+    }
+
+    /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小
+    private func organizePhotoCell(_ photo: PhotoAsset) -> some View {
+        PhotoCell(photo: photo, usesSquareRatio: true)
+            .overlay(alignment: .bottomTrailing) {
+                if category == .largeFiles {
+                    FileSizeBadge(asset: photo.asset)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                selectionMark(isSelected: selectionManager.isSelected(photo.id))
+            }
+            .overlay(alignment: .topTrailing) {
+                // 勾选热区：点这里只切换选中，不进详情页
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectionManager.toggle(photo.id)
                     }
-                    selectionManager.clearSelection()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash.fill")
-                        Text(String(localized: "Delete"))
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                openFullscreen(photo)
+            }
+    }
+
+    /// 选中标记：右上角勾选，选中为系统样式（白勾 + 系统蓝圈）
+    private func selectionMark(isSelected: Bool) -> some View {
+        Group {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .blue)
+            } else {
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2)
+                    .background(Circle().fill(Color.black.opacity(0.2)))
+            }
+        }
+        .frame(width: 24, height: 24)
+        .padding(8)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+    }
+
+    // MARK: - 日期分节构建
+
+    /// 相似/重复：每个簇按天细分（跨天的簇拆成多个日期节，日期降序）；
+    /// 平铺分类：全部照片按天分组；无拍摄日期的按月归类（回退修改时间）
+    private func rebuildDateSections() {
+        var newSections = Self.buildDateSections(
+            category: category,
+            groups: displayedGroups,
+            photos: displayedPhotos,
+            pendingDeletionIDs: photoManager.pendingDeletionIDs
+        )
+        for i in 0..<newSections.count {
+            if let size = sectionSizes[newSections[i].id] {
+                newSections[i].totalSize = size
+            }
+        }
+        dateSections = newSections
+        computeSectionSizes()
+    }
+
+    fileprivate static func buildDateSections(
+        category: OrganizeCategory,
+        groups: [OrganizeGroupDisplay],
+        photos: [PhotoAsset],
+        pendingDeletionIDs: Set<String>
+    ) -> [DateSection] {
+        var sections: [DateSection] = []
+        if category == .similar || category == .duplicates {
+            for group in groups {
+                let groupPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+                sections.append(contentsOf: createDateSections(
+                    in: groupPhotos,
+                    idPrefix: "group-\(group.id)"
+                ))
+            }
+        } else {
+            let flatPhotos = photos.filter { !pendingDeletionIDs.contains($0.id) }
+            sections.append(contentsOf: createDateSections(
+                in: flatPhotos,
+                idPrefix: "flat-\(category.rawValue)"
+            ))
+        }
+        // 跨组合并：前组尾与后组头可能同日，合并相邻同日期节避免重复日期头
+        var merged: [DateSection] = []
+        for section in sections {
+            if let last = merged.last, last.title == section.title {
+                merged[merged.count - 1].photos.append(contentsOf: section.photos)
+            } else {
+                merged.append(section)
+            }
+        }
+        return merged
+    }
+
+    /// 将照片按拍摄日（降序）分节；无拍摄日期的按月归类（回退修改时间）
+    private static func createDateSections(in photos: [PhotoAsset], idPrefix: String) -> [DateSection] {
+        var dayBuckets: [Date: [PhotoAsset]] = [:]
+        var monthBuckets: [Date: [PhotoAsset]] = [:]
+
+        for photo in photos {
+            if let created = photo.asset.creationDate {
+                dayBuckets[Calendar.current.startOfDay(for: created), default: []].append(photo)
+            } else if let modified = photo.asset.modificationDate {
+                let month = Calendar.current.date(
+                    from: Calendar.current.dateComponents([.year, .month], from: modified)
+                ) ?? modified
+                monthBuckets[month, default: []].append(photo)
+            }
+        }
+
+        var sections: [DateSection] = []
+        for day in dayBuckets.keys.sorted(by: >) {
+            let photos = dayBuckets[day]!
+            sections.append(DateSection(
+                id: "\(idPrefix)-day-\(day.timeIntervalSince1970)",
+                groupID: idPrefix,
+                title: day.formatted(date: .long, time: .omitted),
+                photos: photos
+            ))
+        }
+        for month in monthBuckets.keys.sorted(by: >) {
+            let photos = monthBuckets[month]!
+            sections.append(DateSection(
+                id: "\(idPrefix)-month-\(month.timeIntervalSince1970)",
+                groupID: idPrefix,
+                title: month.formatted(Date.FormatStyle().year().month()),
+                photos: photos
+            ))
+        }
+
+        // 相邻同日期节合并：不同簇可能落在同一天，避免重复日期头
+        var merged: [DateSection] = []
+        for section in sections {
+            if let last = merged.last, last.title == section.title {
+                merged[merged.count - 1].photos.append(contentsOf: section.photos)
+            } else {
+                merged.append(section)
+            }
+        }
+        return merged
+    }
+
+    /// 补齐各分节合计大小（异步读缓存尺寸，不阻塞渲染）
+    private func computeSectionSizes() {
+        let sections = dateSections
+        Task {
+            for section in sections {
+                let key = section.id
+                guard sectionSizes[key] == nil else { continue }
+                var total: Int64 = 0
+                for photo in section.photos {
+                    total += await PHAssetSizeHelper.getAssetSize(photo.asset)
+                }
+                sectionSizes[key] = total
+                if let idx = dateSections.firstIndex(where: { $0.id == key }) {
+                    dateSections[idx].totalSize = total
+                }
+            }
+        }
+    }
+
+    // MARK: - Toolbar（右上角：全选 / 取消全选）
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                toggleSelectAll()
+            } label: {
+                Text(selectionManager.count == allPhotos.count && !allPhotos.isEmpty
+                     ? String(localized: "Deselect All")
+                     : String(localized: "Select All"))
+                    .font(.system(size: 15))
+            }
+            .disabled(allPhotos.isEmpty)
+        }
+    }
+
+    private func toggleSelectAll() {
+        if selectionManager.count == allPhotos.count {
+            selectionManager.clearSelection()
+        } else {
+            for photo in allPhotos {
+                if !selectionManager.isSelected(photo.id) {
+                    selectionManager.toggle(photo.id)
+                }
+            }
+        }
+    }
+
+    // MARK: - Bottom Floating Delete Button（系统原生质感蓝色大按钮）
+
+    private var deleteButtonTitle: String {
+        if !selectedSizeText.isEmpty && selectedSizeText != ByteFormatter.format(0) {
+            return String(localized: "Delete \(selectionManager.count) Photos (\(selectedSizeText))")
+        } else {
+            return String(localized: "Delete \(selectionManager.count) Photos")
+        }
+    }
+
+    private var deleteFloatingButton: some View {
+        Button {
+            showDeleteConfirm = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                Text(deleteButtonTitle)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .tint(.blue)
+        .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 6)
+        .padding(.bottom, 16)
+    }
+
+    /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删）
+    private func aiAutoSelect() {
+        guard isGroupedMode else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            for group in displayedGroups {
+                for photo in filtered(group.loadedPhotos) where photo.id != group.bestPhotoId {
+                    if !selectionManager.isSelected(photo.id) {
+                        selectionManager.toggle(photo.id)
                     }
                 }
-                .tint(.red)
-                .disabled(selectionManager.isEmpty)
             }
         }
     }
 
     // MARK: - Helpers
 
-    private func openFullscreen(_ photo: PhotoAsset) {
-        currentPhotoID = photo.id
-        withAnimation(.easeInOut(duration: 0.3)) {
-            isFullscreenMode = true
+    /// 执行删除：所选照片全部移入回收站，并清空选中状态
+    private func deleteSelected() {
+        let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
+        for photo in selected {
+            photoManager.addToTrash(photo)
+        }
+        selectionManager.clearSelection()
+    }
+
+    /// 选中合计大小：异步累加（PHAssetSizeHelper 内部有缓存，重复查询开销小）
+    private func updateSelectedSize() {
+        let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
+        guard !selected.isEmpty else {
+            selectedSizeText = ByteFormatter.format(0)
+            return
+        }
+        Task {
+            var total: Int64 = 0
+            for photo in selected {
+                total += await PHAssetSizeHelper.getAssetSize(photo.asset)
+            }
+            selectedSizeText = ByteFormatter.format(total)
         }
     }
 
@@ -349,186 +618,114 @@ struct OrganizeResultsView: View {
             if newText != categorySizeText { categorySizeText = newText }
             return
         }
-        // Compute size for other categories from loaded photos
-        let photos = organizeManager.paginatedPhotos(for: category)
-        guard !photos.isEmpty else { return }
-        let totalSize = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-            for photo in photos {
-                group.addTask {
-                    await PHAssetSizeHelper.getAssetSize(photo.asset)
-                }
-            }
-            var total: Int64 = 0
-            for await size in group {
-                total += size
-            }
-            return total
+
+        // 优先使用缓存
+        if let cached = SizeCache.load(category.rawValue), !cached.isEmpty {
+            if categorySizeText != cached { categorySizeText = cached }
+            return
         }
+
+        let allIds = organizeManager.scanResults[category]?.flatMap { $0.localIdentifiers }
+            ?? organizeManager.categoryPageStates[category]?.allIdentifiers
+            ?? allPhotos.map(\.id)
+        guard !allIds.isEmpty else { return }
+
+        let totalSize = await Task.detached(priority: .utility) {
+            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: allIds, options: nil)
+            var assets: [PHAsset] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                assets.append(asset)
+            }
+            return await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                for asset in assets {
+                    group.addTask {
+                        await PHAssetSizeHelper.getAssetSize(asset)
+                    }
+                }
+                var total: Int64 = 0
+                for await size in group {
+                    total += size
+                }
+                return total
+            }
+        }.value
+
+        guard totalSize > 0 else { return }
         SizeCache.save(category.rawValue, size: totalSize)
         let newText = ByteFormatter.format(totalSize)
         if newText != categorySizeText { categorySizeText = newText }
     }
 
-    // MARK: - Fullscreen View
-
-    private var fullscreenView: some View {
-        ZStack {
-            Group {
-                let photos = allPhotos
-                if !photos.isEmpty, currentPhotoID != nil {
-                    DraggablePhotoView(
-                        photos: photos,
-                        currentPhotoID: currentPhotoID ?? "",
-                        deleteTrigger: $deleteTrigger,
-                        onPhotoChange: { id, _ in
-                            currentPhotoID = id
-                        },
-                        onDelete: { photo in
-                            photoManager.addToTrash(photo)
-                        },
-                        onBlockedDelete: {
-                            showFavoriteDeleteAlert = true
-                        },
-                        onDismiss: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                                isFullscreenMode = false
-                            }
-                        },
-                        screenSize: ScreenSizeHelper.screenSize
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-            .ignoresSafeArea()
-
-            VStack {
-                HStack {
-                    Button {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                isFullscreenMode = false
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-                    Spacer()
-
-                    Button {
-                        showTrash = true
-                    } label: {
-                        Image(systemName: "trash.fill")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(alignment: .topTrailing) {
-                        if photoManager.trashCount > 0 {
-                            Text("\(photoManager.trashCount)")
-                                .font(.system(.caption2, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(4)
-                                .background(Color.red)
-                                .clipShape(Circle())
-                                .offset(x: 4, y: -2)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-                Spacer()
-
-                HStack(spacing: 16) {
-                    Spacer()
-
-                    Button {
-                        if let photo = currentFullscreenPhoto {
-                            photoManager.toggleFavorite(photo)
-                        }
-                    } label: {
-                        Image(systemName: (currentFullscreenPhoto?.isFavorite ?? false) ? "heart.fill" : "heart")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor((currentFullscreenPhoto?.isFavorite ?? false) ? .red : .primary)
-                            .frame(width: 60, height: 60)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-                    Button {
-                        deleteTrigger += 1
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(.title3, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 60, height: 60)
-                    }
-                    .background(.ultraThinMaterial, in: Circle())
-
-                    Spacer()
-                }
-                .padding(.bottom, 8)
-            }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
-            Button(String(localized: "OK"), role: .cancel) {}
-        } message: {
-            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
-        }
-        .onChange(of: allPhotos) { oldPhotos, newPhotos in
-            guard let id = currentPhotoID, !newPhotos.contains(where: { $0.id == id }) else { return }
-            if let oldIndex = oldPhotos.firstIndex(where: { $0.id == id }) {
-                let newIndex = min(oldIndex, newPhotos.count - 1)
-                currentPhotoID = newPhotos.indices.contains(newIndex) ? newPhotos[newIndex].id : newPhotos.first?.id
-            } else {
-                currentPhotoID = newPhotos.first?.id
-            }
-            if currentPhotoID == nil, !newPhotos.isEmpty {
-                isFullscreenMode = false
-            }
-        }
-        .sheet(isPresented: $showTrash) {
-            TrashView(photoManager: photoManager)
-        }
+    private func openFullscreen(_ photo: PhotoAsset) {
+        currentPhotoID = photo.id
+        isFullscreenMode = true
     }
 
-    private func deselectAll(in group: OrganizeGroupDisplay) {
-        for photo in group.loadedPhotos {
-            if selectionManager.isSelected(photo.id) {
-                selectionManager.toggle(photo.id)
-            }
+    // MARK: - Fullscreen Browser Destination
+
+    @ViewBuilder
+    private var fullscreenBrowserDestination: some View {
+        if let photoID = currentPhotoID {
+            FullscreenPhotoBrowser(
+                photos: allPhotos,
+                initialPhotoID: photoID,
+                onDelete: { photo in
+                    photoManager.addToTrash(photo)
+                },
+                onFavoriteToggled: { photo, isFavorite in
+                    organizeManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
+                },
+                onDismiss: {
+                    isFullscreenMode = false
+                }
+            )
+            .environmentObject(photoManager)
         }
     }
 }
+
+// MARK: - Date Section（日期分节）
+
+/// 相似/重复簇按天细分、平铺分类按天分组后的展示节
+private struct DateSection: Identifiable {
+    let id: String
+    /// 所属分组（平铺分类为 flat-key），用于按批次过滤
+    let groupID: String
+    let title: String
+    var photos: [PhotoAsset]
+    /// 分节合计大小：异步补齐（0 时不显示）
+    var totalSize: Int64 = 0
+}
+
 
 // MARK: - File Size Badge
 
 private struct FileSizeBadge: View {
     let asset: PHAsset
-    @State private var size: Int64 = 0
+    @State private var sizeText: String = ""
 
     var body: some View {
         Group {
-            if size > 0 {
-                Text(ByteFormatter.format(size))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            if !sizeText.isEmpty {
+                Text(sizeText)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2.5)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
                     .padding(6)
             }
         }
-        .onAppear {
-            size = PHAssetSizeHelper.getFileSize(asset)
+        .task {
+            let fastSize = PHAssetSizeHelper.getFileSize(asset)
+            if fastSize > 0 {
+                sizeText = ByteFormatter.format(fastSize)
+            } else {
+                let asyncSize = await PHAssetSizeHelper.getAssetSize(asset)
+                if asyncSize > 0 {
+                    sizeText = ByteFormatter.format(asyncSize)
+                }
+            }
         }
     }
 }

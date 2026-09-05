@@ -5,22 +5,29 @@ struct PhotoCell: View {
     let photo: PhotoAsset
     var isSelected: Bool = false
     var isSelectMode: Bool = false
+    /// 强制 1:1 显示（整理页分类网格）；默认跟随网格设置，其他页面不受影响
+    var usesSquareRatio: Bool = false
     @Environment(GridSettings.self) private var gridSettings
     @State private var imageLoaded = false
 
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
     /// 否则用用户设置的固定比例。
     private var cardAspectRatio: CGFloat {
-        gridSettings.isOriginalRatio ? photo.pixelAspectRatio : gridSettings.aspectRatio
+        if usesSquareRatio { return 1.0 }
+        return gridSettings.isOriginalRatio ? photo.pixelAspectRatio : gridSettings.aspectRatio
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white)
+
                 AssetImage(
                     asset: photo.asset,
                     targetSize: CGSize(width: 400, height: 400),
                     contentMode: .fill,
+                    placeholderColor: .white,
                     onLoad: { imageLoaded = true }
                 )
                 .scaledToFill()
@@ -82,9 +89,9 @@ struct PhotoCell: View {
         case .livePhoto:
             livePhotoBadge
         case .gif:
-            textBadge("GIF", .purple)
+            materialTextBadge("GIF")
         case .screenshot:
-            textBadge(String(localized: "SS"), .orange)
+            materialTextBadge(String(localized: "SS"))
         case .image:
             EmptyView()
         }
@@ -99,7 +106,7 @@ struct PhotoCell: View {
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
             }
         }
-        .foregroundColor(.primary)
+        .foregroundColor(.white)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -108,36 +115,29 @@ struct PhotoCell: View {
 
     private var favoriteBadge: some View {
         Image(systemName: "heart.fill")
-            .font(.system(size: 12, design: .rounded))
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
             .foregroundColor(.white)
-            .padding(6)
+            .shadow(color: Color.black.opacity(0.45), radius: 2, x: 0, y: 1)
+            .padding(7)
     }
 
     private var livePhotoBadge: some View {
         Image(systemName: "livephoto")
-            .font(.system(size: 14, design: .rounded))
-            .foregroundColor(.primary)
-            .padding(2)
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundColor(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding(6)
     }
 
-    private func iconBadge(_ iconName: String, _ color: Color) -> some View {
-        Image(systemName: iconName)
-            .font(.system(size: 16, design: .rounded))
-            .foregroundColor(.white)
-            .padding(7)
-            .background(color, in: RoundedRectangle(cornerRadius: 8))
-            .padding(6)
-    }
-
-    private func textBadge(_ text: String, _ color: Color) -> some View {
+    private func materialTextBadge(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(color, in: RoundedRectangle(cornerRadius: 8))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
             .padding(6)
     }
 }

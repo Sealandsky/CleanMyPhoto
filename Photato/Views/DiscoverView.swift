@@ -65,7 +65,7 @@ final class DiscoverManager: ObservableObject {
 
         // 总数少于采样数量时 drawBatch 自然返回全部
         let batch = drawBatch(count: Self.sampleCount)
-        photos = await buildPhotoAssets(batch)
+        photos = buildPhotoAssets(batch)
         hasMorePhotos = poolCursor < pool.count
         hasLoadedOnce = true
     }
@@ -81,7 +81,7 @@ final class DiscoverManager: ObservableObject {
             hasMorePhotos = false
             return
         }
-        let built = await buildPhotoAssets(batch)
+        let built = buildPhotoAssets(batch)
         photos += built
         hasMorePhotos = poolCursor < pool.count
     }
@@ -119,11 +119,8 @@ final class DiscoverManager: ObservableObject {
         return result
     }
 
-    /// PhotoAsset 构建含 GIF 资源检测（PHAssetResource 调用），放后台线程避免卡主线程
-    private func buildPhotoAssets(_ assets: [PHAsset]) async -> [PhotoAsset] {
-        await Task.detached(priority: .userInitiated) {
-            assets.map { PhotoAsset(asset: $0) }
-        }.value
+    private func buildPhotoAssets(_ assets: [PHAsset]) -> [PhotoAsset] {
+        assets.map { PhotoAsset(asset: $0) }
     }
 }
 
@@ -283,7 +280,7 @@ struct DiscoverView: View {
                 gridView
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         // 首次采样由 ContentView 切换到「发现」Tab 时触发，
         // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
         // 否则 app 启动即会执行全库枚举

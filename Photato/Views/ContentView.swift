@@ -182,30 +182,60 @@ struct ContentView: View {
         ZStack {
             contentViews
         }
-        .background(Color("AccentBg"))
+        .background(Color(UIColor.systemGroupedBackground))
+    }
+
+    // MARK: - Fullscreen Bindings
+    private var isDiscoverFullscreenBinding: Binding<Bool> {
+        Binding(
+            get: { isFullscreenMode && selectedTab == .discover },
+            set: { newValue in
+                if !newValue && selectedTab == .discover {
+                    isFullscreenMode = false
+                }
+            }
+        )
+    }
+
+    private var isLibraryFullscreenBinding: Binding<Bool> {
+        Binding(
+            get: { isFullscreenMode && selectedTab == .allPhotos },
+            set: { newValue in
+                if !newValue && selectedTab == .allPhotos {
+                    isFullscreenMode = false
+                }
+            }
+        )
+    }
+
+    private var isTimelineFullscreenBinding: Binding<Bool> {
+        Binding(
+            get: { isFullscreenMode && selectedTab == .timeline },
+            set: { newValue in
+                if !newValue && selectedTab == .timeline {
+                    isFullscreenMode = false
+                }
+            }
+        )
     }
 
     // MARK: - Content Views
     private var contentViews: some View {
         ZStack {
-            if isFullscreenMode {
-                photoBrowserView
-            }
-
             libraryNavigationView
-                .opacity(selectedTab == .allPhotos && !isFullscreenMode ? 1 : 0)
-                .allowsHitTesting(selectedTab == .allPhotos && !isFullscreenMode)
+                .opacity(selectedTab == .allPhotos ? 1 : 0)
+                .allowsHitTesting(selectedTab == .allPhotos)
 
             timelineNavigationView
-                .opacity(selectedTab == .timeline && !isFullscreenMode ? 1 : 0)
-                .allowsHitTesting(selectedTab == .timeline && !isFullscreenMode)
+                .opacity(selectedTab == .timeline ? 1 : 0)
+                .allowsHitTesting(selectedTab == .timeline)
 
             // 发现 Tab：与其他页相同的 opacity + hitTest 切换方式，零样式改动
             discoverNavigationView
-                .opacity(selectedTab == .discover && !isFullscreenMode ? 1 : 0)
-                .allowsHitTesting(selectedTab == .discover && !isFullscreenMode)
+                .opacity(selectedTab == .discover ? 1 : 0)
+                .allowsHitTesting(selectedTab == .discover)
         }
-        .background(Color(.systemBackground)) // 固定背景，防止露黑
+        .background(Color(UIColor.systemGroupedBackground)) // 固定背景，防止露黑
     }
 
     @State private var selectedTabBeforeSwitch: MainTab = .allPhotos
@@ -214,6 +244,28 @@ struct ContentView: View {
     private var libraryNavigationView: some View {
         NavigationStack {
             applySharedTitleBar(to: photoListView)
+                .navigationDestination(isPresented: isLibraryFullscreenBinding) {
+                    if let photoID = currentPhotoID {
+                        FullscreenPhotoBrowser(
+                            photos: photoManager.displayedPhotos,
+                            initialPhotoID: photoID,
+                            onDelete: { photo in
+                                photoManager.addToTrash(photo)
+                            },
+                            onFavoriteToggled: { _, _ in },
+                            onActivePhotoChange: { photo, index in
+                                currentPhotoID = photo.id
+                                scrollToPhotoID = photo.id
+                                photoManager.preloadAssets(photoIndex: index)
+                            },
+                            onDismiss: {
+                                scrollToPhotoID = currentPhotoID
+                                isFullscreenMode = false
+                            }
+                        )
+                        .environmentObject(photoManager)
+                    }
+                }
         }
     }
 
@@ -268,12 +320,32 @@ struct ContentView: View {
                             onPhotoSelect: { photo in
                                 currentPhotoID = photo.id
                                 scrollToPhotoID = nil
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    isFullscreenMode = true
-                                }
+                                isFullscreenMode = true
                             },
                             scrollToPhotoID: scrollToPhotoID
                         )
+                        .navigationDestination(isPresented: isTimelineFullscreenBinding) {
+                            if let photoID = currentPhotoID {
+                                FullscreenPhotoBrowser(
+                                    photos: monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) },
+                                    initialPhotoID: photoID,
+                                    onDelete: { photo in
+                                        photoManager.addToTrash(photo)
+                                    },
+                                    onFavoriteToggled: { _, _ in },
+                                    onActivePhotoChange: { photo, index in
+                                        currentPhotoID = photo.id
+                                        scrollToPhotoID = photo.id
+                                        photoManager.preloadAssets(photoIndex: index)
+                                    },
+                                    onDismiss: {
+                                        scrollToPhotoID = currentPhotoID
+                                        isFullscreenMode = false
+                                    }
+                                )
+                                .environmentObject(photoManager)
+                            }
+                        }
                     }
                 }
             }
@@ -293,8 +365,7 @@ struct ContentView: View {
 
     // MARK: - Discover Navigation
     // 发现页：独立 NavigationStack，标题栏与其他三页共用（见 applySharedTitleBar）。
-    // 点击照片通过 onPhotoSelect 打开共用的全屏浏览器（DraggablePhotoView），
-    // 与图库页交互完全一致。
+    // 点击照片通过 onPhotoSelect 打开原生推入的全屏详情页（FullscreenPhotoBrowser）
     private var discoverNavigationView: some View {
         NavigationStack {
             applySharedTitleBar(to: DiscoverView(
@@ -302,12 +373,32 @@ struct ContentView: View {
                 onPhotoSelect: { photo in
                     currentPhotoID = photo.id
                     scrollToPhotoID = nil
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isFullscreenMode = true
-                    }
+                    isFullscreenMode = true
                 },
                 scrollToTopSignal: discoverScrollSignal
             ))
+            .navigationDestination(isPresented: isDiscoverFullscreenBinding) {
+                if let photoID = currentPhotoID {
+                    FullscreenPhotoBrowser(
+                        photos: discoverManager.photos,
+                        initialPhotoID: photoID,
+                        onDelete: { photo in
+                            photoManager.addToTrash(photo)
+                            discoverManager.removePhoto(photo)
+                        },
+                        onFavoriteToggled: { photo, isFavorite in
+                            discoverManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
+                        },
+                        onActivePhotoChange: { photo, _ in
+                            currentPhotoID = photo.id
+                        },
+                        onDismiss: {
+                            isFullscreenMode = false
+                        }
+                    )
+                    .environmentObject(photoManager)
+                }
+            }
         }
     }
 
@@ -373,63 +464,11 @@ struct ContentView: View {
             onPhotoSelect: { photo in
                 currentPhotoID = photo.id
                 scrollToPhotoID = nil
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    isFullscreenMode = true
-                }
+                isFullscreenMode = true
             },
             scrollToPhotoID: scrollToPhotoID,
             onScrollOffsetChanged: { offset in
                 scrollOffset = offset
-            }
-        )
-    }
-
-    private var currentPhotos: [PhotoAsset] {
-        // 发现页批次优先：全屏浏览器直接使用发现页的随机批次
-        if selectedTab == .discover {
-            return discoverManager.photos
-        } else if let monthAlbum = selectedMonthAlbum {
-            return monthAlbum.photoAssets.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
-        } else {
-            return photoManager.displayedPhotos
-        }
-    }
-
-    private var currentFullscreenPhoto: PhotoAsset? {
-        guard let id = currentPhotoID else { return nil }
-        return currentPhotos.first { $0.id == id }
-    }
-
-    // MARK: - Photo Browser
-    // 全屏浏览器已提取为共享组件 FullscreenPhotoBrowser（相簿 Tab 等数据源共用），
-    // 这里仅负责注入图库/发现页的数据源回调
-    private var photoBrowserView: some View {
-        FullscreenPhotoBrowser(
-            photos: currentPhotos,
-            initialPhotoID: currentPhotoID ?? "",
-            onDelete: { photo in
-                photoManager.addToTrash(photo)
-                // 同步移出发现页批次：DraggablePhotoView 依赖外部数组收缩滑向下一张
-                discoverManager.removePhoto(photo)
-            },
-            onFavoriteToggled: { photo, isFavorite in
-                // 同步发现页批次内的心形状态（其他页来源时 id 不在批次中，无副作用）
-                discoverManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
-            },
-            onActivePhotoChange: { _, index in
-                scrollToPhotoID = nil
-                // 发现页批次顺序与 photoManager.allPhotos 不同，索引预加载无意义，跳过
-                if selectedTab != .discover {
-                    photoManager.preloadAssets(photoIndex: index)
-                }
-            },
-            onDismiss: {
-                scrollToPhotoID = currentPhotoID
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        isFullscreenMode = false
-                    }
-                }
             }
         )
     }
@@ -446,7 +485,7 @@ struct ContentView: View {
                 .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         .ignoresSafeArea()
     }
 }

@@ -93,7 +93,21 @@
       }
     },
     "%lld photos" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 张照片"
+          }
+        }
+      }
     },
     "%lld Photos" : {
       "localizations" : {
@@ -107,6 +121,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 张照片"
+          }
+        }
+      }
+    },
+    "%lld photos will be permanently deleted and cannot be recovered. Total %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld photos will be permanently deleted and cannot be recovered. Total %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 张照片将从本设备彻底删除，且无法恢复，共 %@"
           }
         }
       }
@@ -292,6 +322,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "访问被拒绝"
+          }
+        }
+      }
+    },
+    "AI Select" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Select"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 帮选"
           }
         }
       }
@@ -569,6 +615,7 @@
       }
     },
     "Best" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -773,6 +820,71 @@
         }
       }
     },
+    "Delete %lld items, %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %lld items, %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除 %lld 项，%@"
+          }
+        }
+      }
+    },
+    "Delete %lld Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %lld Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除 %lld 张照片"
+          }
+        }
+      }
+    },
+    "Delete %lld Photos (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %1$lld Photos (%2$@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除 %1$lld 张照片 (%2$@)"
+          }
+        }
+      }
+    },
+    "Delete %lld photos?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %lld photos?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要删除 %lld 张照片吗？"
+          }
+        }
+      }
+    },
     "Delete All Photos" : {
       "localizations" : {
         "en" : {
@@ -801,6 +913,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已删除照片"
+          }
+        }
+      }
+    },
+    "Deselect All" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deselect All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消全选"
           }
         }
       }
@@ -985,6 +1113,7 @@
       }
     },
     "Identical photos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1033,6 +1162,7 @@
       }
     },
     "Keep All" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1224,6 +1354,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最大程度节省手机图片空间"
+          }
+        }
+      }
+    },
+    "Media Types" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media Types"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒体类型"
           }
         }
       }
@@ -1439,6 +1585,22 @@
         }
       }
     },
+    "No photos in this category" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photos in this category"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该分类暂无照片"
+          }
+        }
+      }
+    },
     "No similar photos yet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1563,7 +1725,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整理"
+            "value" : "清理"
           }
         }
       }
@@ -1611,7 +1773,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Photato 需要获取你的相册权限，以便帮你整理并清理无用照片。"
+            "value" : "Photato 需要获取你的相册权限，以便帮你清理无用照片。"
           }
         }
       }
@@ -2025,6 +2187,22 @@
         }
       }
     },
+    "Select All" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全选"
+          }
+        }
+      }
+    },
     "Settings" : {
       "localizations" : {
         "en" : {
@@ -2090,6 +2268,7 @@
       }
     },
     "Similar photos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2344,6 +2523,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如需使用 Photato，请前往设置开启相册访问权限。"
+          }
+        }
+      }
+    },
+    "Total %lld photos, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total %lld photos, %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 %lld 张，%@"
           }
         }
       }

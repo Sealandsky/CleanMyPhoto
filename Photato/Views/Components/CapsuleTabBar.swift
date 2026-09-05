@@ -149,7 +149,7 @@ struct CapsuleTabBar: View {
         CapsuleTabBar(
             segments: [
                 CapsuleSegment(id: "discover", title: "发现", systemImage: "sparkle.magnifyingglass"),
-                CapsuleSegment(id: "organize", title: "整理", systemImage: "sparkles"),
+                CapsuleSegment(id: "organize", title: "清理", systemImage: "sparkles"),
                 CapsuleSegment(id: "settings", title: "设置", systemImage: "gearshape"),
             ],
             selectionID: .constant("discover"),

@@ -37,17 +37,26 @@ struct AssetImage: View {
     let targetSize: CGSize
     let contentMode: ContentMode
     var highQuality: Bool = false
+    var placeholderColor: Color = .white
     var onLoad: (() -> Void)? = nil
 
     @State private var image: UIImage?
     /// 缩略图/高清均未就绪时为 true（展示 loading 指示器）
     @State private var isLoading = false
 
-    init(asset: PHAsset, targetSize: CGSize, contentMode: ContentMode = .fit, highQuality: Bool = false, onLoad: (() -> Void)? = nil) {
+    init(
+        asset: PHAsset,
+        targetSize: CGSize,
+        contentMode: ContentMode = .fit,
+        highQuality: Bool = false,
+        placeholderColor: Color = .white,
+        onLoad: (() -> Void)? = nil
+    ) {
         self.asset = asset
         self.targetSize = targetSize
         self.contentMode = contentMode
         self.highQuality = highQuality
+        self.placeholderColor = placeholderColor
         self.onLoad = onLoad
     }
 
@@ -58,13 +67,13 @@ struct AssetImage: View {
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
             } else {
-                // 缩略图与高清均未就绪：黑色兜底 + loading 指示器，
-                // 不回退到其他图片
+                // 缩略图与高清均未就绪：占位底色 + loading 指示器，
+                // 默认白色底，不回退到其他图片
                 ZStack {
-                    Color.black
+                    placeholderColor
                     if isLoading {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .progressViewStyle(CircularProgressViewStyle(tint: placeholderColor == .black ? .white : Color(.systemGray3)))
                     }
                 }
             }

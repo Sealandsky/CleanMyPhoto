@@ -35,10 +35,18 @@ final class PhotoCaptionResolver {
 
     // MARK: - 地理位置地址
 
+    /// 同步查询已缓存的地址结果（含负缓存），用于即时渲染避免闪烁
+    func cachedAddress(of asset: PHAsset) -> (isCached: Bool, address: String?) {
+        if let entry = addressCache[asset.localIdentifier] {
+            return (true, entry)
+        }
+        return (false, nil)
+    }
+
     /// 异步解析图片地址（反向地理编码）。
     /// completion 在主线程回调：有地址传地址串；无 GPS / 编码失败 / 拼装为空调用
     /// 由调用方回退到"拍摄日期"标题规则。
-    func resolveAddress(of asset: PHAsset, completion: @escaping (String?) -> Void) {
+    func resolveAddress(of asset: PHAsset, completion: @escaping @MainActor (String?) -> Void) {
         let id = asset.localIdentifier
 
         // 命中缓存（含负缓存）直接返回，不重复请求 CLGeocoder
@@ -54,8 +62,8 @@ final class PhotoCaptionResolver {
             return
         }
 
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
-            guard let self else { return }
+        Task {
+            let placemarks = try? await geocoder.reverseGeocodeLocation(location)
             let placemark = placemarks?.first
             // 地址拼装：城市 + 街道，缺项自动跳过；
             // 拼装为空时回退行政区域（如"广东省"），仍为空则视为无地址
@@ -66,9 +74,7 @@ final class PhotoCaptionResolver {
             }
 
             self.addressCache[id] = .some(address)
-            DispatchQueue.main.async {
-                completion(address)
-            }
+            completion(address)
         }
     }
 }
