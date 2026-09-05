@@ -12,6 +12,7 @@ struct DraggablePhotoView: View {
     let onDismiss: () -> Void
     let screenSize: CGSize
     let photoSpacing: CGFloat = 12
+    var isFavorite: ((PhotoAsset) -> Bool)? = nil
 
     /// 卡片版式：fullScreen = 独立全屏页（默认，上下各留 120pt 给页面操作栏）；
     /// embeddedSection = 作为详情页垂直版式中的预览区嵌入，上下不留白让大图占满区块
@@ -53,10 +54,24 @@ struct DraggablePhotoView: View {
     }
 
     private var currentPhoto: PhotoAsset { photos[safeIndex] }
+    private var isCurrentPhotoFavorite: Bool {
+        isFavorite?(currentPhoto) ?? currentPhoto.isFavorite
+    }
     private var previousPhoto: PhotoAsset? { safeIndex > 0 ? photos[safeIndex - 1] : nil }
     private var nextPhoto: PhotoAsset? { safeIndex < photos.count - 1 ? photos[safeIndex + 1] : nil }
 
-    init(photos: [PhotoAsset], currentPhotoID: String, deleteTrigger: Binding<Int>, onPhotoChange: @escaping (String, Int) -> Void, onDelete: ((PhotoAsset) -> Void)? = nil, onBlockedDelete: (() -> Void)? = nil, onDismiss: @escaping () -> Void, screenSize: CGSize, cardPresentation: CardPresentation = .fullScreen) {
+    init(
+        photos: [PhotoAsset],
+        currentPhotoID: String,
+        deleteTrigger: Binding<Int>,
+        onPhotoChange: @escaping (String, Int) -> Void,
+        onDelete: ((PhotoAsset) -> Void)? = nil,
+        onBlockedDelete: (() -> Void)? = nil,
+        onDismiss: @escaping () -> Void,
+        screenSize: CGSize,
+        cardPresentation: CardPresentation = .fullScreen,
+        isFavorite: ((PhotoAsset) -> Bool)? = nil
+    ) {
         self.photos = photos
         self.currentPhotoID = currentPhotoID
         self._deleteTrigger = deleteTrigger
@@ -66,6 +81,7 @@ struct DraggablePhotoView: View {
         self.onDismiss = onDismiss
         self.screenSize = screenSize
         self.cardPresentation = cardPresentation
+        self.isFavorite = isFavorite
         let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) ?? 0
         _localIndex = State(initialValue: idx)
     }
@@ -74,12 +90,22 @@ struct DraggablePhotoView: View {
         gestureContainer
     }
 
-    /// 手势挂载：全屏版式独占拖动；垂直流式嵌入版式用 simultaneousGesture
-    /// 与页面 ScrollView 共存——垂直滑动滚页面，水平滑动切换素材
+    /// 手势挂载：全屏版式独占拖动（上下滑删除/退出，左右滑切换）；
+    /// 垂直流式嵌入版式使用高精度单向水平手势 DirectionalHorizontalPanGesture，
+    /// 纵向滑动瞬间让权给外层 ScrollView，水平滑动丝滑切换素材
     @ViewBuilder
     private var gestureContainer: some View {
         if cardPresentation == .embeddedSection {
-            cardStack.simultaneousGesture(dragGesture)
+            cardStack.gesture(
+                DirectionalHorizontalPanGesture(
+                    onChanged: { translation in
+                        handleHorizontalPanChanged(translation: translation)
+                    },
+                    onEnded: { translation, velocity in
+                        handleHorizontalPanEnded(translation: translation, velocity: velocity)
+                    }
+                )
+            )
         } else {
             cardStack.gesture(dragGesture)
         }
@@ -102,22 +128,22 @@ struct DraggablePhotoView: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .contentShape(Rectangle())
 
-                // Previous photo (visible when swiping right)
-                if let prev = previousPhoto, !isDeleteTransitioning {
-                    photoCardLayer(prev)
-                        .offset(x: -screenSize.width - photoSpacing + offset.width)
+                // 仅在手指拖拽或切图动画中渲染相邻卡片；静止闲置时只有当前照片存在，彻底杜绝矮宽图背后透出相邻图片
+                if (isDragging || isNavigating || offset != .zero), let prev = previousPhoto, !isDeleteTransitioning {
+                    mediaCardLayer(prev, isCurrent: false, containerSize: geometry.size)
+                        .offset(x: -geometry.size.width - photoSpacing + offset.width)
                         .zIndex(0)
                 }
 
-                // Current photo
-                currentMediaCardLayer(currentPhoto)
+                // 当前照片卡片
+                mediaCardLayer(currentPhoto, isCurrent: true, containerSize: geometry.size)
                     .offset(x: offset.width, y: offset.height)
                     .zIndex(1)
 
-                // Next photo (visible when swiping left)
-                if let next = nextPhoto {
-                    photoCardLayer(next)
-                        .offset(x: screenSize.width + photoSpacing + offset.width)
+                // 仅在手指拖拽或切图动画中渲染相邻卡片
+                if (isDragging || isNavigating || offset != .zero), let next = nextPhoto {
+                    mediaCardLayer(next, isCurrent: false, containerSize: geometry.size)
+                        .offset(x: geometry.size.width + photoSpacing + offset.width)
                         .zIndex(0)
                 }
 
@@ -139,16 +165,17 @@ struct DraggablePhotoView: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .onChange(of: currentPhotoID) { _, newID in
-            guard !isDeleteTransitioning else { return }
+            guard !isDeleteTransitioning, !isNavigating else { return }
             if let idx = photos.firstIndex(where: { $0.id == newID }) {
                 localIndex = idx
             }
         }
         .onChange(of: deleteTrigger) { oldValue, newValue in
             guard newValue > oldValue, onDelete != nil else { return }
-            if currentPhoto.isFavorite {
+            if isCurrentPhotoFavorite {
                 onBlockedDelete?()
                 return
             }
@@ -158,142 +185,114 @@ struct DraggablePhotoView: View {
         }
     }
 
-    /// 区块底色：全屏版式白色底（历史行为，OrganizeResultsView 共用）；
-    /// 垂直流式嵌入版式不绘制底色，透出详情页统一页面底色（systemGray6）
+    /// 区块底色：全屏版式统一使用系统分组背景底色（与设置页一致）；
+    /// 垂直流式嵌入版式不绘制底色，透出详情页统一页面底色（systemGroupedBackground）
     @ViewBuilder
     private var backgroundLayer: some View {
         if cardPresentation == .embeddedSection {
             Color.clear
         } else {
-            Color(.systemBackground)
+            Color(UIColor.systemGroupedBackground)
                 .ignoresSafeArea()
         }
     }
 
-    // MARK: - Photo Layer (swipe neighbors — always thumbnail)
-    private func photoLayer(_ photoAsset: PhotoAsset) -> some View {
-        AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+    // MARK: - Card Size Helper
+    private func cardSize(for photoAsset: PhotoAsset, in available: CGSize) -> CGSize {
+        guard available.width > 0, available.height > 0 else { return .zero }
+        let ratio = photoAsset.pixelAspectRatio
+        let containerRatio = available.width / available.height
+        if containerRatio > ratio {
+            let h = available.height
+            let w = min(h * ratio, available.width)
+            return CGSize(width: w, height: h)
+        } else {
+            let w = available.width
+            let h = min(w / max(ratio, 0.01), available.height)
+            return CGSize(width: w, height: h)
+        }
     }
 
-    // MARK: - Current Photo Layer (media-appropriate player)
+    // MARK: - Media Card Layer（当前卡片与相邻卡片共用统一视图骨架，杜绝切图瞬间视图替换闪烁与卡顿）
     @ViewBuilder
-    private func currentMediaLayer(_ photoAsset: PhotoAsset) -> some View {
+    private func mediaCardLayer(_ photoAsset: PhotoAsset, isCurrent: Bool, containerSize: CGSize) -> some View {
+        let available = CGSize(
+            width: max(0, containerSize.width - cardPadding * 2),
+            height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
+        )
+        let size = cardSize(for: photoAsset, in: available)
+
         switch photoAsset.mediaType {
         case .video:
             ZStack {
-                photoLayer(photoAsset)
-                VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-            .id(photoAsset.id)
-        case .livePhoto:
-            ZStack {
-                photoLayer(photoAsset)
-                LivePhotoPlayerView(asset: photoAsset.asset)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-            .id(photoAsset.id)
-        default:
-            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-        }
-    }
-    // MARK: - Card Size Helper
-        private func cardSize(for photoAsset: PhotoAsset, in available: CGSize) -> CGSize {
-            let ratio = CGFloat(photoAsset.asset.pixelWidth) / max(CGFloat(photoAsset.asset.pixelHeight), 1)
-            if available.width / available.height > ratio {
-                return CGSize(width: available.height * ratio, height: available.height)
-            } else {
-                return CGSize(width: available.width, height: available.width / ratio)
-            }
-        }
-
-    // MARK: - Photo Card Layer（带卡片样式的前后图）
-        private func photoCardLayer(_ photoAsset: PhotoAsset) -> some View {
-            GeometryReader { geo in
-                let size = cardSize(for: photoAsset, in: geo.size)
-
                 AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
                     .frame(width: size.width, height: size.height)
-                    .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                    .frame(width: geo.size.width, height: geo.size.height)
-            }
-            .padding(.horizontal, cardPadding)
-            .padding(.top, effectiveCardTopPadding)
-            .padding(.bottom, effectiveCardBottomPadding)
-        }
 
-        // MARK: - Current Photo Card Layer（带卡片样式的当前图）
-        @ViewBuilder
-        private func currentMediaCardLayer(_ photoAsset: PhotoAsset) -> some View {
-            GeometryReader { geo in
-                let size = cardSize(for: photoAsset, in: geo.size)
-
-                switch photoAsset.mediaType {
-                case .video:
-                    ZStack {
-                        AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                            .frame(width: size.width, height: size.height)
-                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                            )
-                            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-
-                        VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
-                            .frame(width: size.width, height: size.height)
-                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                    }
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .id(photoAsset.id)
-                case .livePhoto:
-                    ZStack {
-                        AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                            .frame(width: size.width, height: size.height)
-                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                            )
-                            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-
-                        LivePhotoPlayerView(asset: photoAsset.asset)
-                            .frame(width: size.width, height: size.height)
-                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                    }
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .id(photoAsset.id)
-                default:
-                    AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                if isCurrent {
+                    VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
                         .frame(width: size.width, height: size.height)
-                        .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                        )
-                        .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                        .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
-            .padding(.horizontal, cardPadding)
-            .padding(.top, effectiveCardTopPadding)
-            .padding(.bottom, effectiveCardBottomPadding)
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+            .frame(width: containerSize.width, height: containerSize.height)
+            .id(photoAsset.id)
+
+        case .livePhoto:
+            ZStack {
+                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                    .frame(width: size.width, height: size.height)
+
+                if isCurrent {
+                    LivePhotoPlayerView(asset: photoAsset.asset)
+                        .frame(width: size.width, height: size.height)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+            .frame(width: containerSize.width, height: containerSize.height)
+            .id(photoAsset.id)
+
+        default:
+            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
+                .frame(width: size.width, height: size.height)
+                .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+                .frame(width: containerSize.width, height: containerSize.height)
+                .id(photoAsset.id)
         }
+    }
     // MARK: - Gesture Handlers
     @State private var showDeleteIndicator = false
+
+    /// 水平单向手势位移回调：驱动卡片横向视差滑动
+    private func handleHorizontalPanChanged(translation: CGPoint) {
+        if isNavigating { return }
+        isDragging = true
+        withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
+            offset = CGSize(width: translation.x, height: 0)
+        }
+    }
+
+    /// 水平单向手势结束回调：判定滑动距离与速度决定是否切图
+    private func handleHorizontalPanEnded(translation: CGPoint, velocity: CGPoint) {
+        if isNavigating { return }
+        horizontalNavigate(horizontal: translation.x, vertical: translation.y, velocity: velocity.x)
+    }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
         if isNavigating { return }
@@ -337,7 +336,7 @@ struct DraggablePhotoView: View {
         if cardPresentation != .embeddedSection {
             // Swipe up to delete
             if vertical < -deleteThreshold && onDelete != nil {
-                if currentPhoto.isFavorite {
+                if isCurrentPhotoFavorite {
                     onBlockedDelete?()
                     resetPosition()
                 } else {
@@ -389,25 +388,26 @@ struct DraggablePhotoView: View {
             return
         }
 
+        let targetIndex = direction == .forward ? localIndex + 1 : localIndex - 1
+        let targetPhoto = photos[targetIndex]
+
         let currentNavID = navigationID + 1
         navigationID = currentNavID
         isNavigating = true
+
+        // 核心丝滑优化：一旦确定切图，在开始滑动的第 0 毫秒立即通知外部
+        // 此时 isNavigating 已置为 true，父视图更新 currentPhotoID 不会提前打乱 localIndex
+        onPhotoChange(targetPhoto.id, targetIndex)
+
         let pageStep = screenSize.width + photoSpacing
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.95)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.92)) {
             offset = direction == .forward
                 ? CGSize(width: -pageStep, height: 0)
                 : CGSize(width: pageStep, height: 0)
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        } completion: {
             guard navigationID == currentNavID else { return }
 
-            if direction == .forward {
-                localIndex += 1
-            } else {
-                localIndex -= 1
-            }
-            onPhotoChange(currentPhoto.id, localIndex)
+            localIndex = targetIndex
 
             var t = Transaction()
             t.disablesAnimations = true
@@ -539,3 +539,123 @@ struct DraggablePhotoView: View {
         screenSize: CGSize(width: 393, height: 852)
     )
 }
+
+// MARK: - Directional Horizontal Pan Gesture
+/// 专用于垂直流式页面内的单向水平滑动手势：
+/// 1. 优先判定：当手指滑动初始方向更偏向纵向（abs(y) > abs(x) 且 > 4pt）时，立即置为 .failed，
+///    将触摸事件瞬时且无损地让权移交给外层父级 UIScrollView 滚动页面。
+/// 2. 横向判定：当横向位移主导时正常识别，驱动卡片切换；并在拖拽期间互斥阻止外层纵向滚动抖动。
+/// 3. cancelsTouchesInView = false 保留视频控制按钮（播放/暂停/静音）等子视图点击事件。
+final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        delegate = self
+        cancelsTouchesInView = false
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        // 若初始触摸点直接落在屏幕最左边缘（< 22pt），立即失败让权给系统原生边缘侧滑返回
+        if let touch = touches.first, touch.location(in: nil).x < 22 {
+            state = .failed
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        if state == .possible {
+            // 边缘保护：若手指在初始微移阶段落在屏幕最左边缘（< 22pt），立即失败让权
+            if let touch = touches.first, touch.location(in: nil).x < 22 {
+                state = .failed
+                return
+            }
+
+            let translation = self.translation(in: view)
+            let absX = abs(translation.x)
+            let absY = abs(translation.y)
+            // 纵向滑动优先退出：只要检测到纵向趋势（absY >= absX 且产生微移 > 1pt），
+            // 在调用 super.touchesMoved 之前立即置为 .failed，
+            // 彻底杜绝手势进入 .began，将触摸控制权零延迟让渡给外层 ScrollView
+            if absY >= absX && absY > 1 {
+                state = .failed
+                return
+            }
+        }
+        super.touchesMoved(touches, with: event)
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === self else { return true }
+        guard let view = self.view else { return false }
+
+        let v = velocity(in: view)
+        let t = translation(in: view)
+
+        // 判定用户意图：必须明确是横向滑动，才允许本水平切图手势开始。
+        // 1. 如果纵向速度大于等于横向速度，说明用户意在上下滚动页面，直接拒绝手势开始
+        if abs(v.y) >= abs(v.x) {
+            return false
+        }
+        // 2. 如果纵向累计位移大于等于横向累计位移，直接拒绝
+        if abs(t.y) >= abs(t.x) && abs(t.y) > 0 {
+            return false
+        }
+
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // 水平滑动切图拖拽中时，互斥阻止外层垂直 ScrollView 发生纵向抖动
+        if state == .began || state == .changed {
+            if otherGestureRecognizer is UIPanGestureRecognizer {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+@available(iOS 18.0, *)
+struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
+    var onChanged: ((CGPoint) -> Void)?
+    var onEnded: ((CGPoint, CGPoint) -> Void)?
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator(onChanged: onChanged, onEnded: onEnded)
+    }
+
+    func makeUIGestureRecognizer(context: Context) -> DirectionalHorizontalPanGestureRecognizer {
+        DirectionalHorizontalPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+    }
+
+    func updateUIGestureRecognizer(_ recognizer: DirectionalHorizontalPanGestureRecognizer, context: Context) {
+        context.coordinator.onChanged = onChanged
+        context.coordinator.onEnded = onEnded
+    }
+
+    final class Coordinator: NSObject {
+        var onChanged: ((CGPoint) -> Void)?
+        var onEnded: ((CGPoint, CGPoint) -> Void)?
+
+        init(onChanged: ((CGPoint) -> Void)?, onEnded: ((CGPoint, CGPoint) -> Void)?) {
+            self.onChanged = onChanged
+            self.onEnded = onEnded
+        }
+
+        @objc func handlePan(_ recognizer: DirectionalHorizontalPanGestureRecognizer) {
+            guard let view = recognizer.view else { return }
+            let translation = recognizer.translation(in: view)
+            let velocity = recognizer.velocity(in: view)
+            switch recognizer.state {
+            case .began, .changed:
+                onChanged?(translation)
+            case .ended:
+                onEnded?(translation, velocity)
+            case .cancelled, .failed:
+                onEnded?(translation, .zero)
+            default:
+                break
+            }
+        }
+    }
+}
+

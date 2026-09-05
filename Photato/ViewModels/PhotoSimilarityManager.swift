@@ -280,8 +280,15 @@ final class PhotoSimilarityManager {
     }
 
     func largeFileGroup() -> OrganizeScanGroup? {
+        let minSize: Int64 = 10 * 1024 * 1024
+        let highResThreshold: Int32 = 6000 * 4000
+        let highResMinSize: Int64 = 6 * 1024 * 1024
+
         let request = PhotoFingerprint.fetchRequest()
-        request.predicate = NSPredicate(format: "pixelWidth * pixelHeight > %d AND fileSize > 0", 4000 * 4000)
+        request.predicate = NSPredicate(
+            format: "fileSize >= %lld OR (pixelWidth * pixelHeight >= %d AND fileSize >= %lld)",
+            minSize, highResThreshold, highResMinSize
+        )
 
         let results = (try? context.fetch(request)) ?? []
         guard !results.isEmpty else { return nil }

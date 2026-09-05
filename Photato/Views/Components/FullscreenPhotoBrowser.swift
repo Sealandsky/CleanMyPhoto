@@ -100,8 +100,8 @@ struct FullscreenPhotoBrowser: View {
                 gestureInstructionsOverlay
             }
         }
-        // 页面底色铺满全屏（含安全区）：对齐 Figma #F3F3F3，语义色深浅色自动适配
-        .background(Color(.systemGray6).ignoresSafeArea())
+        // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         // 分享结果 toast：覆盖在详情页上，自动消失，不拦截触摸
         .overlay(alignment: .bottom) {
             if let toast = shareToast {
@@ -118,6 +118,27 @@ struct FullscreenPhotoBrowser: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: shareToast)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text(captionTitle)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if !captionSubtitle.isEmpty {
+                        Text(captionSubtitle)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.22), value: captionTitle)
+                .animation(.easeInOut(duration: 0.22), value: captionSubtitle)
+            }
+        }
         .toolbar(.hidden, for: .tabBar)
         .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
             Button(String(localized: "OK"), role: .cancel) {}
@@ -139,6 +160,7 @@ struct FullscreenPhotoBrowser: View {
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
             await loadRelatedPhotos()
+            prewarmNeighbors()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
         .onChange(of: photos) { oldPhotos, newPhotos in
@@ -153,82 +175,49 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // MARK: - 垂直流式版式（对齐 Figma 639-3025）
-    /// 顶部标题信息固定，其下为可滚动内容：大图预览区域 → 操作按钮栏 →
-    /// 相关图片列表占位模块（设计稿整页高 1625pt，超出屏幕需要滚动）。
-    /// 仅调整排版结构：左右滑动切换、视频播放/加载、收藏/分享/删除能力全部保留
+    /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
+    /// 大图预览区域 → 操作按钮栏 → 相关图片列表推荐
     private var verticalDetailLayout: some View {
-        VStack(spacing: 0) {
-            titleInfoBar
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
-                    // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
-                    DraggablePhotoView(
-                        photos: photos,
-                        currentPhotoID: currentPhotoID,
-                        deleteTrigger: $deleteTrigger,
-                        onPhotoChange: { id, index in
-                            currentPhotoID = id
-                            if let photo = photos.first(where: { $0.id == id }) {
-                                onActivePhotoChange?(photo, index)
-                            }
-                        },
-                        onDelete: { photo in
-                            onDelete?(photo)
-                        },
-                        onBlockedDelete: {
-                            showFavoriteDeleteAlert = true
-                        },
-                        onDismiss: {
-                            onDismiss()
-                        },
-                        screenSize: ScreenSizeHelper.screenSize,
-                        cardPresentation: .embeddedSection
-                    )
-                    .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
-                    .frame(maxWidth: .infinity)
-                    .onAppear {
-                        showGestureInstructionsIfNeeded()
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
+                // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
+                DraggablePhotoView(
+                    photos: photos,
+                    currentPhotoID: currentPhotoID,
+                    deleteTrigger: $deleteTrigger,
+                    onPhotoChange: { id, index in
+                        currentPhotoID = id
+                        if let photo = photos.first(where: { $0.id == id }) {
+                            onActivePhotoChange?(photo, index)
+                        }
+                    },
+                    onDelete: { photo in
+                        onDelete?(photo)
+                    },
+                    onBlockedDelete: {
+                        showFavoriteDeleteAlert = true
+                    },
+                    onDismiss: {
+                        onDismiss()
+                    },
+                    screenSize: ScreenSizeHelper.screenSize,
+                    cardPresentation: .embeddedSection,
+                    isFavorite: { photo in
+                        photoManager.isFavorite(photo)
                     }
-
-                    actionBar
-                    RelatedPhotosSection(state: relatedState)
+                )
+                .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+                .onAppear {
+                    showGestureInstructionsIfNeeded()
                 }
+
+                actionBar
+                RelatedPhotosSection(state: relatedState)
             }
         }
-    }
-
-    // 顶部标题信息：返回 + 双行标题（主=地址/拍摄日期，副=日期时间/拍摄时间）。
-    // 顶部垃圾桶入口已按新版式移除；右侧等宽透明占位保证标题在栏内居中
-    private var titleInfoBar: some View {
-        HStack {
-            glassActionButton(size: 44, iconSize: 17) {
-                Image(systemName: "chevron.left")
-                    .foregroundColor(.primary)
-            } action: {
-                onDismiss()
-            }
-
-            VStack(spacing: 2) {
-                Text(captionTitle)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(captionSubtitle)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
-
-            Color.clear.frame(width: 44, height: 44)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 5)
     }
 
     // 操作按钮栏：左侧[收藏 添加 分享 更多]横向排布，右侧独立[删除]；
@@ -248,17 +237,22 @@ struct FullscreenPhotoBrowser: View {
         .padding(.vertical, 16)
     }
 
-    private var isCurrentFavorite: Bool { currentPhoto?.isFavorite ?? false }
+    private var isCurrentFavorite: Bool {
+        guard let photo = currentPhoto else { return false }
+        return photoManager.isFavorite(photo)
+    }
 
     // 收藏：切换后经回调同步外部数据源状态（如发现批次）
     private var favoriteButton: some View {
         glassActionButton {
             Image(systemName: isCurrentFavorite ? "heart.fill" : "heart")
                 .foregroundColor(isCurrentFavorite ? .red : .primary)
+                .animation(.easeInOut(duration: 0.2), value: isCurrentFavorite)
         } action: {
             if let photo = currentPhoto {
+                let willBeFavorite = !isCurrentFavorite
                 photoManager.toggleFavorite(photo)
-                onFavoriteToggled?(photo, !photo.isFavorite)
+                onFavoriteToggled?(photo, willBeFavorite)
             }
         }
     }
@@ -419,7 +413,7 @@ struct FullscreenPhotoBrowser: View {
                 options: options,
                 dataReceivedHandler: { data in
                     // 增量数据流式追加写入（非全量，控制内存峰值）
-                    try? handle.seekToEnd()
+                    _ = try? handle.seekToEnd()
                     try? handle.write(contentsOf: data)
                 },
                 completionHandler: { error in
@@ -485,17 +479,50 @@ struct FullscreenPhotoBrowser: View {
             return
         }
 
-        // 默认无地址规则
-        captionTitle = date
-        captionSubtitle = time
+        let cached = captionResolver.cachedAddress(of: photo.asset)
+        if cached.isCached {
+            // 命中缓存（含相邻素材静默预热）：直接同步赋值，切换瞬间（0ms）即展示真实地点，彻底消除延迟跳变
+            if let address = cached.address, !address.isEmpty {
+                captionTitle = address
+                captionSubtitle = "\(date) \(time)"
+            } else {
+                captionTitle = date
+                captionSubtitle = time
+            }
+        } else {
+            // 未命中缓存：先以日期/时间垫底，异步完成后平滑淡入更新
+            captionTitle = date
+            captionSubtitle = time
 
-        captionResolver.resolveAddress(of: photo.asset) { address in
-            // 竞态守卫：快速切换素材后，迟到的地址只应用于当前素材
-            guard photo.id == currentPhotoID else { return }
-            // 地址缺失或为空串：维持无地址规则（日期/时间），主标题不出现空白
-            guard let address, !address.isEmpty else { return }
-            captionTitle = address
-            captionSubtitle = "\(date) \(time)"
+            captionResolver.resolveAddress(of: photo.asset) { address in
+                // 竞态守卫：快速切换素材后，迟到的地址只应用于当前素材
+                guard photo.id == currentPhotoID else { return }
+                // 地址缺失或为空串：维持无地址规则（日期/时间），主标题不出现空白
+                guard let address, !address.isEmpty else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    captionTitle = address
+                    captionSubtitle = "\(date) \(time)"
+                }
+            }
+        }
+    }
+
+    /// 预热相邻素材的数据缓存（包括地理位置地址与相似照片快照），
+    /// 保证用户左右滑动切换到相邻照片时，标题和相关推荐能瞬间（0ms）显示，避免出现转圈或闪烁。
+    private func prewarmNeighbors() {
+        guard let currentIndex = photos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
+        let prevIndex = currentIndex - 1
+        let nextIndex = currentIndex + 1
+        let neighbors = [prevIndex, nextIndex].compactMap { idx in
+            photos.indices.contains(idx) ? photos[idx] : nil
+        }
+        for neighbor in neighbors {
+            PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
+        }
+        Task(priority: .utility) {
+            for neighbor in neighbors {
+                _ = await PhotoSimilarityMatcher.shared.cachedSnapshot(to: neighbor.asset)
+            }
         }
     }
 
@@ -506,7 +533,9 @@ struct FullscreenPhotoBrowser: View {
     /// （切换照片/页面消失 → onCancel → matcher.cancel）
     private func loadRelatedPhotos() async {
         guard let photo = currentPhoto else {
-            relatedState = .hidden
+            withAnimation(.easeInOut(duration: 0.25)) {
+                relatedState = .hidden
+            }
             return
         }
 
@@ -518,11 +547,15 @@ struct FullscreenPhotoBrowser: View {
         if let snapshot = matcher.cachedSnapshotSync(to: photo.asset) {
             let newState: RelatedPhotosState = snapshot.isEmpty ? .empty : .loaded(snapshot)
             if newState != relatedState {
-                relatedState = newState
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    relatedState = newState
+                }
             }
         } else if case .loaded = relatedState {
             // 内存库尚未就绪且已有展示（上一张的快照不再适用）→ 亮骨架过渡
-            relatedState = .loading
+            withAnimation(.easeInOut(duration: 0.25)) {
+                relatedState = .loading
+            }
         }
 
         // 后台全量扫描定稿：有特征缓存时近乎瞬时；结果与已展示一致时跳过重写
@@ -534,23 +567,27 @@ struct FullscreenPhotoBrowser: View {
             }
         } onCancel: {
             // 页面消失/素材已切换：中止后台扫描（回调 .cancelled，旧协程随即退出）
-            matcher.cancel()
+            Task { @MainActor in
+                matcher.cancel()
+            }
         }
 
         // 任务已被取代：状态由新一轮任务接管，此处不再写入（防旧结果覆盖新素材）
         guard !Task.isCancelled else { return }
 
-        if result.1 != nil {
-            // 匹配失败（权限不足/基准图不可提取/已取消）：静默隐藏列表区域，
-            // 不弹窗打扰主图浏览
-            relatedState = .hidden
-        } else if result.0.isEmpty {
-            relatedState = .empty
-        } else if case .loaded(let shown) = relatedState,
-                  shown.map(\.localIdentifier) == result.0.map(\.localIdentifier) {
-            // 与已展示内容完全一致：跳过重写，避免列表无谓重绘闪动
-        } else {
-            relatedState = .loaded(result.0)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if result.1 != nil {
+                // 匹配失败（权限不足/基准图不可提取/已取消）：静默隐藏列表区域，
+                // 不弹窗打扰主图浏览
+                relatedState = .hidden
+            } else if result.0.isEmpty {
+                relatedState = .empty
+            } else if case .loaded(let shown) = relatedState,
+                      shown.map(\.localIdentifier) == result.0.map(\.localIdentifier) {
+                // 与已展示内容完全一致：跳过重写，避免列表无谓重绘闪动
+            } else {
+                relatedState = .loaded(result.0)
+            }
         }
     }
 
@@ -689,6 +726,7 @@ private struct RelatedPhotosSection: View {
                         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 8)
@@ -727,3 +765,5 @@ private struct RelatedPhotosSection: View {
         return columns
     }
 }
+
+

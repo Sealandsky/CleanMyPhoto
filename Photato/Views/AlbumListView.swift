@@ -29,7 +29,7 @@ struct AlbumListView: View {
                 .padding(.bottom, 90)
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 

@@ -108,7 +108,7 @@ struct PhotoListView: View {
                         .onChange(of: geo.size.height) { _, h in scrollViewHeight = h }
                 }
             )
-            .background(Color(UIColor.systemBackground))
+            .background(Color(UIColor.systemGroupedBackground))
             .coordinateSpace(name: "scrollView")
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
                 scrollOffset = offset

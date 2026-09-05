@@ -196,51 +196,8 @@ final class PhotoSimilarityMatcher {
     ) -> [PHAsset]? {
         let baseID = base.localIdentifier
         storeLock.lock()
-        if let memo = snapshotMemo[baseID] {
-            storeLock.unlock()
-            return memo
-        }
-        let storeReady = featureStore != nil
-        storeLock.unlock()
-        guard storeReady else { return nil }
-
-        guard let basePrint = cachedObservation(for: base) else {
-            storeLock.lock()
-            snapshotMemo[baseID] = []
-            storeLock.unlock()
-            return []
-        }
-
-        let fetchOptions = PHFetchOptions()
-        fetchOptions.predicate = NSPredicate(
-            format: "mediaType == %d", PHAssetMediaType.image.rawValue
-        )
-        let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
-
-        var scored: [(asset: PHAsset, distance: Float)] = []
-        fetchResult.enumerateObjects { [weak self] asset, _, _ in
-            guard let self, asset.localIdentifier != baseID else { return }
-            storeLock.lock()
-            let feature = featureStore?[asset.localIdentifier]
-            storeLock.unlock()
-            guard let feature, feature.modificationDate == asset.modificationDate else { return }
-            var distance: Float = .greatestFiniteMagnitude
-            if (try? basePrint.computeDistance(&distance, to: feature.observation)) != nil,
-               distance <= maxDistance {
-                scored.append((asset, distance))
-            }
-        }
-
-        let results = Array(scored
-            .sorted { $0.distance < $1.distance }
-            .prefix(max(0, topN))
-            .map(\.asset)
-            .filter { $0.localIdentifier != baseID })
-
-        storeLock.lock()
-        snapshotMemo[baseID] = results
-        storeLock.unlock()
-        return results
+        defer { storeLock.unlock() }
+        return snapshotMemo[baseID]
     }
 
     /// 缓存快照：仅用已缓存的指纹计算相似结果（零图像解码、零 Vision 计算）。
@@ -280,12 +237,15 @@ final class PhotoSimilarityMatcher {
                     }
                 }
 
-                let results = scored
+                let results = Array(scored
                     .sorted { $0.distance < $1.distance }
                     .prefix(max(0, topN))
                     .map(\.asset)
-                    .filter { $0.localIdentifier != baseID }
-                continuation.resume(returning: Array(results))
+                    .filter { $0.localIdentifier != baseID })
+                self.storeLock.lock()
+                self.snapshotMemo[baseID] = results
+                self.storeLock.unlock()
+                continuation.resume(returning: results)
             }
         }
     }

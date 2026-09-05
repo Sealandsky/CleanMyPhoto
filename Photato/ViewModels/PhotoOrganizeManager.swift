@@ -319,20 +319,20 @@ final class PhotoOrganizeManager {
         scanResults[category]?.flatMap { $0.localIdentifiers } ?? []
     }
 
-    // MARK: - Scan: Large Files (two-pass: metadata filter → size check)
+    // MARK: - Scan: Large Files (Option A: >= 10MB, or >= 24MP & >= 6MB)
+
+    static let minLargeFileSize: Int64 = 10 * 1024 * 1024       // 10MB 绝对门槛
+    static let highResThreshold: Int = 6000 * 4000              // 2400 万像素 (如 iPhone 24MP/48MP/全景)
+    static let highResMinSize: Int64 = 6 * 1024 * 1024          // 6MB (高像素下的体积门槛)
 
     private func scanLargeFiles(from fetchResult: PHFetchResult<PHAsset>) async {
-        // Pass 1: collect high-res candidates (metadata only)
-        var candidates: [(identifier: String, asset: PHAsset)] = []
+        // 收集所有静态图片资产
+        var candidates: [(identifier: String, asset: PHAsset, resolution: Int)] = []
         fetchResult.enumerateObjects { asset, _, _ in
             guard asset.mediaType == .image else { return }
-            let megapixels = Double(asset.pixelWidth * asset.pixelHeight)
-            if megapixels > 4000.0 * 4000.0 {
-                candidates.append((asset.localIdentifier, asset))
-            }
+            candidates.append((asset.localIdentifier, asset, asset.pixelWidth * asset.pixelHeight))
         }
 
-        // Pass 2: fetch sizes for candidates only
         var sized: [(identifier: String, size: Int64)] = []
         let total = candidates.count
         let startProgress: Double = 1.0 / 6.0
@@ -341,8 +341,12 @@ final class PhotoOrganizeManager {
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
             analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+
             let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
-            sized.append((candidate.identifier, size))
+            // 判定条件：真实大小 >= 10MB，或者超高分辨率(>=24MP)且大小 >= 6MB
+            if size >= Self.minLargeFileSize || (candidate.resolution >= Self.highResThreshold && size >= Self.highResMinSize) {
+                sized.append((candidate.identifier, size))
+            }
         }
 
         let sorted = sized.sorted { $0.size > $1.size }
@@ -387,25 +391,29 @@ final class PhotoOrganizeManager {
 
     // MARK: - Paginated Category Loading
 
-    func loadCategory(_ category: OrganizeCategory) async {
-        if categoryPageStates[category]?.hasMore == false || !(categoryPageStates[category]?.groups.isEmpty ?? true) {
-            return
+    func isCategoryLoaded(_ category: OrganizeCategory) -> Bool {
+        guard let state = categoryPageStates[category] else { return false }
+        if state.isLoading { return true }
+        if category == .similar || category == .duplicates {
+            return !state.groups.isEmpty || !state.hasMore
+        } else {
+            return !state.loadedPhotos.isEmpty || !state.hasMore
         }
+    }
+
+    func loadCategory(_ category: OrganizeCategory) async {
+        guard !isCategoryLoaded(category) else { return }
 
         var state = OrganizeCategoryPageState()
         let groups = scanResults[category] ?? []
         state.allIdentifiers = identifiers(for: category)
 
         if category == .similar || category == .duplicates {
-            state.groups = groups.map { group in
-                OrganizeGroupDisplay(
-                    id: group.id,
-                    title: group.title,
-                    localIdentifiers: group.localIdentifiers
-                )
-            }
+            state.hasMore = !groups.isEmpty
             categoryPageStates[category] = state
-            await loadAllGroupPhotos(for: category)
+            if state.hasMore {
+                await loadMoreGroups(for: category)
+            }
         } else {
             state.hasMore = !state.allIdentifiers.isEmpty
             categoryPageStates[category] = state
@@ -415,66 +423,108 @@ final class PhotoOrganizeManager {
         }
     }
 
-    // MARK: - Grouped Loading (similar/duplicates)
+    // MARK: - Grouped Loading (similar/duplicates 分批按需加载)
 
-    private func loadAllGroupPhotos(for category: OrganizeCategory) async {
-        guard var state = categoryPageStates[category] else { return }
-
-        let allIdentifiers = state.allIdentifiers
-        guard !allIdentifiers.isEmpty else { return }
+    func loadMoreGroups(for category: OrganizeCategory) async {
+        guard var state = categoryPageStates[category],
+              state.hasMore,
+              !state.isLoading else { return }
 
         state.isLoading = true
         categoryPageStates[category] = state
 
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: allIdentifiers, options: nil)
+        let scanGroups = scanResults[category] ?? []
+        let startIndex = state.groups.count
+        let endIndex = min(startIndex + OrganizeCategoryPageState.groupBatchSize, scanGroups.count)
+
+        guard startIndex < scanGroups.count else {
+            state.hasMore = false
+            state.isLoading = false
+            categoryPageStates[category] = state
+            return
+        }
+
+        let groupsToLoad = Array(scanGroups[startIndex..<endIndex])
+        let batchIdentifiers = groupsToLoad.flatMap { $0.localIdentifiers }
+
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: batchIdentifiers, options: nil)
         var assetMap: [String: PHAsset] = [:]
         fetchResult.enumerateObjects { asset, _, _ in
             assetMap[asset.localIdentifier] = asset
         }
 
-        // Fetch all sizes in parallel
-        let allAssets = allIdentifiers.compactMap { assetMap[$0] }
-        let sizeMap: [String: Int64] = await withTaskGroup(of: (String, Int64).self, returning: [String: Int64].self) { group in
-            for asset in allAssets {
-                group.addTask { [similarityManager] in
-                    let size = await similarityManager.getOrFetchFileSize(for: asset)
-                    return (asset.localIdentifier, size)
-                }
-            }
-            var result: [String: Int64] = [:]
-            for await (id, size) in group {
-                result[id] = size
-            }
-            return result
-        }
+        var newGroups: [OrganizeGroupDisplay] = []
+        var newPhotos: [PhotoAsset] = []
 
-        for i in 0..<state.groups.count {
-            var group = state.groups[i]
+        for scanGroup in groupsToLoad {
+            var displayGroup = OrganizeGroupDisplay(
+                id: scanGroup.id,
+                title: scanGroup.title,
+                localIdentifiers: scanGroup.localIdentifiers
+            )
 
-            for identifier in group.localIdentifiers {
+            for identifier in scanGroup.localIdentifiers {
                 if let asset = assetMap[identifier] {
-                    group.loadedPhotos.append(PhotoAsset(asset: asset))
+                    let photoAsset = PhotoAsset(asset: asset)
+                    displayGroup.loadedPhotos.append(photoAsset)
+                    newPhotos.append(photoAsset)
                 }
             }
 
-            if let best = group.loadedPhotos.max(by: {
+            if let best = displayGroup.loadedPhotos.max(by: {
                 $0.asset.pixelWidth * $0.asset.pixelHeight < $1.asset.pixelWidth * $1.asset.pixelHeight
             }) {
-                group.bestPhotoId = best.id
+                displayGroup.bestPhotoId = best.id
             }
 
-            group.totalSize = group.loadedPhotos.reduce(Int64(0)) { $0 + (sizeMap[$1.id] ?? 0) }
-            state.groups[i] = group
+            newGroups.append(displayGroup)
         }
 
-        state.loadedPhotos = state.groups.flatMap { $0.loadedPhotos }
-        state.hasMore = false
+        state.groups.append(contentsOf: newGroups)
+        state.loadedPhotos.append(contentsOf: newPhotos)
+        state.currentPage += 1
+        state.hasMore = endIndex < scanGroups.count
         state.isLoading = false
         categoryPageStates[category] = state
+
+        // 异步后台补齐这批分组的大小，不阻塞主线程上屏
+        let groupIdsToFill = newGroups.map { $0.id }
+        Task { [weak self] in
+            await self?.fillGroupSizes(for: category, targetGroupIds: groupIdsToFill)
+        }
+    }
+
+    /// 后台补齐各组合计大小：异步低优先级逐张读缓存尺寸，平滑更新
+    private func fillGroupSizes(for category: OrganizeCategory, targetGroupIds: [String]) async {
+        guard var state = categoryPageStates[category] else { return }
+        let targetSet = Set(targetGroupIds)
+
+        for i in 0..<state.groups.count {
+            if targetSet.contains(state.groups[i].id) && state.groups[i].totalSize == 0 {
+                var total: Int64 = 0
+                for photo in state.groups[i].loadedPhotos {
+                    total += await similarityManager.getOrFetchFileSize(for: photo.asset)
+                }
+                state.groups[i].totalSize = total
+                categoryPageStates[category] = state
+            }
+        }
     }
 
     func groups(for category: OrganizeCategory) -> [OrganizeGroupDisplay] {
         categoryPageStates[category]?.groups ?? []
+    }
+
+    func hasMoreGroups(for category: OrganizeCategory) -> Bool {
+        categoryPageStates[category]?.hasMore ?? false
+    }
+
+    func loadMore(for category: OrganizeCategory) async {
+        if category == .similar || category == .duplicates {
+            await loadMoreGroups(for: category)
+        } else {
+            await loadMorePhotos(for: category)
+        }
     }
 
     // MARK: - Flat Loading (screenshots, large files, low quality)
@@ -533,5 +583,30 @@ final class PhotoOrganizeManager {
 
     func clearCategoryState(_ category: OrganizeCategory) {
         categoryPageStates.removeValue(forKey: category)
+    }
+
+    /// 全屏收藏切换后同步状态，保证返回列表后心形角标与数据源一致
+    func updateFavorite(photoID: String, isFavorite: Bool) {
+        for category in categoryPageStates.keys {
+            guard var state = categoryPageStates[category] else { continue }
+            var changed = false
+            for i in 0..<state.loadedPhotos.count {
+                if state.loadedPhotos[i].id == photoID {
+                    state.loadedPhotos[i].isFavorite = isFavorite
+                    changed = true
+                }
+            }
+            for i in 0..<state.groups.count {
+                for j in 0..<state.groups[i].loadedPhotos.count {
+                    if state.groups[i].loadedPhotos[j].id == photoID {
+                        state.groups[i].loadedPhotos[j].isFavorite = isFavorite
+                        changed = true
+                    }
+                }
+            }
+            if changed {
+                categoryPageStates[category] = state
+            }
+        }
     }
 }

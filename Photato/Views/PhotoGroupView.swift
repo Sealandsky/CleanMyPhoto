@@ -59,7 +59,7 @@ struct PhotoGroupView: View {
                 .scrollIndicators(.hidden)  // 隐藏滚动条
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemGroupedBackground))
         .task {
             if albumManager.yearAlbums.isEmpty {
                 await albumManager.fetchYearAlbums()
@@ -188,7 +188,7 @@ struct SystemMonthPhotosView: View {
                 }
                 .padding(.horizontal, 4)
             }
-            .background(Color(UIColor.systemBackground))
+            .background(Color(UIColor.systemGroupedBackground))
             .onAppear {
                 monthSizeText = SizeCache.load("month_\(monthAlbum.id)") ?? ""
                 if let photoID = scrollToPhotoID {
@@ -216,7 +216,6 @@ struct SystemMonthPhotosView: View {
         .navigationBarTitleDisplayMode(selectionManager.isSelectMode ? .inline : .large)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if selectionManager.isSelectMode {

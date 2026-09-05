@@ -63,4 +63,11 @@ class AlbumManager: ObservableObject {
     var displayedAlbumPhotos: [PhotoAsset] {
         currentAlbumPhotos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
+
+    /// 全屏收藏切换后同步相簿照片状态
+    func updateFavorite(photoID: String, isFavorite: Bool) {
+        if let idx = currentAlbumPhotos.firstIndex(where: { $0.id == photoID }) {
+            currentAlbumPhotos[idx].isFavorite = isFavorite
+        }
+    }
 }
