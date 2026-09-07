@@ -171,10 +171,17 @@ struct OrganizeResultsView: View {
         ScrollView {
             subtitleView
             if dateSections.isEmpty && allPhotos.isEmpty {
-                if organizeManager.isLoadingPhotos(for: category) {
-                    ProgressView()
-                        .tint(.primary)
-                        .frame(maxWidth: .infinity, minHeight: 200)
+                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.regular)
+                        Text(organizeManager.isAnalyzing && !organizeManager.currentStep.isEmpty
+                             ? organizeManager.currentStep
+                             : String(localized: "Scanning for similar photos..."))
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 220)
                 } else {
                     groupedEmptyView
                 }
@@ -203,16 +210,33 @@ struct OrganizeResultsView: View {
     }
 
     private var groupedEmptyView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 26, design: .rounded))
+                .font(.system(size: 32, design: .rounded))
                 .foregroundColor(Color(.tertiaryLabel))
-            Text(String(localized: "No similar photos yet"))
+            Text(category == .similar
+                 ? String(localized: "No similar photos yet")
+                 : String(localized: "No duplicate photos yet"))
                 .font(.system(.subheadline, design: .rounded))
                 .foregroundColor(.secondary)
+
+            if !organizeManager.isAnalyzing {
+                Button {
+                    organizeManager.startFullAnalysis()
+                } label: {
+                    Text(String(localized: "Scan Now"))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
+        .padding(.vertical, 40)
     }
 
     // MARK: - Flat Body (screenshots, large files, low quality)
@@ -221,10 +245,17 @@ struct OrganizeResultsView: View {
         ScrollView {
             subtitleView
             if dateSections.isEmpty && allPhotos.isEmpty {
-                if organizeManager.isLoadingPhotos(for: category) {
-                    ProgressView()
-                        .tint(.primary)
-                        .frame(maxWidth: .infinity, minHeight: 200)
+                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.regular)
+                        Text(organizeManager.isAnalyzing && !organizeManager.currentStep.isEmpty
+                             ? organizeManager.currentStep
+                             : String(localized: "Loading..."))
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 220)
                 } else {
                     flatEmptyView
                 }

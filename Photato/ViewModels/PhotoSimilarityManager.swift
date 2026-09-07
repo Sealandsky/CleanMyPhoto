@@ -177,19 +177,23 @@ final class PhotoSimilarityManager {
 
     // MARK: - Similar & Duplicate Groups
 
-    func similarAndDuplicateGroups(skipValidation: Bool = false) -> (similar: [OrganizeScanGroup], duplicates: [OrganizeScanGroup]) {
+    func similarAndDuplicateGroups(skipValidation: Bool = false) async -> (similar: [OrganizeScanGroup], duplicates: [OrganizeScanGroup]) {
         let fingerprints = loadAllFingerprints()
         guard fingerprints.count > 1 else { return ([], []) }
 
         let validFingerprints = skipValidation ? fingerprints : validateAndClean(fingerprints)
         guard validFingerprints.count > 1 else { return ([], []) }
 
-        return (computeSimilarGroups(from: validFingerprints), computeDuplicateGroups(from: validFingerprints))
+        return await Task.detached(priority: .userInitiated) {
+            let similar = Self.computeSimilarGroups(from: validFingerprints)
+            let duplicates = Self.computeDuplicateGroups(from: validFingerprints)
+            return (similar, duplicates)
+        }.value
     }
 
     // MARK: - Private: Group Computation
 
-    private func computeSimilarGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
+    nonisolated private static func computeSimilarGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
         let sorted = fingerprints.sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
 
         let uf = UnionFind()
@@ -233,7 +237,7 @@ final class PhotoSimilarityManager {
             }
     }
 
-    private func computeDuplicateGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
+    nonisolated private static func computeDuplicateGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
         var groups: [String: [String]] = [:]
         for fp in fingerprints {
             let dateKey: String
@@ -332,7 +336,7 @@ final class PhotoSimilarityManager {
 
     // MARK: - Private: Core Data Helpers
 
-    private struct FingerprintData {
+    private struct FingerprintData: Sendable {
         let localIdentifier: String
         let dhash: String
         let creationDate: Date?
@@ -468,7 +472,7 @@ final class PhotoSimilarityManager {
 
     // MARK: - Hamming Distance
 
-    private static func hammingDistance(_ a: String, _ b: String) -> Int {
+    nonisolated private static func hammingDistance(_ a: String, _ b: String) -> Int {
         guard a.count == b.count else { return Int.max }
         var distance = 0
         for (c1, c2) in zip(a, b) {

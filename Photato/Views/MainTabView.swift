@@ -77,6 +77,11 @@ struct MainTabView: View {
                     // 启动预热：提前把相似照片特征库载入内存，
                     // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
                     PhotoSimilarityMatcher.shared.prewarm()
+
+                    // 后台低优先级预热整理页快速缓存，避免首次切 Tab 时等待
+                    Task(priority: .utility) {
+                        await organizeManager.quickAnalysis()
+                    }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !shouldHideBottomBar {

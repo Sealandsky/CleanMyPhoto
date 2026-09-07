@@ -12,6 +12,7 @@ final class PhotoOrganizeManager {
     var totalPhotoCount: Int = 0
     var categoryPageStates: [OrganizeCategory: OrganizeCategoryPageState] = [:]
     var hasLoadedInitialData = false
+    var isQuickAnalyzing: Bool = false
 
     let similarityManager = PhotoSimilarityManager()
     let qualityAnalyzer = PhotoQualityAnalyzer()
@@ -55,9 +56,15 @@ final class PhotoOrganizeManager {
     // MARK: - Quick Analysis
 
     func quickAnalysis() async {
+        guard !isAnalyzing && !isQuickAnalyzing else { return }
+        isQuickAnalyzing = true
+        defer {
+            isQuickAnalyzing = false
+            hasLoadedInitialData = true
+        }
+
         // 1. Try instant JSON cache load (no Core Data, no computation)
         if loadCacheSummary() {
-            hasLoadedInitialData = true
             return
         }
 
@@ -73,7 +80,7 @@ final class PhotoOrganizeManager {
                 scanResults[.lowQuality] = [lq]
                 categoryStats[.lowQuality] = lq.localIdentifiers.count
             }
-            let (similar, duplicates) = similarityManager.similarAndDuplicateGroups(skipValidation: true)
+            let (similar, duplicates) = await similarityManager.similarAndDuplicateGroups(skipValidation: true)
             if !similar.isEmpty {
                 scanResults[.similar] = similar
                 categoryStats[.similar] = similar.reduce(0) { $0 + $1.localIdentifiers.count }
@@ -94,13 +101,12 @@ final class PhotoOrganizeManager {
 
         let fetchResult = fetchSystemPHAssets()
         totalPhotoCount = fetchResult.count
-        scanMetadataCategories(from: fetchResult)
+        await scanMetadataCategories(from: fetchResult)
 
         // Save cache for next launch
         if totalGroupCount > 0 {
             saveCacheSummary(totalPhotoCount: totalPhotoCount)
         }
-        hasLoadedInitialData = true
     }
 
     // MARK: - JSON Cache
@@ -224,7 +230,7 @@ final class PhotoOrganizeManager {
             let totalSteps: Double = 6
 
             currentStep = String(localized: "Scanning for metadata...")
-            scanMetadataCategories(from: fetchResult)
+            await scanMetadataCategories(from: fetchResult)
             analysisProgress = 1.0 / totalSteps
 
             guard !Task.isCancelled else { return }
@@ -245,7 +251,7 @@ final class PhotoOrganizeManager {
             await similarityManager.computeIfNeeded(assets: fetchResult)
             analysisProgress = 4.0 / totalSteps
 
-            let (similar, duplicates) = similarityManager.similarAndDuplicateGroups()
+            let (similar, duplicates) = await similarityManager.similarAndDuplicateGroups()
             scanResults[.similar] = similar
             categoryStats[.similar] = similar.reduce(0) { $0 + $1.localIdentifiers.count }
             scanResults[.duplicates] = duplicates
@@ -282,20 +288,23 @@ final class PhotoOrganizeManager {
 
     // MARK: - Scan: Metadata Categories (single pass)
 
-    private func scanMetadataCategories(from fetchResult: PHFetchResult<PHAsset>) {
-        var screenshotIds: [String] = []
-        var livePhotoIds: [String] = []
-        var videoIds: [String] = []
+    private func scanMetadataCategories(from fetchResult: PHFetchResult<PHAsset>) async {
+        let (screenshotIds, livePhotoIds, videoIds) = await Task.detached(priority: .userInitiated) {
+            var sIds: [String] = []
+            var lIds: [String] = []
+            var vIds: [String] = []
 
-        fetchResult.enumerateObjects { asset, _, _ in
-            if asset.mediaSubtypes.contains(.photoScreenshot) {
-                screenshotIds.append(asset.localIdentifier)
-            } else if asset.mediaType == .image && asset.mediaSubtypes.contains(.photoLive) {
-                livePhotoIds.append(asset.localIdentifier)
-            } else if asset.mediaType == .video {
-                videoIds.append(asset.localIdentifier)
+            fetchResult.enumerateObjects { asset, _, _ in
+                if asset.mediaSubtypes.contains(.photoScreenshot) {
+                    sIds.append(asset.localIdentifier)
+                } else if asset.mediaType == .image && asset.mediaSubtypes.contains(.photoLive) {
+                    lIds.append(asset.localIdentifier)
+                } else if asset.mediaType == .video {
+                    vIds.append(asset.localIdentifier)
+                }
             }
-        }
+            return (sIds, lIds, vIds)
+        }.value
 
         storeFlatCategory(.screenshots, identifiers: screenshotIds)
         storeFlatCategory(.livePhotos, identifiers: livePhotoIds)
@@ -591,6 +600,19 @@ final class PhotoOrganizeManager {
 
     func isLoadingPhotos(for category: OrganizeCategory) -> Bool {
         categoryPageStates[category]?.isLoading ?? false
+    }
+
+    func isCategoryAnalyzing(_ category: OrganizeCategory) -> Bool {
+        if isAnalyzing { return true }
+        if isQuickAnalyzing && (categoryStats[category] == nil || categoryStats[category] == 0) {
+            return true
+        }
+        return false
+    }
+
+    func isCategoryLoading(_ category: OrganizeCategory) -> Bool {
+        if isCategoryAnalyzing(category) { return true }
+        return categoryPageStates[category]?.isLoading ?? false
     }
 
     func clearCategoryState(_ category: OrganizeCategory) {

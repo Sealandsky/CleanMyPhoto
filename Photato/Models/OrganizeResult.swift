@@ -3,7 +3,7 @@ import Photos
 
 // MARK: - Organize Category
 
-enum OrganizeCategory: String, CaseIterable, Identifiable {
+enum OrganizeCategory: String, CaseIterable, Identifiable, Sendable {
     case similar
     case duplicates
     case screenshots
@@ -65,7 +65,7 @@ enum OrganizeCategory: String, CaseIterable, Identifiable {
 
 // MARK: - Organize Group (lightweight scan result)
 
-struct OrganizeScanGroup: Identifiable {
+struct OrganizeScanGroup: Identifiable, Sendable {
     let id: String
     let category: OrganizeCategory
     let title: String
