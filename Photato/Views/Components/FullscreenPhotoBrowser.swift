@@ -686,7 +686,11 @@ struct FullscreenPhotoBrowser: View {
         }
         relatedBrowsePhotos = deck
         relatedBrowseInitialID = asset.localIdentifier
-        isRelatedDetailActive = true
+        // 种子数据先落定、推入开关下一拍再翻：同帧内同时写入目标内容与
+        // 推入开关，系统会跳过推入转场（新页直接闪现而非从右侧滑入）
+        Task { @MainActor in
+            isRelatedDetailActive = true
+        }
     }
 
     /// 详情滚动回预览区顶部：批次内切换相似照片后主图必须回到视野
