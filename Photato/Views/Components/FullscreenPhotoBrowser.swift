@@ -569,8 +569,8 @@ struct FullscreenPhotoBrowser: View {
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
-        // 预热相邻素材的 600x600 缩略图
-        let targetSize = ScreenSizeHelper.cardThumbnailSize
+        // 1. 预热相邻素材的高清大图缓存，保证切图后迅速获得最高画质
+        let highResSize = ScreenSizeHelper.screenPhysicalSize
         let neighborAssets = neighbors.map(\.asset)
         let imageOptions = PHImageRequestOptions()
         imageOptions.deliveryMode = .opportunistic
@@ -578,30 +578,30 @@ struct FullscreenPhotoBrowser: View {
         imageOptions.isSynchronous = false
         PhotoAssetImageManager.shared.startCachingImages(
             for: neighborAssets,
-            targetSize: targetSize,
+            targetSize: highResSize,
             contentMode: .aspectFit,
             options: imageOptions
         )
 
-        // 核心直存：将前后相邻照片直接加载存入 PhotoImageCache 内存
-        // 保证在用户左右滑动卡片的第一帧，AssetImage 能同步从内存拿到图片，彻底根绝白屏闪烁
+        // 2. 预存相邻素材的过渡缩略图（600x600）到内存 placeholder 缓存
+        // 保证左右滑动切图的第 0 毫秒立即有清晰缩略图垫底展示，随后高清大图平滑替换，彻底杜绝白屏与等待
+        let thumbSize = ScreenSizeHelper.cardThumbnailSize
         for neighbor in neighbors {
-            if PhotoImageCache.shared.get(for: neighbor.id, targetSize: targetSize, isHighQuality: true) == nil {
+            if PhotoImageCache.shared.getPlaceholder(for: neighbor.id) == nil &&
+               PhotoImageCache.shared.get(for: neighbor.id, targetSize: highResSize, isHighQuality: true) == nil {
                 let options = PHImageRequestOptions()
-                options.deliveryMode = .opportunistic
+                options.deliveryMode = .fastFormat
                 options.isNetworkAccessAllowed = true
                 options.isSynchronous = false
                 _ = PhotoAssetImageManager.shared.requestImage(
                     for: neighbor.asset,
-                    targetSize: targetSize,
+                    targetSize: thumbSize,
                     contentMode: .aspectFit,
                     options: options
                 ) { image, _ in
                     if let image = image {
-                        PhotoImageCache.shared.set(
+                        PhotoImageCache.shared.setPlaceholder(
                             for: neighbor.id,
-                            targetSize: targetSize,
-                            isHighQuality: true,
                             image: image
                         )
                     }
