@@ -22,14 +22,7 @@ struct OrganizeResultsView: View {
         self.organizeManager = organizeManager
         self.category = category
         self.photoManager = photoManager
-
-        let initialSections = Self.buildDateSections(
-            category: category,
-            groups: organizeManager.groups(for: category),
-            photos: organizeManager.paginatedPhotos(for: category),
-            pendingDeletionIDs: photoManager.pendingDeletionIDs
-        )
-        self._dateSections = State(initialValue: initialSections)
+        self._dateSections = State(initialValue: [])
     }
 
     private var isGroupedMode: Bool {
@@ -171,7 +164,7 @@ struct OrganizeResultsView: View {
         ScrollView {
             subtitleView
             if dateSections.isEmpty && allPhotos.isEmpty {
-                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) {
+                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) || !organizeManager.isCategoryLoaded(category) {
                     VStack(spacing: 12) {
                         ProgressView()
                             .controlSize(.regular)
@@ -245,7 +238,7 @@ struct OrganizeResultsView: View {
         ScrollView {
             subtitleView
             if dateSections.isEmpty && allPhotos.isEmpty {
-                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) {
+                if organizeManager.isCategoryAnalyzing(category) || organizeManager.isLoadingPhotos(for: category) || !organizeManager.isCategoryLoaded(category) {
                     VStack(spacing: 12) {
                         ProgressView()
                             .controlSize(.regular)

@@ -255,12 +255,7 @@ struct OrganizeView: View {
         let isCategoryLoading = organizeManager.isCategoryLoading(category)
 
         return Button {
-            // 无论当前是否有已缓存结果，点击均立即响应并推进到二级结果页
-            if !organizeManager.isCategoryLoaded(category) {
-                Task {
-                    await organizeManager.loadCategory(category)
-                }
-            }
+            // 点击立即推入二级结果页，不在外层阻滞或抢占加载
             onCategorySelect(category)
         } label: {
             HStack(spacing: 6) {
