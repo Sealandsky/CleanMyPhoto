@@ -231,8 +231,14 @@ struct DraggablePhotoView: View {
         switch photoAsset.mediaType {
         case .video:
             ZStack {
-                AssetImage(asset: photoAsset.asset, targetSize: imageSize, contentMode: .fit, highQuality: true)
-                    .frame(width: size.width, height: size.height)
+                AssetImage(
+                    asset: photoAsset.asset,
+                    targetSize: imageSize,
+                    contentMode: .fit,
+                    highQuality: true,
+                    placeholderColor: Color(UIColor.secondarySystemFill)
+                )
+                .frame(width: size.width, height: size.height)
 
                 if isCurrent {
                     VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
@@ -251,8 +257,14 @@ struct DraggablePhotoView: View {
 
         case .livePhoto:
             ZStack {
-                AssetImage(asset: photoAsset.asset, targetSize: imageSize, contentMode: .fit, highQuality: true)
-                    .frame(width: size.width, height: size.height)
+                AssetImage(
+                    asset: photoAsset.asset,
+                    targetSize: imageSize,
+                    contentMode: .fit,
+                    highQuality: true,
+                    placeholderColor: Color(UIColor.secondarySystemFill)
+                )
+                .frame(width: size.width, height: size.height)
 
                 if isCurrent {
                     LivePhotoPlayerView(asset: photoAsset.asset)
@@ -270,16 +282,22 @@ struct DraggablePhotoView: View {
             .id(photoAsset.id)
 
         default:
-            AssetImage(asset: photoAsset.asset, targetSize: imageSize, contentMode: .fit, highQuality: true)
-                .frame(width: size.width, height: size.height)
-                .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                .frame(width: containerSize.width, height: containerSize.height)
-                .id(photoAsset.id)
+            AssetImage(
+                asset: photoAsset.asset,
+                targetSize: imageSize,
+                contentMode: .fit,
+                highQuality: true,
+                placeholderColor: Color(UIColor.secondarySystemFill)
+            )
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+            .frame(width: containerSize.width, height: containerSize.height)
+            .id(photoAsset.id)
         }
     }
     // MARK: - Gesture Handlers

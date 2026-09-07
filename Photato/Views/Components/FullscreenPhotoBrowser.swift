@@ -187,8 +187,8 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
-            await loadRelatedPhotos()
             prewarmNeighbors()
+            await loadRelatedPhotos()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
         .onChange(of: photos) { oldPhotos, newPhotos in
@@ -557,19 +557,20 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    /// 预热相邻素材的数据缓存（包括地理位置地址与相似照片快照），
-    /// 保证用户左右滑动切换到相邻照片时，标题和相关推荐能瞬间（0ms）显示，避免出现转圈或闪烁。
+    /// 预热相邻素材的数据缓存（包括地理位置地址、相似照片快照与卡片图片），
+    /// 保证用户左右滑动切换到相邻照片时，卡片能瞬间（0ms）显示，彻底消除白屏与二次加载跳动。
     private func prewarmNeighbors() {
         guard let currentIndex = browsePhotos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
-        let prevIndex = currentIndex - 1
-        let nextIndex = currentIndex + 1
-        let neighbors = [prevIndex, nextIndex].compactMap { idx in
+        // 预热前后各 2 张，保证快速连续左右滑动时也能无缝命中内存缓存
+        let neighborIndices = [currentIndex - 2, currentIndex - 1, currentIndex + 1, currentIndex + 2]
+        let neighbors = neighborIndices.compactMap { idx in
             browsePhotos.indices.contains(idx) ? browsePhotos[idx] : nil
         }
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
-        // 预热相邻素材的 600x600 缩略图，保证左右滑动卡片时瞬间直接呈现，杜绝延迟与跳变
+        // 预热相邻素材的 600x600 缩略图
+        let targetSize = ScreenSizeHelper.cardThumbnailSize
         let neighborAssets = neighbors.map(\.asset)
         let imageOptions = PHImageRequestOptions()
         imageOptions.deliveryMode = .opportunistic
@@ -577,10 +578,36 @@ struct FullscreenPhotoBrowser: View {
         imageOptions.isSynchronous = false
         PhotoAssetImageManager.shared.startCachingImages(
             for: neighborAssets,
-            targetSize: ScreenSizeHelper.cardThumbnailSize,
+            targetSize: targetSize,
             contentMode: .aspectFit,
             options: imageOptions
         )
+
+        // 核心直存：将前后相邻照片直接加载存入 PhotoImageCache 内存
+        // 保证在用户左右滑动卡片的第一帧，AssetImage 能同步从内存拿到图片，彻底根绝白屏闪烁
+        for neighbor in neighbors {
+            if PhotoImageCache.shared.get(for: neighbor.id, targetSize: targetSize, isHighQuality: true) == nil {
+                let options = PHImageRequestOptions()
+                options.deliveryMode = .opportunistic
+                options.isNetworkAccessAllowed = true
+                options.isSynchronous = false
+                _ = PhotoAssetImageManager.shared.requestImage(
+                    for: neighbor.asset,
+                    targetSize: targetSize,
+                    contentMode: .aspectFit,
+                    options: options
+                ) { image, _ in
+                    if let image = image {
+                        PhotoImageCache.shared.set(
+                            for: neighbor.id,
+                            targetSize: targetSize,
+                            isHighQuality: true,
+                            image: image
+                        )
+                    }
+                }
+            }
+        }
 
         Task(priority: .utility) {
             for neighbor in neighbors {

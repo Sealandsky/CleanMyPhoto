@@ -60,11 +60,11 @@ final class PhotoImageCache {
 
     func get(for identifier: String, targetSize: CGSize, isHighQuality: Bool) -> UIImage? {
         let key = cacheKey(for: identifier, targetSize: targetSize, isHighQuality: isHighQuality) as NSString
-        if isHighQuality {
-            return highResCache.object(forKey: key)
-        } else {
-            return thumbnailCache.object(forKey: key)
-        }
+        let cached = isHighQuality ? highResCache.object(forKey: key) : thumbnailCache.object(forKey: key)
+        if let cached = cached { return cached }
+        // 容错：若相同 targetSize 但相反 qualityTag 命中，直接复用
+        let fallbackKey = cacheKey(for: identifier, targetSize: targetSize, isHighQuality: !isHighQuality) as NSString
+        return isHighQuality ? thumbnailCache.object(forKey: fallbackKey) : highResCache.object(forKey: fallbackKey)
     }
 
     /// 获取该素材最近可用的清晰占位图（用于进入大图时平滑过渡，避免马赛克）
@@ -184,13 +184,13 @@ struct AssetImage: View {
     let targetSize: CGSize
     let contentMode: ContentMode
     var highQuality: Bool = false
-    var placeholderColor: Color = .white
+    var placeholderColor: Color = Color(UIColor.secondarySystemFill)
     var onLoad: (() -> Void)? = nil
 
     /// 最终显示的高清大图或缩略图
     @State private var image: UIImage?
     /// 是否处于加载中（图像尚未加载完成）
-    @State private var isLoading = false
+    @State private var isLoading: Bool
     @State private var currentRequestID: PHImageRequestID? = nil
 
     init(
@@ -198,7 +198,7 @@ struct AssetImage: View {
         targetSize: CGSize,
         contentMode: ContentMode = .fit,
         highQuality: Bool = false,
-        placeholderColor: Color = .white,
+        placeholderColor: Color = Color(UIColor.secondarySystemFill),
         onLoad: (() -> Void)? = nil
     ) {
         self.asset = asset
@@ -207,6 +207,11 @@ struct AssetImage: View {
         self.highQuality = highQuality
         self.placeholderColor = placeholderColor
         self.onLoad = onLoad
+
+        // 核心同步初始化：若内存缓存已命中，第 0 帧直接渲染图像，绝不出现白屏或空白闪烁
+        let initialCached = PhotoImageCache.shared.get(for: asset.localIdentifier, targetSize: targetSize, isHighQuality: highQuality)
+        _image = State(initialValue: initialCached)
+        _isLoading = State(initialValue: initialCached == nil)
     }
 
     private var phContentMode: PHImageContentMode {
@@ -215,7 +220,7 @@ struct AssetImage: View {
 
     var body: some View {
         ZStack {
-            // 兜底色
+            // 兜底色（默认使用系统次级填充底色，不使用纯白，暗黑与浅色模式皆温和自然）
             placeholderColor
 
             // 主图层：就绪时直接展示清晰图像，淡入平滑过渡，彻底杜绝从模糊到清晰的跳变体验
@@ -240,10 +245,17 @@ struct AssetImage: View {
         .onDisappear {
             cancelActiveRequests()
         }
-        .onChange(of: asset.localIdentifier) { _, _ in
+        .onChange(of: asset.localIdentifier) { _, newID in
             cancelActiveRequests()
-            image = nil
-            checkCacheAndLoad()
+            // 素材切换时，若内存已有缓存则平滑同步直切，不赋 nil 引发白屏跳动
+            if let cached = PhotoImageCache.shared.get(for: newID, targetSize: targetSize, isHighQuality: highQuality) {
+                image = cached
+                isLoading = false
+                onLoad?()
+            } else {
+                image = nil
+                checkCacheAndLoad()
+            }
         }
     }
 
@@ -265,10 +277,7 @@ struct AssetImage: View {
             image = cached
             isLoading = false
             onLoad?()
-            // 如果是普通缩略图且已命中，无需再次发起 PhotoKit 异步请求
-            if !highQuality {
-                return
-            }
+            return
         }
 
         loadImage()
