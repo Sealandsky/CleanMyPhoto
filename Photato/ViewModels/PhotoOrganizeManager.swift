@@ -26,6 +26,18 @@ final class PhotoOrganizeManager {
         categoryStats[category] ?? 0
     }
 
+    /// 废片数量：给定功能分类下去重后的唯一照片数。
+    /// 分类之间互相重叠（如重复组几乎必然也在相似组里，一张模糊截图同时
+    /// 计入截图与模糊），简单求和会重复计数导致废片数大于照片总数，
+    /// 因此按 localIdentifier 取并集口径
+    func uniqueJunkCount(categories: [OrganizeCategory]) -> Int {
+        var ids = Set<String>()
+        for category in categories {
+            ids.formUnion(identifiers(for: category))
+        }
+        return ids.count
+    }
+
     // MARK: - Fetch System Photos (returns raw PHFetchResult, no wrapping)
 
     private func fetchSystemPHAssets() -> PHFetchResult<PHAsset> {
