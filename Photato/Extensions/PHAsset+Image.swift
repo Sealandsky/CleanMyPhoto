@@ -16,18 +16,161 @@ import Combine
 @MainActor
 final class PhotoImageCache {
     static let shared = PhotoImageCache()
-    private let cache = NSCache<NSString, UIImage>()
+
+    /// 缩略图缓存：条目多但单张体积小，以数量和 60MB 上限控制
+    private let thumbnailCache = NSCache<NSString, UIImage>()
+    /// 高清大图缓存：单张体积大（全屏多达 10~30MB 解码像素），限制在 120MB 和 15 张
+    private let highResCache = NSCache<NSString, UIImage>()
+    /// 记录最近访问过的缩略图，支持快速跨模式垫底
+    private let anyThumbnailMap = NSCache<NSString, UIImage>()
 
     init() {
-        cache.countLimit = 100
+        thumbnailCache.countLimit = 300
+        thumbnailCache.totalCostLimit = 60 * 1024 * 1024
+
+        highResCache.countLimit = 15
+        highResCache.totalCostLimit = 120 * 1024 * 1024
+
+        anyThumbnailMap.countLimit = 200
+
+        // 监听系统内存告警，及时释放内存压力
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearAll()
+        }
     }
 
+    private func cacheKey(for identifier: String, targetSize: CGSize, isHighQuality: Bool) -> String {
+        let roundedW = Int(targetSize.width.rounded())
+        let roundedH = Int(targetSize.height.rounded())
+        let qualityTag = isHighQuality ? "HQ" : "THUMB"
+        return "\(identifier)_\(roundedW)x\(roundedH)_\(qualityTag)"
+    }
+
+    private func calculateCost(for image: UIImage) -> Int {
+        if let cgImage = image.cgImage {
+            return cgImage.bytesPerRow * cgImage.height
+        }
+        return Int(image.size.width * image.size.height * 4)
+    }
+
+    func get(for identifier: String, targetSize: CGSize, isHighQuality: Bool) -> UIImage? {
+        let key = cacheKey(for: identifier, targetSize: targetSize, isHighQuality: isHighQuality) as NSString
+        if isHighQuality {
+            return highResCache.object(forKey: key)
+        } else {
+            return thumbnailCache.object(forKey: key)
+        }
+    }
+
+    /// 获取该素材任意可用的缩略图（用于进入大图时零等待首帧展示）
+    func getAnyThumbnail(for identifier: String) -> UIImage? {
+        anyThumbnailMap.object(forKey: identifier as NSString)
+    }
+
+    func set(for identifier: String, targetSize: CGSize, isHighQuality: Bool, image: UIImage) {
+        let key = cacheKey(for: identifier, targetSize: targetSize, isHighQuality: isHighQuality) as NSString
+        let cost = calculateCost(for: image)
+        if isHighQuality {
+            highResCache.setObject(image, forKey: key, cost: cost)
+        } else {
+            thumbnailCache.setObject(image, forKey: key, cost: cost)
+            anyThumbnailMap.setObject(image, forKey: identifier as NSString, cost: cost)
+        }
+    }
+
+    // 兼容旧接口
     func get(_ identifier: String) -> UIImage? {
-        cache.object(forKey: identifier as NSString)
+        getAnyThumbnail(for: identifier)
     }
 
     func set(_ identifier: String, image: UIImage) {
-        cache.setObject(image, forKey: identifier as NSString)
+        let cost = calculateCost(for: image)
+        anyThumbnailMap.setObject(image, forKey: identifier as NSString, cost: cost)
+    }
+
+    func clearAll() {
+        thumbnailCache.removeAllObjects()
+        highResCache.removeAllObjects()
+        anyThumbnailMap.removeAllObjects()
+    }
+}
+
+// MARK: - Centralized PhotoKit Image Manager
+final class PhotoAssetImageManager: @unchecked Sendable {
+    static let shared = PhotoAssetImageManager()
+
+    let cachingManager = PHCachingImageManager()
+
+    private init() {
+        // 关闭高分辨率图像缓存可以减少后台无用全分辨率预热内存
+        cachingManager.allowsCachingHighQualityImages = false
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.cachingManager.stopCachingImagesForAllAssets()
+        }
+    }
+
+    func requestImage(
+        for asset: PHAsset,
+        targetSize: CGSize,
+        contentMode: PHImageContentMode,
+        options: PHImageRequestOptions?,
+        resultHandler: @escaping (UIImage?, [AnyHashable: Any]?) -> Void
+    ) -> PHImageRequestID {
+        cachingManager.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: contentMode,
+            options: options,
+            resultHandler: resultHandler
+        )
+    }
+
+    func cancelRequest(_ requestID: PHImageRequestID?) {
+        guard let requestID = requestID, requestID != PHInvalidImageRequestID else { return }
+        cachingManager.cancelImageRequest(requestID)
+    }
+
+    func startCachingImages(
+        for assets: [PHAsset],
+        targetSize: CGSize,
+        contentMode: PHImageContentMode,
+        options: PHImageRequestOptions?
+    ) {
+        guard !assets.isEmpty else { return }
+        cachingManager.startCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: contentMode,
+            options: options
+        )
+    }
+
+    func stopCachingImages(
+        for assets: [PHAsset],
+        targetSize: CGSize,
+        contentMode: PHImageContentMode,
+        options: PHImageRequestOptions?
+    ) {
+        guard !assets.isEmpty else { return }
+        cachingManager.stopCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: contentMode,
+            options: options
+        )
+    }
+
+    func stopCachingImagesForAllAssets() {
+        cachingManager.stopCachingImagesForAllAssets()
     }
 }
 
@@ -43,6 +186,8 @@ struct AssetImage: View {
     @State private var image: UIImage?
     /// 缩略图/高清均未就绪时为 true（展示 loading 指示器）
     @State private var isLoading = false
+    @State private var currentRequestID: PHImageRequestID? = nil
+    @State private var thumbnailRequestID: PHImageRequestID? = nil
 
     init(
         asset: PHAsset,
@@ -58,6 +203,10 @@ struct AssetImage: View {
         self.highQuality = highQuality
         self.placeholderColor = placeholderColor
         self.onLoad = onLoad
+    }
+
+    private var phContentMode: PHImageContentMode {
+        contentMode == .fill ? .aspectFill : .aspectFit
     }
 
     var body: some View {
@@ -79,23 +228,52 @@ struct AssetImage: View {
             }
         }
         .onAppear {
-            if let cached = PhotoImageCache.shared.get(asset.localIdentifier) {
-                image = cached
-                onLoad?()
-            }
-            loadImage()
+            checkCacheAndLoad()
         }
-        .onChange(of: asset.localIdentifier) { _, newID in
-            // 切换图片：清掉属于旧照片的画面（禁止拿别的图片当占位），
-            // 命中缓存则立即显示本图缩略，否则走「缩略图先行 → 高清替换」
+        .onDisappear {
+            cancelActiveRequests()
+        }
+        .onChange(of: asset.localIdentifier) { _, _ in
+            cancelActiveRequests()
             image = nil
-            isLoading = true
-            if let cached = PhotoImageCache.shared.get(newID) {
-                image = cached
-                onLoad?()
-            }
-            loadImage()
+            checkCacheAndLoad()
         }
+    }
+
+    private func cancelActiveRequests() {
+        if let reqID = currentRequestID {
+            PhotoAssetImageManager.shared.cancelRequest(reqID)
+            currentRequestID = nil
+        }
+        if let thumbReqID = thumbnailRequestID {
+            PhotoAssetImageManager.shared.cancelRequest(thumbReqID)
+            thumbnailRequestID = nil
+        }
+    }
+
+    private func checkCacheAndLoad() {
+        guard asset.localIdentifier.contains("-") else {
+            isLoading = false
+            return
+        }
+
+        // 1. 同步检查内存精确命中
+        if let cached = PhotoImageCache.shared.get(for: asset.localIdentifier, targetSize: targetSize, isHighQuality: highQuality) {
+            image = cached
+            isLoading = false
+            onLoad?()
+            // 如果是普通缩略图且已精确命中，无需再次发起 PhotoKit 异步请求
+            if !highQuality {
+                return
+            }
+        } else if highQuality, let anyThumb = PhotoImageCache.shared.getAnyThumbnail(for: asset.localIdentifier) {
+            // 2. 高清模式下未命中大图，但已有任意小图缓存时，先行展示小图垫底，不转菊花
+            image = anyThumb
+            isLoading = false
+            onLoad?()
+        }
+
+        loadImage()
     }
 
     private func loadImage() {
@@ -103,57 +281,77 @@ struct AssetImage: View {
             isLoading = false
             return
         }
-        // 尚无任何可显示内容时展示 loading
         isLoading = (image == nil)
 
-        // 缩略图先行：高清大图解码期间先用小图占位。
-        // fastFormat 不写 PhotoImageCache，避免低清帧污染高清缓存；
-        // image 非空（缓存/高清已到）时丢弃迟到的缩略图，防止画面回退
-        if highQuality {
-            let thumbnailOptions = PHImageRequestOptions()
-            thumbnailOptions.deliveryMode = .fastFormat
-            thumbnailOptions.isNetworkAccessAllowed = true
-            thumbnailOptions.isSynchronous = false
+        // 高清先行缩略图：若无任何小图可显示，先发轻量小图请求垫底
+        if highQuality && image == nil {
+            let thumbOptions = PHImageRequestOptions()
+            thumbOptions.deliveryMode = .fastFormat
+            thumbOptions.isNetworkAccessAllowed = true
+            thumbOptions.isSynchronous = false
 
-            PHImageManager.default().requestImage(
+            thumbnailRequestID = PhotoAssetImageManager.shared.requestImage(
                 for: asset,
-                targetSize: CGSize(width: 600, height: 600),
+                targetSize: CGSize(width: 400, height: 400),
                 contentMode: .aspectFill,
-                options: thumbnailOptions
+                options: thumbOptions
             ) { [self] thumbnail, _ in
-                Task { @MainActor in
-                    if image == nil, let thumbnail {
-                        image = thumbnail
-                        onLoad?()
+                let updateUI = {
+                    if self.image == nil, let thumbnail = thumbnail {
+                        self.image = thumbnail
+                        self.onLoad?()
                     }
+                }
+                if Thread.isMainThread {
+                    updateUI()
+                } else {
+                    DispatchQueue.main.async(execute: updateUI)
                 }
             }
         }
 
-        // 高清请求（原有逻辑）
+        // 主请求
         let options = PHImageRequestOptions()
         options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        PHImageManager.default().requestImage(
+        let requestedAssetID = asset.localIdentifier
+        currentRequestID = PhotoAssetImageManager.shared.requestImage(
             for: asset,
-            targetSize: self.targetSize,
-            contentMode: .aspectFit,
+            targetSize: targetSize,
+            contentMode: phContentMode,
             options: options
         ) { [self] resultImage, info in
-            Task { @MainActor in
+            let updateUI = {
+                // 确保回调的 asset 与当前视图一致
+                guard self.asset.localIdentifier == requestedAssetID else { return }
+
                 if let img = resultImage {
                     self.image = img
-                    PhotoImageCache.shared.set(self.asset.localIdentifier, image: img)
-                    self.onLoad?()
+                    let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
+                    // 仅对非低清帧写入内存缓存，避免低清帧覆盖高质量图
+                    if !isDegraded {
+                        PhotoImageCache.shared.set(
+                            for: self.asset.localIdentifier,
+                            targetSize: self.targetSize,
+                            isHighQuality: self.highQuality,
+                            image: img
+                        )
+                        self.onLoad?()
+                    }
                 }
-                // 成功或失败都结束 loading；失败时保持黑色兜底，不回退到其他图片
                 self.isLoading = false
 
                 if let error = info?[PHImageErrorKey] as? Error {
                     print("Image loading error: \(error.localizedDescription)")
                 }
+            }
+
+            if Thread.isMainThread {
+                updateUI()
+            } else {
+                DispatchQueue.main.async(execute: updateUI)
             }
         }
     }

@@ -25,10 +25,14 @@ struct PhotoCell: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // 缩略图按实际渲染尺寸 × 屏幕倍率请求像素：固定 400px 在
-            // 2 列大格/原比例瀑布流下会被拉伸发虚
-            let pixelWidth = min(max(geometry.size.width * displayScale, Self.minPixelEdge), Self.maxPixelEdge)
-            let pixelHeight = min(max(geometry.size.height * displayScale, Self.minPixelEdge), Self.maxPixelEdge)
+            // 缩略图按实际渲染尺寸 × 屏幕倍率请求像素，以 20px 步进向上量化规整，
+            // 消除不同卡片间的浮点亚像素微差，最大化 PhotoKit 与内存缓存命中率
+            let rawWidth = geometry.size.width * displayScale
+            let rawHeight = geometry.size.height * displayScale
+            let quantizedWidth = (rawWidth / 20.0).rounded(.up) * 20.0
+            let quantizedHeight = (rawHeight / 20.0).rounded(.up) * 20.0
+            let pixelWidth = min(max(quantizedWidth, Self.minPixelEdge), Self.maxPixelEdge)
+            let pixelHeight = min(max(quantizedHeight, Self.minPixelEdge), Self.maxPixelEdge)
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
