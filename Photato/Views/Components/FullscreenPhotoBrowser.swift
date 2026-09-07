@@ -569,6 +569,19 @@ struct FullscreenPhotoBrowser: View {
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
+        // 预热相邻素材的高清图像，确保左右滑动卡片时几乎瞬间清晰，避免从模糊到清晰的跨度感
+        let neighborAssets = neighbors.map(\.asset)
+        let imageOptions = PHImageRequestOptions()
+        imageOptions.deliveryMode = .opportunistic
+        imageOptions.isNetworkAccessAllowed = true
+        imageOptions.isSynchronous = false
+        PhotoAssetImageManager.shared.startCachingImages(
+            for: neighborAssets,
+            targetSize: ScreenSizeHelper.screenPhysicalSize,
+            contentMode: .aspectFit,
+            options: imageOptions
+        )
+
         Task(priority: .utility) {
             for neighbor in neighbors {
                 _ = await PhotoSimilarityMatcher.shared.cachedSnapshot(to: neighbor.asset)

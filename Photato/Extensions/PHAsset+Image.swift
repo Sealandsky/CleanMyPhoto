@@ -17,21 +17,22 @@ import Combine
 final class PhotoImageCache {
     static let shared = PhotoImageCache()
 
-    /// 缩略图缓存：条目多但单张体积小，以数量和 60MB 上限控制
+    /// 缩略图/中图缓存：条目较多，控制在 100MB 以内
     private let thumbnailCache = NSCache<NSString, UIImage>()
-    /// 高清大图缓存：单张体积大（全屏多达 10~30MB 解码像素），限制在 120MB 和 15 张
+    /// 高清大图缓存：全屏高清大图，上限 20 张，最大内存占用 150MB
     private let highResCache = NSCache<NSString, UIImage>()
-    /// 记录最近访问过的缩略图，支持快速跨模式垫底
-    private let anyThumbnailMap = NSCache<NSString, UIImage>()
+    /// 记录最近解码过的优质过渡图（尺寸通常在 600~1000px），支持进入大图时清晰平滑垫底
+    private let placeholderMap = NSCache<NSString, UIImage>()
 
     init() {
         thumbnailCache.countLimit = 300
-        thumbnailCache.totalCostLimit = 60 * 1024 * 1024
+        thumbnailCache.totalCostLimit = 100 * 1024 * 1024
 
-        highResCache.countLimit = 15
-        highResCache.totalCostLimit = 120 * 1024 * 1024
+        highResCache.countLimit = 20
+        highResCache.totalCostLimit = 150 * 1024 * 1024
 
-        anyThumbnailMap.countLimit = 200
+        placeholderMap.countLimit = 150
+        placeholderMap.totalCostLimit = 60 * 1024 * 1024
 
         // 监听系统内存告警，及时释放内存压力
         NotificationCenter.default.addObserver(
@@ -66,9 +67,9 @@ final class PhotoImageCache {
         }
     }
 
-    /// 获取该素材任意可用的缩略图（用于进入大图时零等待首帧展示）
-    func getAnyThumbnail(for identifier: String) -> UIImage? {
-        anyThumbnailMap.object(forKey: identifier as NSString)
+    /// 获取该素材最近可用的清晰占位图（用于进入大图时平滑过渡，避免马赛克）
+    func getPlaceholder(for identifier: String) -> UIImage? {
+        placeholderMap.object(forKey: identifier as NSString)
     }
 
     func set(for identifier: String, targetSize: CGSize, isHighQuality: Bool, image: UIImage) {
@@ -78,24 +79,27 @@ final class PhotoImageCache {
             highResCache.setObject(image, forKey: key, cost: cost)
         } else {
             thumbnailCache.setObject(image, forKey: key, cost: cost)
-            anyThumbnailMap.setObject(image, forKey: identifier as NSString, cost: cost)
+        }
+        // 若图片尺寸达到一定清晰度（>= 300px），保留一份作为大图过渡的优质占位底图
+        if max(image.size.width, image.size.height) >= 300 {
+            placeholderMap.setObject(image, forKey: identifier as NSString, cost: cost)
         }
     }
 
     // 兼容旧接口
     func get(_ identifier: String) -> UIImage? {
-        getAnyThumbnail(for: identifier)
+        getPlaceholder(for: identifier)
     }
 
     func set(_ identifier: String, image: UIImage) {
         let cost = calculateCost(for: image)
-        anyThumbnailMap.setObject(image, forKey: identifier as NSString, cost: cost)
+        placeholderMap.setObject(image, forKey: identifier as NSString, cost: cost)
     }
 
     func clearAll() {
         thumbnailCache.removeAllObjects()
         highResCache.removeAllObjects()
-        anyThumbnailMap.removeAllObjects()
+        placeholderMap.removeAllObjects()
     }
 }
 
@@ -106,8 +110,8 @@ final class PhotoAssetImageManager: @unchecked Sendable {
     let cachingManager = PHCachingImageManager()
 
     private init() {
-        // 关闭高分辨率图像缓存可以减少后台无用全分辨率预热内存
-        cachingManager.allowsCachingHighQualityImages = false
+        // 允许高分辨率图像预热缓存，使得全屏滑动浏览相邻照片时能够瞬间呈现清晰图像
+        cachingManager.allowsCachingHighQualityImages = true
 
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -183,11 +187,14 @@ struct AssetImage: View {
     var placeholderColor: Color = .white
     var onLoad: (() -> Void)? = nil
 
+    /// 最终显示的高清大图或缩略图
     @State private var image: UIImage?
-    /// 缩略图/高清均未就绪时为 true（展示 loading 指示器）
+    /// 用于平滑过渡的占位图（来自缓存或高质量中图）
+    @State private var placeholderImage: UIImage?
+    /// 缩略图与占位图均未就绪时为 true
     @State private var isLoading = false
     @State private var currentRequestID: PHImageRequestID? = nil
-    @State private var thumbnailRequestID: PHImageRequestID? = nil
+    @State private var placeholderRequestID: PHImageRequestID? = nil
 
     init(
         asset: PHAsset,
@@ -210,23 +217,33 @@ struct AssetImage: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
+            // 兜底色
+            placeholderColor
+
+            // 占位图层：若已有占位图，在高清图到达前保持稳定展示
+            if let placeholder = placeholderImage {
+                Image(uiImage: placeholder)
+                    .resizable()
+                    .aspectRatio(contentMode: contentMode)
+            }
+
+            // 主图层：就绪时带有平滑淡入效果（0.18s），彻底避免模糊突变至清晰的生硬感
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
-            } else {
-                // 缩略图与高清均未就绪：占位底色 + loading 指示器，
-                // 默认白色底，不回退到其他图片
-                ZStack {
-                    placeholderColor
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: placeholderColor == .black ? .white : Color(.systemGray3)))
-                    }
-                }
+                    .transition(.opacity)
+            }
+
+            // 无任何图可展示时的加载指示器
+            if isLoading && placeholderImage == nil && image == nil {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: placeholderColor == .black ? .white : Color(.systemGray3)))
             }
         }
+        .clipped()
+        .animation(.easeOut(duration: 0.18), value: image != nil)
         .onAppear {
             checkCacheAndLoad()
         }
@@ -236,6 +253,7 @@ struct AssetImage: View {
         .onChange(of: asset.localIdentifier) { _, _ in
             cancelActiveRequests()
             image = nil
+            placeholderImage = nil
             checkCacheAndLoad()
         }
     }
@@ -245,9 +263,9 @@ struct AssetImage: View {
             PhotoAssetImageManager.shared.cancelRequest(reqID)
             currentRequestID = nil
         }
-        if let thumbReqID = thumbnailRequestID {
+        if let thumbReqID = placeholderRequestID {
             PhotoAssetImageManager.shared.cancelRequest(thumbReqID)
-            thumbnailRequestID = nil
+            placeholderRequestID = nil
         }
     }
 
@@ -257,18 +275,18 @@ struct AssetImage: View {
             return
         }
 
-        // 1. 同步检查内存精确命中
+        // 1. 同步检查内存精确命中（首帧直出）
         if let cached = PhotoImageCache.shared.get(for: asset.localIdentifier, targetSize: targetSize, isHighQuality: highQuality) {
             image = cached
             isLoading = false
             onLoad?()
-            // 如果是普通缩略图且已精确命中，无需再次发起 PhotoKit 异步请求
+            // 如果是普通缩略图且已命中，无需再次发起 PhotoKit 异步请求
             if !highQuality {
                 return
             }
-        } else if highQuality, let anyThumb = PhotoImageCache.shared.getAnyThumbnail(for: asset.localIdentifier) {
-            // 2. 高清模式下未命中大图，但已有任意小图缓存时，先行展示小图垫底，不转菊花
-            image = anyThumb
+        } else if highQuality, let placeholder = PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier) {
+            // 2. 高清模式下未命中全尺寸大图时，先展示已有优质中图/占位图垫底，绝无白屏或菊花
+            placeholderImage = placeholder
             isLoading = false
             onLoad?()
         }
@@ -281,24 +299,25 @@ struct AssetImage: View {
             isLoading = false
             return
         }
-        isLoading = (image == nil)
+        isLoading = (image == nil && placeholderImage == nil)
 
-        // 高清先行缩略图：若无任何小图可显示，先发轻量小图请求垫底
-        if highQuality && image == nil {
+        // 高清模式过渡图：若当前完全没有任何画面，先发中等规格请求（800x800），
+        // 相比 400x400 清晰度大幅提升，在手机全屏上观感十分自然，不再有严重马赛克
+        if highQuality && image == nil && placeholderImage == nil {
             let thumbOptions = PHImageRequestOptions()
             thumbOptions.deliveryMode = .fastFormat
             thumbOptions.isNetworkAccessAllowed = true
             thumbOptions.isSynchronous = false
 
-            thumbnailRequestID = PhotoAssetImageManager.shared.requestImage(
+            placeholderRequestID = PhotoAssetImageManager.shared.requestImage(
                 for: asset,
-                targetSize: CGSize(width: 400, height: 400),
-                contentMode: .aspectFill,
+                targetSize: CGSize(width: 900, height: 900),
+                contentMode: .aspectFit,
                 options: thumbOptions
-            ) { [self] thumbnail, _ in
+            ) { [self] placeholder, _ in
                 let updateUI = {
-                    if self.image == nil, let thumbnail = thumbnail {
-                        self.image = thumbnail
+                    if self.image == nil, let placeholder = placeholder {
+                        self.placeholderImage = placeholder
                         self.onLoad?()
                     }
                 }
@@ -310,7 +329,7 @@ struct AssetImage: View {
             }
         }
 
-        // 主请求
+        // 主请求：高清大图或网格缩略图
         let options = PHImageRequestOptions()
         options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
         options.isNetworkAccessAllowed = true
@@ -328,10 +347,15 @@ struct AssetImage: View {
                 guard self.asset.localIdentifier == requestedAssetID else { return }
 
                 if let img = resultImage {
-                    self.image = img
                     let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
-                    // 仅对非低清帧写入内存缓存，避免低清帧覆盖高质量图
-                    if !isDegraded {
+                    if isDegraded {
+                        // 如果是中间降级帧，作为平滑过渡占位图显示，不直接赋给最终 image
+                        if self.image == nil {
+                            self.placeholderImage = img
+                        }
+                    } else {
+                        // 最终高清帧到达，优雅替换
+                        self.image = img
                         PhotoImageCache.shared.set(
                             for: self.asset.localIdentifier,
                             targetSize: self.targetSize,
