@@ -615,7 +615,6 @@
       }
     },
     "Best" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2663,6 +2662,9 @@
           }
         }
       }
+    },
+    "Unknown Date" : {
+
     },
     "Unknown time" : {
       "extractionState" : "stale",

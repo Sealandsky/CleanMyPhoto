@@ -36,13 +36,13 @@ struct PhotoCell: View {
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white)
+                    .fill(Color(UIColor.secondarySystemFill))
 
                 AssetImage(
                     asset: photo.asset,
                     targetSize: CGSize(width: pixelWidth, height: pixelHeight),
                     contentMode: .fill,
-                    placeholderColor: .white,
+                    placeholderColor: Color(UIColor.secondarySystemFill),
                     onLoad: { imageLoaded = true }
                 )
                 .scaledToFill()
@@ -52,6 +52,7 @@ struct PhotoCell: View {
 
                 mediaBadge
                     .opacity(imageLoaded ? 1 : 0)
+                    .animation(.easeIn(duration: 0.2), value: imageLoaded)
 
                 if isSelectMode && !isSelected {
                     Color.black.opacity(0.2)
@@ -66,11 +67,11 @@ struct PhotoCell: View {
                 if !isSelectMode && photo.isFavorite {
                     favoriteBadge
                         .opacity(imageLoaded ? 1 : 0)
+                        .animation(.easeIn(duration: 0.2), value: imageLoaded)
                 }
             }
         }
         .aspectRatio(cardAspectRatio, contentMode: .fit)
-        .animation(.easeIn(duration: 0.2), value: imageLoaded)
     }
 
     private var selectionIndicator: some View {

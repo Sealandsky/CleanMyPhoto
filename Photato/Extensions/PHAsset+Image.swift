@@ -80,8 +80,12 @@ final class PhotoImageCache {
         } else {
             thumbnailCache.setObject(image, forKey: key, cost: cost)
         }
-        // 若图片尺寸达到一定清晰度（>= 300px），保留一份作为大图过渡的优质占位底图
-        if max(image.size.width, image.size.height) >= 300 {
+        // 保留一份作为大图/列表过渡的优质占位底图（尺寸更大时覆盖更新）
+        if let existing = placeholderMap.object(forKey: identifier as NSString) {
+            if max(image.size.width, image.size.height) >= max(existing.size.width, existing.size.height) {
+                placeholderMap.setObject(image, forKey: identifier as NSString, cost: cost)
+            }
+        } else if max(image.size.width, image.size.height) >= 80 {
             placeholderMap.setObject(image, forKey: identifier as NSString, cost: cost)
         }
     }
@@ -218,10 +222,10 @@ struct AssetImage: View {
         self.onLoad = onLoad
 
         // 核心同步初始化：
-        // 1. 若目标大图已在缓存中，第 0 帧直接展示最终大图；
-        // 2. 若是高清模式且大图未就绪，同步取出列表已有的缩略图垫底，第 0 毫秒即有图显示，绝不白屏
+        // 1. 若目标尺寸已在精确缓存中，第 0 帧直接展示；
+        // 2. 若未精确命中，同步取出已有任意缩略图/占位图垫底，第 0 毫秒即有图显示，绝不白闪
         let exactCached = PhotoImageCache.shared.get(for: asset.localIdentifier, targetSize: targetSize, isHighQuality: highQuality)
-        let placeholderCached = (exactCached == nil && highQuality)
+        let placeholderCached = (exactCached == nil)
             ? PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier)
             : nil
 
@@ -239,7 +243,7 @@ struct AssetImage: View {
             // 兜底色（默认使用系统次级填充底色，不使用纯白，暗黑与浅色模式皆温和自然）
             placeholderColor
 
-            // 占位缩略图层：若已有列表缩略图，在高清大图到达前稳定垫底，杜绝白屏与等待
+            // 占位缩略图层：若已有列表/过渡缩略图，在最终图像到达前稳定垫底，杜绝白屏与等待
             if let placeholder = placeholderImage, image == nil {
                 Image(uiImage: placeholder)
                     .resizable()
@@ -272,7 +276,7 @@ struct AssetImage: View {
             cancelActiveRequests()
             // 素材切换时同步检查缓存，优先保证画面连续性，不赋 nil 造成白屏跳动
             let exactCached = PhotoImageCache.shared.get(for: newID, targetSize: targetSize, isHighQuality: highQuality)
-            let placeholderCached = (exactCached == nil && highQuality)
+            let placeholderCached = (exactCached == nil)
                 ? PhotoImageCache.shared.getPlaceholder(for: newID)
                 : nil
 
@@ -313,8 +317,8 @@ struct AssetImage: View {
             return
         }
 
-        // 2. 高清模式下未命中全尺寸大图时，先展示已有缩略图垫底
-        if highQuality && image == nil && placeholderImage == nil {
+        // 2. 未命中精确尺寸时，先展示已有任意缩略图垫底，绝无白屏或菊花
+        if image == nil && placeholderImage == nil {
             if let placeholder = PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier) {
                 placeholderImage = placeholder
                 isLoading = false
