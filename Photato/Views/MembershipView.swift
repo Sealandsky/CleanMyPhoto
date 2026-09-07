@@ -227,21 +227,14 @@ struct MembershipView: View {
                         await membershipManager.purchase(membershipManager.selectedProduct)
                     }
                 } label: {
-                    HStack {
-                        if membershipManager.isLoadingPurchase {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Text(String(localized: "Subscribe"))
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        }
+                    if membershipManager.isLoadingPurchase {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text(String(localized: "Subscribe"))
                     }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(membershipManager.isLoadingPurchase)
 
                 HStack(spacing: 8) {
