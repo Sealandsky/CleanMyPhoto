@@ -8,7 +8,13 @@ struct PhotoCell: View {
     /// 强制 1:1 显示（整理页分类网格）；默认跟随网格设置，其他页面不受影响
     var usesSquareRatio: Bool = false
     @Environment(GridSettings.self) private var gridSettings
+    @Environment(\.displayScale) private var displayScale
     @State private var imageLoaded = false
+
+    /// 缩略图请求像素下/上限：下限保证极小格子仍清晰，上限防止
+    /// 原比例瀑布流中的超长截图把请求尺寸顶到离谱的内存占用
+    private static let minPixelEdge: CGFloat = 300
+    private static let maxPixelEdge: CGFloat = 1400
 
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
     /// 否则用用户设置的固定比例。
@@ -19,13 +25,18 @@ struct PhotoCell: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // 缩略图按实际渲染尺寸 × 屏幕倍率请求像素：固定 400px 在
+            // 2 列大格/原比例瀑布流下会被拉伸发虚
+            let pixelWidth = min(max(geometry.size.width * displayScale, Self.minPixelEdge), Self.maxPixelEdge)
+            let pixelHeight = min(max(geometry.size.height * displayScale, Self.minPixelEdge), Self.maxPixelEdge)
+
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white)
 
                 AssetImage(
                     asset: photo.asset,
-                    targetSize: CGSize(width: 400, height: 400),
+                    targetSize: CGSize(width: pixelWidth, height: pixelHeight),
                     contentMode: .fill,
                     placeholderColor: .white,
                     onLoad: { imageLoaded = true }

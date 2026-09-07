@@ -41,12 +41,27 @@ struct FullscreenPhotoBrowser: View {
     // 白块闪现）；loading=骨架屏；loaded=结果瀑布流；empty=暂无相似
     @State private var relatedState: RelatedPhotosState = .hidden
 
+    // 相似照片跳转：点击相似照片一律以「来源照片 + 相似列表」推入
+    // 下一级详情页（原生返回逐层回退，每层独立重算标题与相似推荐）
+    @State private var relatedBrowsePhotos: [PhotoAsset] = []
+    @State private var relatedBrowseInitialID = ""
+    @State private var isRelatedDetailActive = false
+
+    // 本实例内删除的素材：推入页的批次是构造期快照，不随外部数据源收缩，
+    // 删除后需在此即时剔除才能让大图滑向下一张；外层实例同样受益
+    @State private var removedPhotoIDs: Set<String> = []
+
     // 手势引导（全局只提示一次）
     @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
     @State private var showGestureInstructions = false
 
+    /// 当前生效批次：剔除本实例内已删除的素材
+    private var browsePhotos: [PhotoAsset] {
+        photos.filter { !removedPhotoIDs.contains($0.id) }
+    }
+
     private var currentPhoto: PhotoAsset? {
-        photos.first { $0.id == currentPhotoID }
+        browsePhotos.first { $0.id == currentPhotoID }
     }
 
     /// 显式构造器：当前照片在构造期即为外部指定的目标照片。
@@ -89,7 +104,7 @@ struct FullscreenPhotoBrowser: View {
     var body: some View {
         ZStack {
             Group {
-                if !photos.isEmpty {
+                if !browsePhotos.isEmpty {
                     verticalDetailLayout
                 } else {
                     emptyStateView
@@ -145,11 +160,24 @@ struct FullscreenPhotoBrowser: View {
         } message: {
             Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
         }
+        // 相似照片点击推入的下一级详情页：系统返回/侧滑原生回退并自动
+        // 复位本开关；不透传 onActivePhotoChange（层内批次索引与外部数据
+        // 源无关），onDismiss 仅服务删空批次后的自动回退
+        .navigationDestination(isPresented: $isRelatedDetailActive) {
+            FullscreenPhotoBrowser(
+                photos: relatedBrowsePhotos,
+                initialPhotoID: relatedBrowseInitialID,
+                onDelete: handlePhotoDeleted,
+                onFavoriteToggled: onFavoriteToggled,
+                onDismiss: { isRelatedDetailActive = false }
+            )
+            .environmentObject(photoManager)
+        }
         .onAppear {
             // 初始化当前照片：优先用外部指定的初始照片，异常时回退首张
-            if currentPhotoID.isEmpty || !photos.contains(where: { $0.id == currentPhotoID }) {
-                currentPhotoID = photos.first(where: { $0.id == initialPhotoID })?.id
-                    ?? photos.first?.id
+            if currentPhotoID.isEmpty || !browsePhotos.contains(where: { $0.id == currentPhotoID }) {
+                currentPhotoID = browsePhotos.first(where: { $0.id == initialPhotoID })?.id
+                    ?? browsePhotos.first?.id
                     ?? ""
             }
             updateCaption(for: currentPhoto)
@@ -183,18 +211,26 @@ struct FullscreenPhotoBrowser: View {
                 // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
                 // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
                 DraggablePhotoView(
-                    photos: photos,
+                    photos: browsePhotos,
                     currentPhotoID: currentPhotoID,
                     deleteTrigger: $deleteTrigger,
                     onPhotoChange: { id, index in
-                        currentPhotoID = id
-                        if let photo = photos.first(where: { $0.id == id }) {
+                        // 删除流转会在数组收缩前回报旧素材 id：此时以回退
+                        // 索引对齐生效批次（索引即 DraggablePhotoView 落定
+                        // 的邻近位），避免删除后当前素材悬空（标题/操作栏/
+                        // 相似区失效）；正常滑动回报的 id 必在批次内
+                        if browsePhotos.contains(where: { $0.id == id }) {
+                            currentPhotoID = id
+                        } else {
+                            currentPhotoID = browsePhotos.indices.contains(index)
+                                ? browsePhotos[index].id
+                                : browsePhotos.first?.id ?? ""
+                        }
+                        if let photo = browsePhotos.first(where: { $0.id == currentPhotoID }) {
                             onActivePhotoChange?(photo, index)
                         }
                     },
-                    onDelete: { photo in
-                        onDelete?(photo)
-                    },
+                    onDelete: handlePhotoDeleted,
                     onBlockedDelete: {
                         showFavoriteDeleteAlert = true
                     },
@@ -215,9 +251,23 @@ struct FullscreenPhotoBrowser: View {
                 }
 
                 actionBar
-                RelatedPhotosSection(state: relatedState)
+                RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
             }
         }
+    }
+
+    /// 本实例内删除：记入删除集使生效批次即时收缩（DraggablePhotoView 依赖
+    /// 数组收缩滑向下一张），并同步收敛相似推荐列表（推入页删除返回后，
+    /// 父页列表不再残留已删素材），最后交还调用方执行真正的删除业务
+    private func handlePhotoDeleted(_ photo: PhotoAsset) {
+        removedPhotoIDs.insert(photo.id)
+        if case .loaded(let assets) = relatedState {
+            let remaining = assets.filter { $0.localIdentifier != photo.id }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                relatedState = remaining.isEmpty ? .empty : .loaded(remaining)
+            }
+        }
+        onDelete?(photo)
     }
 
     // 操作按钮栏：左侧[收藏 添加 分享 更多]横向排布，右侧独立[删除]；
@@ -414,7 +464,7 @@ struct FullscreenPhotoBrowser: View {
                 dataReceivedHandler: { data in
                     // 增量数据流式追加写入（非全量，控制内存峰值）
                     _ = try? handle.seekToEnd()
-                    try? handle.write(contentsOf: data)
+                    _ = try? handle.write(contentsOf: data)
                 },
                 completionHandler: { error in
                     try? handle.close()
@@ -510,11 +560,11 @@ struct FullscreenPhotoBrowser: View {
     /// 预热相邻素材的数据缓存（包括地理位置地址与相似照片快照），
     /// 保证用户左右滑动切换到相邻照片时，标题和相关推荐能瞬间（0ms）显示，避免出现转圈或闪烁。
     private func prewarmNeighbors() {
-        guard let currentIndex = photos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
+        guard let currentIndex = browsePhotos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
         let prevIndex = currentIndex - 1
         let nextIndex = currentIndex + 1
         let neighbors = [prevIndex, nextIndex].compactMap { idx in
-            photos.indices.contains(idx) ? photos[idx] : nil
+            browsePhotos.indices.contains(idx) ? browsePhotos[idx] : nil
         }
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
@@ -591,6 +641,32 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
+    // MARK: - 相似照片跳转
+    /// 点击相似照片一律新开一页（不替换当前页主图，来源页上下文保持不变）：
+    /// 以「来源照片 + 相似列表」推入下一级详情页，可左右连览整组相似照片；
+    /// 系统返回逐层回退，每层由 .task(id:) 独立重算标题与相似推荐
+    private func selectRelatedAsset(_ asset: PHAsset) {
+        guard let origin = currentPhoto else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        var related: [PHAsset] = []
+        if case .loaded(let assets) = relatedState { related = assets }
+
+        // 推入批次 = 来源照片（置首，便于滑回）+ 被点目标 + 相似列表，去重
+        var seen = Set<String>([origin.id])
+        var deck: [PhotoAsset] = [origin]
+        for candidate in [asset] + related where seen.insert(candidate.localIdentifier).inserted {
+            deck.append(PhotoAsset(asset: candidate))
+        }
+        relatedBrowsePhotos = deck
+        relatedBrowseInitialID = asset.localIdentifier
+        // 种子数据先落定、推入开关下一拍再翻：同帧内同时写入目标内容与
+        // 推入开关，系统会跳过推入转场（新页直接闪现而非从右侧滑入）
+        Task { @MainActor in
+            isRelatedDetailActive = true
+        }
+    }
+
     // MARK: - Gesture Instructions
     private func showGestureInstructionsIfNeeded() {
         if !hasShownGestureInstructions && !showGestureInstructions {
@@ -655,8 +731,11 @@ private enum RelatedPhotosState: Equatable {
 /// 「More like this photo」：以当前照片为基准的相似照片双列瀑布流。
 /// 数据来自 PhotoSimilarityMatcher（Vision 特征检索）；布局沿用占位期的
 /// 版式（8pt 页边距与列距、24pt 圆角、双列错落）。
+/// 单元格可点击：跳转由宿主 FullscreenPhotoBrowser 分流（批次内切换 /
+/// 批次外推入下一级详情页），本模块只上报被点素材
 private struct RelatedPhotosSection: View {
     let state: RelatedPhotosState
+    var onSelect: (PHAsset) -> Void = { _ in }
 
     /// 骨架屏列高：沿用占位期错落节奏
     private static let skeletonColumns: [[CGFloat]] = [
@@ -709,21 +788,27 @@ private struct RelatedPhotosSection: View {
         .padding(.horizontal, 8)
     }
 
-    /// 结果瀑布流：双列按累计高度贪心均衡，单元格按照片原始宽高比渲染
+    /// 结果瀑布流：双列按累计高度贪心均衡，单元格按照片原始宽高比渲染；
+    /// 单元格 Button 化上报点击（按压态由 RelatedPhotoCardStyle 反馈）
     private func photoBody(_ assets: [PHAsset]) -> some View {
         let columns = Self.splitBalancedColumns(assets)
         return HStack(alignment: .top, spacing: 8) {
             ForEach(columns.indices, id: \.self) { column in
                 VStack(spacing: 8) {
                     ForEach(columns[column], id: \.localIdentifier) { asset in
-                        AssetImage(
-                            asset: asset,
-                            targetSize: CGSize(width: 400, height: 400),
-                            contentMode: .fill
-                        )
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(Self.cellAspectRatio(of: asset), contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        Button {
+                            onSelect(asset)
+                        } label: {
+                            AssetImage(
+                                asset: asset,
+                                targetSize: CGSize(width: 400, height: 400),
+                                contentMode: .fill
+                            )
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(Self.cellAspectRatio(of: asset), contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        }
+                        .buttonStyle(RelatedPhotoCardStyle())
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -763,6 +848,17 @@ private struct RelatedPhotosSection: View {
             heights[index] += 1.0 / cellAspectRatio(of: asset)
         }
         return columns
+    }
+}
+
+// MARK: - 相似照片卡片按压态
+/// 轻微缩放 + 降不透明度：提示「可点」而不喧宾夺主
+private struct RelatedPhotoCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: configuration.isPressed)
     }
 }
 

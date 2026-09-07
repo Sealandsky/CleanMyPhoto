@@ -87,9 +87,12 @@ struct OrganizeView: View {
         await organizeManager.quickAnalysis()
     }
 
-    // MARK: - 废片数量与占比（排除媒体类型：视频和实况照片不属于废片，不计入）
+    // MARK: - 废片数量与占比
+    /// 排除媒体类型（视频/实况属于格式筛选，不计入废片）；
+    /// 跨分类去重取唯一照片数——一张照片同属多个分类只计一次，
+    /// 避免求和口径下废片数大于照片总数
     private var junkCount: Int {
-        Self.functionCategories.reduce(0) { $0 + organizeManager.stat(for: $1) }
+        organizeManager.uniqueJunkCount(categories: Self.functionCategories)
     }
 
     private var junkPercentage: Double {
