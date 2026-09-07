@@ -32,7 +32,10 @@ final class GridSettings {
         let storedRatio = UserDefaults.standard.double(forKey: GridColumnHelper.ratioStorageKey)
         self.aspectRatio = (storedRatio >= 0.1 && storedRatio <= 2.0) ? storedRatio : GridColumnHelper.defaultRatio
 
-        self.isOriginalRatio = UserDefaults.standard.bool(forKey: GridColumnHelper.originalRatioStorageKey)
+        // 未设置过时默认原比例（瀑布流按图片真实宽高比）；init 赋值不触发
+        // didSet，只有用户此后切换选项才落盘
+        let storedOriginal = UserDefaults.standard.object(forKey: GridColumnHelper.originalRatioStorageKey) as? Bool
+        self.isOriginalRatio = storedOriginal ?? true
     }
 }
 
@@ -40,7 +43,8 @@ enum GridColumnHelper {
     static let columnStorageKey = "gridColumnCount"
     static let ratioStorageKey = "gridAspectRatio"
     static let originalRatioStorageKey = "gridIsOriginalRatio"
-    static let defaultCount = 3
+    /// 默认 2 列：大格更契合原比例瀑布流的浏览体验
+    static let defaultCount = 2
     static let defaultRatio: CGFloat = 3.0 / 4.0
     static let spacing: CGFloat = 4
 
