@@ -38,4 +38,7 @@ struct ScreenSizeHelper {
         let scale = screenScale
         return CGSize(width: size.width * scale, height: size.height * 0.6 * scale)
     }
+
+    /// 重温/详情卡片直接提取的 600x600 缩略图尺寸，单次直出无需二次请求
+    static let cardThumbnailSize = CGSize(width: 600, height: 600)
 }

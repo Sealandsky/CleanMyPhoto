@@ -213,12 +213,9 @@ struct DraggablePhotoView: View {
         }
     }
 
+    /// 重温/详情卡片直接提取 600x600 缩略图，单次加载无二次请求与替换
     private var cardTargetSize: CGSize {
-        if cardPresentation == .embeddedSection {
-            return ScreenSizeHelper.cardPhysicalSize
-        } else {
-            return ScreenSizeHelper.screenPhysicalSize
-        }
+        ScreenSizeHelper.cardThumbnailSize
     }
 
     // MARK: - Media Card Layer（当前卡片与相邻卡片共用统一视图骨架，杜绝切图瞬间视图替换闪烁与卡顿）
