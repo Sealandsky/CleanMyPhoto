@@ -243,8 +243,8 @@ struct AssetImage: View {
             // 兜底色（默认使用系统次级填充底色，不使用纯白，暗黑与浅色模式皆温和自然）
             placeholderColor
 
-            // 占位缩略图层：若已有列表/过渡缩略图，在最终图像到达前稳定垫底，杜绝白屏与等待
-            if let placeholder = placeholderImage, image == nil {
+            // 占位缩略图层：若已有列表/过渡缩略图，在最终图像到达前稳定垫底，在主图淡入过程中始终保留，杜绝漏出底色或闪白
+            if let placeholder = placeholderImage {
                 Image(uiImage: placeholder)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
