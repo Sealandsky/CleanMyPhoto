@@ -239,7 +239,7 @@ struct MembershipView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(.accentGradient)
+                    .background(Color.blue)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .disabled(membershipManager.isLoadingPurchase)

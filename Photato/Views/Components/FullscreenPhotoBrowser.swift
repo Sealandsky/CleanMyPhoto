@@ -577,7 +577,7 @@ struct FullscreenPhotoBrowser: View {
         imageOptions.isSynchronous = false
         PhotoAssetImageManager.shared.startCachingImages(
             for: neighborAssets,
-            targetSize: ScreenSizeHelper.screenPhysicalSize,
+            targetSize: ScreenSizeHelper.cardPhysicalSize,
             contentMode: .aspectFit,
             options: imageOptions
         )

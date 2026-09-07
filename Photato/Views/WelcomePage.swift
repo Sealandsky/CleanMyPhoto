@@ -50,13 +50,13 @@ struct WelcomePage: View {
             }) {
                 HStack {
                     Text(String(localized: "Try 7 Days Free"))
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
                 }
-                .foregroundColor(.primary)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 72)
-                .background(Color("PrimaryBtn"))
-                .cornerRadius(22)
+                .frame(height: 54)
+                .background(Color.blue)
+                .cornerRadius(16)
             }
             .padding(.horizontal, 32)
         }

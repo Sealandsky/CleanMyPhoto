@@ -189,12 +189,9 @@ struct AssetImage: View {
 
     /// 最终显示的高清大图或缩略图
     @State private var image: UIImage?
-    /// 用于平滑过渡的占位图（来自缓存或高质量中图）
-    @State private var placeholderImage: UIImage?
-    /// 缩略图与占位图均未就绪时为 true
+    /// 是否处于加载中（图像尚未加载完成）
     @State private var isLoading = false
     @State private var currentRequestID: PHImageRequestID? = nil
-    @State private var placeholderRequestID: PHImageRequestID? = nil
 
     init(
         asset: PHAsset,
@@ -221,14 +218,7 @@ struct AssetImage: View {
             // 兜底色
             placeholderColor
 
-            // 占位图层：若已有占位图，在高清图到达前保持稳定展示
-            if let placeholder = placeholderImage {
-                Image(uiImage: placeholder)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-            }
-
-            // 主图层：就绪时带有平滑淡入效果（0.18s），彻底避免模糊突变至清晰的生硬感
+            // 主图层：就绪时直接展示清晰图像，淡入平滑过渡，彻底杜绝从模糊到清晰的跳变体验
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
@@ -236,8 +226,8 @@ struct AssetImage: View {
                     .transition(.opacity)
             }
 
-            // 无任何图可展示时的加载指示器
-            if isLoading && placeholderImage == nil && image == nil {
+            // 加载中指示器（不展示拉伸模糊图，干净等待适合尺寸图像到位）
+            if isLoading && image == nil {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: placeholderColor == .black ? .white : Color(.systemGray3)))
             }
@@ -253,7 +243,6 @@ struct AssetImage: View {
         .onChange(of: asset.localIdentifier) { _, _ in
             cancelActiveRequests()
             image = nil
-            placeholderImage = nil
             checkCacheAndLoad()
         }
     }
@@ -262,10 +251,6 @@ struct AssetImage: View {
         if let reqID = currentRequestID {
             PhotoAssetImageManager.shared.cancelRequest(reqID)
             currentRequestID = nil
-        }
-        if let thumbReqID = placeholderRequestID {
-            PhotoAssetImageManager.shared.cancelRequest(thumbReqID)
-            placeholderRequestID = nil
         }
     }
 
@@ -284,11 +269,6 @@ struct AssetImage: View {
             if !highQuality {
                 return
             }
-        } else if highQuality, let placeholder = PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier) {
-            // 2. 高清模式下未命中全尺寸大图时，先展示已有优质中图/占位图垫底，绝无白屏或菊花
-            placeholderImage = placeholder
-            isLoading = false
-            onLoad?()
         }
 
         loadImage()
@@ -299,37 +279,9 @@ struct AssetImage: View {
             isLoading = false
             return
         }
-        isLoading = (image == nil && placeholderImage == nil)
+        isLoading = (image == nil)
 
-        // 高清模式过渡图：若当前完全没有任何画面，先发中等规格请求（800x800），
-        // 相比 400x400 清晰度大幅提升，在手机全屏上观感十分自然，不再有严重马赛克
-        if highQuality && image == nil && placeholderImage == nil {
-            let thumbOptions = PHImageRequestOptions()
-            thumbOptions.deliveryMode = .fastFormat
-            thumbOptions.isNetworkAccessAllowed = true
-            thumbOptions.isSynchronous = false
-
-            placeholderRequestID = PhotoAssetImageManager.shared.requestImage(
-                for: asset,
-                targetSize: CGSize(width: 900, height: 900),
-                contentMode: .aspectFit,
-                options: thumbOptions
-            ) { [self] placeholder, _ in
-                let updateUI = {
-                    if self.image == nil, let placeholder = placeholder {
-                        self.placeholderImage = placeholder
-                        self.onLoad?()
-                    }
-                }
-                if Thread.isMainThread {
-                    updateUI()
-                } else {
-                    DispatchQueue.main.async(execute: updateUI)
-                }
-            }
-        }
-
-        // 主请求：高清大图或网格缩略图
+        // 主请求：直接加载适合尺寸的清晰图片
         let options = PHImageRequestOptions()
         options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
         options.isNetworkAccessAllowed = true
@@ -348,13 +300,8 @@ struct AssetImage: View {
 
                 if let img = resultImage {
                     let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
-                    if isDegraded {
-                        // 如果是中间降级帧，作为平滑过渡占位图显示，不直接赋给最终 image
-                        if self.image == nil {
-                            self.placeholderImage = img
-                        }
-                    } else {
-                        // 最终高清帧到达，优雅替换
+                    // 绝不展示低清/降级中间帧，彻底杜绝从模糊到清晰的生硬变化
+                    if !isDegraded {
                         self.image = img
                         PhotoImageCache.shared.set(
                             for: self.asset.localIdentifier,
@@ -362,16 +309,13 @@ struct AssetImage: View {
                             isHighQuality: self.highQuality,
                             image: img
                         )
+                        self.isLoading = false
                         self.onLoad?()
                     }
-                }
-                self.isLoading = false
-
-                if let error = info?[PHImageErrorKey] as? Error {
-                    print("Image loading error: \(error.localizedDescription)")
+                } else if info?[PHImageErrorKey] != nil {
+                    self.isLoading = false
                 }
             }
-
             if Thread.isMainThread {
                 updateUI()
             } else {
