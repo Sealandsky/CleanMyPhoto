@@ -78,10 +78,16 @@ struct OrganizeResultsView: View {
     }
 
     private var allPhotos: [PhotoAsset] {
-        let photos = isGroupedMode
-            ? displayedGroups.flatMap { $0.loadedPhotos }
-            : organizeManager.paginatedPhotos(for: category)
-        return photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
+        if isGroupedMode {
+            return dateSections.flatMap { $0.photos }
+        } else {
+            let photos = organizeManager.paginatedPhotos(for: category)
+            return photos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
+        }
+    }
+
+    private var bestPhotoIDs: Set<String> {
+        Set(displayedGroups.compactMap { $0.bestPhotoId })
     }
 
     private func filtered(_ photos: [PhotoAsset]) -> [PhotoAsset] {
@@ -374,6 +380,22 @@ struct OrganizeResultsView: View {
                     FileSizeBadge(asset: photo.asset)
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if isGroupedMode && bestPhotoIDs.contains(photo.id) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 9))
+                        Text(String(localized: "Best"))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.blue)
+                    .clipShape(Capsule())
+                    .padding(6)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 selectionMark(isSelected: selectionManager.isSelected(photo.id))
             }
@@ -437,32 +459,80 @@ struct OrganizeResultsView: View {
         photos: [PhotoAsset],
         pendingDeletionIDs: Set<String>
     ) -> [DateSection] {
-        var sections: [DateSection] = []
         if category == .similar || category == .duplicates {
+            var sections: [DateSection] = []
+
+            // 统计每个基准日期出现的次数，以便在同日有多组时区分标注「组 1」、「组 2」
+            var dateCountMap: [String: Int] = [:]
+            for group in groups {
+                let validPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+                guard validPhotos.count >= 2 else { continue }
+                let dateKey = primaryDateString(for: validPhotos)
+                dateCountMap[dateKey, default: 0] += 1
+            }
+
+            var dateIndexMap: [String: Int] = [:]
             for group in groups {
                 let groupPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
-                sections.append(contentsOf: createDateSections(
-                    in: groupPhotos,
-                    idPrefix: "group-\(group.id)"
+                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
+                guard groupPhotos.count >= 2 else { continue }
+
+                let baseDate = primaryDateString(for: groupPhotos)
+                let totalForDate = dateCountMap[baseDate] ?? 1
+                let title: String
+                if totalForDate > 1 {
+                    let currentIndex = (dateIndexMap[baseDate] ?? 0) + 1
+                    dateIndexMap[baseDate] = currentIndex
+                    title = "\(baseDate) · 组 \(currentIndex)"
+                } else {
+                    title = baseDate
+                }
+
+                sections.append(DateSection(
+                    id: "group-\(group.id)",
+                    groupID: group.id,
+                    title: title,
+                    photos: groupPhotos,
+                    totalSize: group.totalSize
                 ))
             }
+            return sections
         } else {
             let flatPhotos = photos.filter { !pendingDeletionIDs.contains($0.id) }
-            sections.append(contentsOf: createDateSections(
+            let sections = createDateSections(
                 in: flatPhotos,
                 idPrefix: "flat-\(category.rawValue)"
-            ))
-        }
-        // 跨组合并：前组尾与后组头可能同日，合并相邻同日期节避免重复日期头
-        var merged: [DateSection] = []
-        for section in sections {
-            if let last = merged.last, last.title == section.title {
-                merged[merged.count - 1].photos.append(contentsOf: section.photos)
-            } else {
-                merged.append(section)
+            )
+            // 跨组合并：仅平铺分类按同日合并相邻节
+            var merged: [DateSection] = []
+            for section in sections {
+                if let last = merged.last, last.title == section.title {
+                    merged[merged.count - 1].photos.append(contentsOf: section.photos)
+                } else {
+                    merged.append(section)
+                }
             }
+            return merged
         }
-        return merged
+    }
+
+    /// 提取一组照片的主日期文案（同日显示单日期，跨天显示区间）
+    private static func primaryDateString(for photos: [PhotoAsset]) -> String {
+        let dates = photos.compactMap { $0.asset.creationDate }.sorted()
+        guard let first = dates.first else {
+            return String(localized: "Unknown Date")
+        }
+        guard let last = dates.last else {
+            return first.formatted(date: .long, time: .omitted)
+        }
+        let cal = Calendar.current
+        if cal.isDate(first, inSameDayAs: last) {
+            return first.formatted(date: .long, time: .omitted)
+        } else {
+            let fStr = first.formatted(date: .long, time: .omitted)
+            let lStr = last.formatted(date: .long, time: .omitted)
+            return "\(fStr) ~ \(lStr)"
+        }
     }
 
     /// 将照片按拍摄日（降序）分节；无拍摄日期的按月归类（回退修改时间）
@@ -598,7 +668,9 @@ struct OrganizeResultsView: View {
         guard isGroupedMode else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             for group in displayedGroups {
-                for photo in filtered(group.loadedPhotos) where photo.id != group.bestPhotoId {
+                let photos = filtered(group.loadedPhotos)
+                guard photos.count >= 2 else { continue }
+                for photo in photos where photo.id != group.bestPhotoId {
                     if !selectionManager.isSelected(photo.id) {
                         selectionManager.toggle(photo.id)
                     }
