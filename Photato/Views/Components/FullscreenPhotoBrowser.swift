@@ -41,7 +41,7 @@ struct FullscreenPhotoBrowser: View {
     // 白块闪现）；loading=骨架屏；loaded=结果瀑布流；empty=暂无相似
     @State private var relatedState: RelatedPhotosState = .hidden
 
-    // 相似照片跳转：点击批次外的相似照片时，以「来源照片 + 相似列表」推入
+    // 相似照片跳转：点击相似照片一律以「来源照片 + 相似列表」推入
     // 下一级详情页（原生返回逐层回退，每层独立重算标题与相似推荐）
     @State private var relatedBrowsePhotos: [PhotoAsset] = []
     @State private var relatedBrowseInitialID = ""
@@ -50,9 +50,6 @@ struct FullscreenPhotoBrowser: View {
     // 本实例内删除的素材：推入页的批次是构造期快照，不随外部数据源收缩，
     // 删除后需在此即时剔除才能让大图滑向下一张；外层实例同样受益
     @State private var removedPhotoIDs: Set<String> = []
-
-    // 详情滚动定位：批次内切换相似照片后把预览区滚回顶部
-    @State private var detailScrollProxy: ScrollViewProxy?
 
     // 手势引导（全局只提示一次）
     @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
@@ -163,9 +160,9 @@ struct FullscreenPhotoBrowser: View {
         } message: {
             Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
         }
-        // 相似照片推入的下一级详情页：批次外目标「跳入」，系统返回/侧滑
-        // 原生回退并自动复位本开关；不透传 onActivePhotoChange（层内批次
-        // 索引与外部数据源无关），onDismiss 仅服务删空批次后的自动回退
+        // 相似照片点击推入的下一级详情页：系统返回/侧滑原生回退并自动
+        // 复位本开关；不透传 onActivePhotoChange（层内批次索引与外部数据
+        // 源无关），onDismiss 仅服务删空批次后的自动回退
         .navigationDestination(isPresented: $isRelatedDetailActive) {
             FullscreenPhotoBrowser(
                 photos: relatedBrowsePhotos,
@@ -209,59 +206,52 @@ struct FullscreenPhotoBrowser: View {
     /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
     /// 大图预览区域 → 操作按钮栏 → 相关图片列表推荐
     private var verticalDetailLayout: some View {
-        ScrollViewReader { proxy in
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
-                    // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
-                    DraggablePhotoView(
-                        photos: browsePhotos,
-                        currentPhotoID: currentPhotoID,
-                        deleteTrigger: $deleteTrigger,
-                        onPhotoChange: { id, index in
-                            // 删除流转会在数组收缩前回报旧素材 id：此时以回退
-                            // 索引对齐生效批次（索引即 DraggablePhotoView 落定
-                            // 的邻近位），避免删除后当前素材悬空（标题/操作栏/
-                            // 相似区失效）；正常滑动回报的 id 必在批次内
-                            if browsePhotos.contains(where: { $0.id == id }) {
-                                currentPhotoID = id
-                            } else {
-                                currentPhotoID = browsePhotos.indices.contains(index)
-                                    ? browsePhotos[index].id
-                                    : browsePhotos.first?.id ?? ""
-                            }
-                            if let photo = browsePhotos.first(where: { $0.id == currentPhotoID }) {
-                                onActivePhotoChange?(photo, index)
-                            }
-                        },
-                        onDelete: handlePhotoDeleted,
-                        onBlockedDelete: {
-                            showFavoriteDeleteAlert = true
-                        },
-                        onDismiss: {
-                            onDismiss()
-                        },
-                        screenSize: ScreenSizeHelper.screenSize,
-                        cardPresentation: .embeddedSection,
-                        isFavorite: { photo in
-                            photoManager.isFavorite(photo)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
+                // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
+                DraggablePhotoView(
+                    photos: browsePhotos,
+                    currentPhotoID: currentPhotoID,
+                    deleteTrigger: $deleteTrigger,
+                    onPhotoChange: { id, index in
+                        // 删除流转会在数组收缩前回报旧素材 id：此时以回退
+                        // 索引对齐生效批次（索引即 DraggablePhotoView 落定
+                        // 的邻近位），避免删除后当前素材悬空（标题/操作栏/
+                        // 相似区失效）；正常滑动回报的 id 必在批次内
+                        if browsePhotos.contains(where: { $0.id == id }) {
+                            currentPhotoID = id
+                        } else {
+                            currentPhotoID = browsePhotos.indices.contains(index)
+                                ? browsePhotos[index].id
+                                : browsePhotos.first?.id ?? ""
                         }
-                    )
-                    .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-                    // 相似照片批次内切换后滚动定位的锚点（预览区顶缘）
-                    .id(BrowserScrollAnchor.top)
-                    .onAppear {
-                        showGestureInstructionsIfNeeded()
+                        if let photo = browsePhotos.first(where: { $0.id == currentPhotoID }) {
+                            onActivePhotoChange?(photo, index)
+                        }
+                    },
+                    onDelete: handlePhotoDeleted,
+                    onBlockedDelete: {
+                        showFavoriteDeleteAlert = true
+                    },
+                    onDismiss: {
+                        onDismiss()
+                    },
+                    screenSize: ScreenSizeHelper.screenSize,
+                    cardPresentation: .embeddedSection,
+                    isFavorite: { photo in
+                        photoManager.isFavorite(photo)
                     }
-
-                    actionBar
-                    RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
+                )
+                .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+                .onAppear {
+                    showGestureInstructionsIfNeeded()
                 }
-            }
-            .onAppear {
-                detailScrollProxy = proxy
+
+                actionBar
+                RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
             }
         }
     }
@@ -652,29 +642,13 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // MARK: - 相似照片跳转
-    /// 点击相似照片的分流：
-    /// - 目标已在当前批次 → 原地切换主图，保留左右滑动的批次上下文
-    /// - 目标在批次外 → 以「来源照片 + 相似列表」推入下一级详情页，可左右
-    ///   连览整组相似照片；系统返回逐层回退，每层由 .task(id:) 独立重算
-    ///   标题与相似推荐
+    /// 点击相似照片一律新开一页（不替换当前页主图，来源页上下文保持不变）：
+    /// 以「来源照片 + 相似列表」推入下一级详情页，可左右连览整组相似照片；
+    /// 系统返回逐层回退，每层由 .task(id:) 独立重算标题与相似推荐
     private func selectRelatedAsset(_ asset: PHAsset) {
-        // 跳入新详情页 = 一次明确的「进入」导航，触感比批次内切换更重
-        let isPushingOut = !browsePhotos.contains(where: { $0.id == asset.localIdentifier })
-        UIImpactFeedbackGenerator(style: isPushingOut ? .medium : .light).impactOccurred()
-
-        if let index = browsePhotos.firstIndex(where: { $0.id == asset.localIdentifier }) {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                currentPhotoID = asset.localIdentifier
-            }
-            // 同步外部当前素材（列表滚动定位/预加载）；推入实例未接此回调自然跳过
-            if let photo = photos.first(where: { $0.id == asset.localIdentifier }) {
-                onActivePhotoChange?(photo, index)
-            }
-            scrollDetailToTop()
-            return
-        }
-
         guard let origin = currentPhoto else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
         var related: [PHAsset] = []
         if case .loaded(let assets) = relatedState { related = assets }
 
@@ -690,14 +664,6 @@ struct FullscreenPhotoBrowser: View {
         // 推入开关，系统会跳过推入转场（新页直接闪现而非从右侧滑入）
         Task { @MainActor in
             isRelatedDetailActive = true
-        }
-    }
-
-    /// 详情滚动回预览区顶部：批次内切换相似照片后主图必须回到视野
-    private func scrollDetailToTop() {
-        guard let proxy = detailScrollProxy else { return }
-        withAnimation(.easeInOut(duration: 0.3)) {
-            proxy.scrollTo(BrowserScrollAnchor.top, anchor: .top)
         }
     }
 
@@ -883,12 +849,6 @@ private struct RelatedPhotosSection: View {
         }
         return columns
     }
-}
-
-// MARK: - 相似照片跳转辅助
-/// 详情滚动定位锚点：批次内切换相似照片后把预览区滚回顶部
-private enum BrowserScrollAnchor {
-    static let top = "browser-detail-top"
 }
 
 // MARK: - 相似照片卡片按压态
