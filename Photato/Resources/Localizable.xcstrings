@@ -1936,7 +1936,6 @@
       }
     },
     "Photos (Filter)" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
