@@ -162,7 +162,7 @@ struct ContentView: View {
     // MARK: - 页面右上角格式筛选器
     @ViewBuilder
     private var formatFilterMenu: some View {
-        let menu = Menu {
+        Menu {
             ForEach(MediaFormatFilter.allCases) { filter in
                 Button {
                     Task {
@@ -176,49 +176,48 @@ struct ContentView: View {
                     }
                 }
             }
-            .tint(.primary)
         } label: {
             filterMenuLabel
-        }
-
-        if discoverManager.selectedFilter != .all {
-            if #available(iOS 26.0, *) {
-                menu
-                    .buttonStyle(.glassProminent)
-                    .tint(.blue)
-            } else {
-                menu
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-            }
-        } else {
-            menu
         }
     }
 
     @ViewBuilder
     private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下不用加文本：纯图标排版，常规系统颜色
+            // 全部分类下不用加文本：纯图标排版，常规系统外观
             if #available(iOS 26.0, *) {
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
+                    .frame(width: 36, height: 36)
+                    .glassEffect(.regular.interactive(), in: Circle())
             } else {
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 36, height: 36)
                     .background(.ultraThinMaterial, in: Circle())
             }
         } else {
-            // 选中某个分类：文本+图标排版，由系统 .buttonStyle(.glassProminent).tint(.blue) 渲染蓝色半透玻璃底，
-            // 保持图标文字自动变白与 liquid-glass 原生按压高亮变色逻辑，不手动设置 foregroundStyle
+            // 选中某个分类：文本+图标排版，整个按钮渲染为系统高亮蓝色半透玻璃胶囊，文字与图标反白
             HStack(spacing: 5) {
                 Text(discoverManager.selectedFilter.localizedText)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                if #available(iOS 26.0, *) {
+                    Capsule()
+                        .fill(Color.blue.opacity(0.85))
+                        .glassEffect(.regular.tint(.blue).interactive(), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(Color.blue)
+                }
             }
         }
     }
