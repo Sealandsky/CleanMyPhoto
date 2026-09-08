@@ -328,10 +328,19 @@ struct DiscoverView: View {
         }
     }
 
-    // MARK: - 下拉指示器（从屏幕顶部跟手滑入，刷新完成后上移消失）
+    /// 视觉呈现进度：在拉深一定距离（pullProgress > 0.35，即手指下拉约 60pt）之前不露头；
+    /// 之后才平滑滑出，到达 1.0 时正好就位
+    private var visualPullProgress: CGFloat {
+        if isRefreshing { return 1.0 }
+        let deadZone: CGFloat = 0.35
+        guard pullProgress > deadZone else { return 0 }
+        return min(1.0, (pullProgress - deadZone) / (1.0 - deadZone))
+    }
+
+    // MARK: - 下拉指示器（从灵动岛下方平滑滑入，刷新完成后上移消失）
     @ViewBuilder
     private var refreshIndicator: some View {
-        if isRefreshing || pullProgress > 0.02 {
+        if isRefreshing || visualPullProgress > 0.01 {
             Group {
                 if isRefreshing {
                     ProgressView()
@@ -341,22 +350,22 @@ struct DiscoverView: View {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .foregroundColor(pullArmed ? .blue : .primary)
+                        .rotationEffect(.degrees(visualPullProgress * 180))
                 }
             }
             .frame(width: 48, height: 48)
             .background(.ultraThinMaterial, in: Circle())
-            // 位置：下拉时从顶部上方跟手滑入，刷新中停驻，完成后上移淡出
+            // 位置：更靠近灵动岛（停驻于顶部工具栏中央，与菜单按钮高度齐平）
             .offset(y: indicatorOffsetY)
-            .opacity(Double(min(1, pullProgress * 1.6)))
+            .opacity(isRefreshing ? 1.0 : Double(min(1, visualPullProgress * 1.5)))
             .transition(.opacity)
         }
     }
 
-    /// 指示器纵向位置：progress 0 → 隐藏在顶部上方（-58），1 → 就位（+10）；
-    /// 刷新中固定停驻在 +10
+    /// 指示器纵向位置：更靠近灵动岛（在顶部栏中央停驻于 -115，与顶部操作按钮对齐）
     private var indicatorOffsetY: CGFloat {
-        if isRefreshing { return 10 }
-        return -58 + min(pullProgress, 1) * 68
+        if isRefreshing { return -115 }
+        return -180 + visualPullProgress * 65
     }
 
     // 权限校验：延续现有方案，直接读取 PhotoManager.authorizationStatus。
