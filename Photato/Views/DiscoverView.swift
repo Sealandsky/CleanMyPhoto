@@ -337,7 +337,7 @@ struct DiscoverView: View {
         return min(1.0, (pullProgress - deadZone) / (1.0 - deadZone))
     }
 
-    // MARK: - 下拉指示器（从灵动岛下方平滑滑入，刷新完成后上移消失）
+    // MARK: - 下拉指示器（从顶部平滑滑入，刷新完成后上移消失）
     @ViewBuilder
     private var refreshIndicator: some View {
         if isRefreshing || visualPullProgress > 0.01 {
@@ -355,17 +355,17 @@ struct DiscoverView: View {
             }
             .frame(width: 48, height: 48)
             .background(.ultraThinMaterial, in: Circle())
-            // 位置：更靠近灵动岛（停驻于顶部工具栏中央，与菜单按钮高度齐平）
+            // 位置：停驻于屏幕 y ≈ 140pt（与「回忆」大标题水平带居中齐平）
             .offset(y: indicatorOffsetY)
             .opacity(isRefreshing ? 1.0 : Double(min(1, visualPullProgress * 1.5)))
             .transition(.opacity)
         }
     }
 
-    /// 指示器纵向位置：更靠近灵动岛（在顶部栏中央停驻于 -115，与顶部操作按钮对齐）
+    /// 指示器纵向位置：停驻于屏幕 y ≈ 140pt 位置（介于顶部导航栏与内容卡片之间的大标题水平带）
     private var indicatorOffsetY: CGFloat {
-        if isRefreshing { return -115 }
-        return -180 + visualPullProgress * 65
+        if isRefreshing { return -55 }
+        return -120 + visualPullProgress * 65
     }
 
     // 权限校验：延续现有方案，直接读取 PhotoManager.authorizationStatus。
