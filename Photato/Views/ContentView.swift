@@ -184,7 +184,7 @@ struct ContentView: View {
         if discoverManager.selectedFilter != .all {
             if #available(iOS 26.0, *) {
                 menu
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glassProminent)
                     .tint(.blue)
             } else {
                 menu
