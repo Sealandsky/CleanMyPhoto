@@ -160,8 +160,9 @@ struct ContentView: View {
     }
 
     // MARK: - 页面右上角格式筛选器
+    @ViewBuilder
     private var formatFilterMenu: some View {
-        Menu {
+        let menu = Menu {
             ForEach(MediaFormatFilter.allCases) { filter in
                 Button {
                     Task {
@@ -175,10 +176,24 @@ struct ContentView: View {
                     }
                 }
             }
+            .tint(.primary)
         } label: {
             filterMenuLabel
         }
-        // 不加 .tint，保持下拉菜单样式不变，避免菜单项跟随变蓝
+
+        if discoverManager.selectedFilter != .all {
+            if #available(iOS 26.0, *) {
+                menu
+                    .buttonStyle(.glass)
+                    .tint(.blue)
+            } else {
+                menu
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+            }
+        } else {
+            menu
+        }
     }
 
     @ViewBuilder
@@ -197,17 +212,13 @@ struct ContentView: View {
                     .background(.ultraThinMaterial, in: Circle())
             }
         } else {
-            // 选中某个分类：整个按钮变蓝色，保持系统效果，文本+图标排版
+            // 选中某个分类：文本+图标排版，由系统 .buttonStyle(.glass).tint(.blue) 渲染玻璃蓝底
             HStack(spacing: 5) {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-            .background(Color.blue, in: Capsule())
         }
     }
 }
