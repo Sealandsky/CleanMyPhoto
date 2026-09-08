@@ -252,19 +252,11 @@ struct OrganizeView: View {
 
     private func categoryCard(for category: OrganizeCategory) -> some View {
         let count = organizeManager.stat(for: category)
-        let hasResults = count > 0
+        let isCategoryLoading = organizeManager.isCategoryLoading(category)
 
         return Button {
-            if hasResults {
-                if !organizeManager.isCategoryLoaded(category) {
-                    Task {
-                        await organizeManager.loadCategory(category)
-                    }
-                }
-                onCategorySelect(category)
-            } else {
-                organizeManager.startFullAnalysis()
-            }
+            // 点击立即推入二级结果页，不在外层阻滞或抢占加载
+            onCategorySelect(category)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: category.icon)
@@ -279,9 +271,14 @@ struct OrganizeView: View {
 
                 Spacer(minLength: 2)
 
-                Text("\(count)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundColor(Color(.systemGray))
+                if isCategoryLoading && count == 0 {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.systemGray))
+                }
             }
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity)
@@ -298,7 +295,5 @@ struct OrganizeView: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(organizeManager.isAnalyzing)
-        .opacity(organizeManager.isAnalyzing ? 0.5 : 1)
     }
 }

@@ -48,17 +48,11 @@ struct WelcomePage: View {
             Button(action: {
                 hasShownWelcome = true
             }) {
-                HStack {
-                    Text(String(localized: "Try 7 Days Free"))
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                }
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 72)
-                .background(Color("PrimaryBtn"))
-                .cornerRadius(22)
+                Text(String(localized: "Try 7 Days Free"))
             }
-            .padding(.horizontal, 32)
+            .buttonStyle(PrimaryButtonStyle())
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
         }
         .background(Color(UIColor.systemBackground))
     }

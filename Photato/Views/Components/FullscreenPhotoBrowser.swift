@@ -187,8 +187,8 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
-            await loadRelatedPhotos()
             prewarmNeighbors()
+            await loadRelatedPhotos()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
         .onChange(of: photos) { oldPhotos, newPhotos in
@@ -557,18 +557,58 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    /// 预热相邻素材的数据缓存（包括地理位置地址与相似照片快照），
-    /// 保证用户左右滑动切换到相邻照片时，标题和相关推荐能瞬间（0ms）显示，避免出现转圈或闪烁。
+    /// 预热相邻素材的数据缓存（包括地理位置地址、相似照片快照与卡片图片），
+    /// 保证用户左右滑动切换到相邻照片时，卡片能瞬间（0ms）显示，彻底消除白屏与二次加载跳动。
     private func prewarmNeighbors() {
         guard let currentIndex = browsePhotos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
-        let prevIndex = currentIndex - 1
-        let nextIndex = currentIndex + 1
-        let neighbors = [prevIndex, nextIndex].compactMap { idx in
+        // 预热前后各 2 张，保证快速连续左右滑动时也能无缝命中内存缓存
+        let neighborIndices = [currentIndex - 2, currentIndex - 1, currentIndex + 1, currentIndex + 2]
+        let neighbors = neighborIndices.compactMap { idx in
             browsePhotos.indices.contains(idx) ? browsePhotos[idx] : nil
         }
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
+        // 1. 预热相邻素材的高清大图缓存，保证切图后迅速获得最高画质
+        let highResSize = ScreenSizeHelper.screenPhysicalSize
+        let neighborAssets = neighbors.map(\.asset)
+        let imageOptions = PHImageRequestOptions()
+        imageOptions.deliveryMode = .opportunistic
+        imageOptions.isNetworkAccessAllowed = true
+        imageOptions.isSynchronous = false
+        PhotoAssetImageManager.shared.startCachingImages(
+            for: neighborAssets,
+            targetSize: highResSize,
+            contentMode: .aspectFit,
+            options: imageOptions
+        )
+
+        // 2. 预存相邻素材的过渡缩略图（600x600）到内存 placeholder 缓存
+        // 保证左右滑动切图的第 0 毫秒立即有清晰缩略图垫底展示，随后高清大图平滑替换，彻底杜绝白屏与等待
+        let thumbSize = ScreenSizeHelper.cardThumbnailSize
+        for neighbor in neighbors {
+            if PhotoImageCache.shared.getPlaceholder(for: neighbor.id) == nil &&
+               PhotoImageCache.shared.get(for: neighbor.id, targetSize: highResSize, isHighQuality: true) == nil {
+                let options = PHImageRequestOptions()
+                options.deliveryMode = .fastFormat
+                options.isNetworkAccessAllowed = true
+                options.isSynchronous = false
+                _ = PhotoAssetImageManager.shared.requestImage(
+                    for: neighbor.asset,
+                    targetSize: thumbSize,
+                    contentMode: .aspectFit,
+                    options: options
+                ) { image, _ in
+                    if let image = image {
+                        PhotoImageCache.shared.setPlaceholder(
+                            for: neighbor.id,
+                            image: image
+                        )
+                    }
+                }
+            }
+        }
+
         Task(priority: .utility) {
             for neighbor in neighbors {
                 _ = await PhotoSimilarityMatcher.shared.cachedSnapshot(to: neighbor.asset)

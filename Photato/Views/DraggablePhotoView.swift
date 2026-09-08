@@ -213,6 +213,11 @@ struct DraggablePhotoView: View {
         }
     }
 
+    /// 详情页大图目标尺寸：采用屏幕物理像素加载高清大图，配合缩略图平滑过渡替换
+    private var cardTargetSize: CGSize {
+        ScreenSizeHelper.screenPhysicalSize
+    }
+
     // MARK: - Media Card Layer（当前卡片与相邻卡片共用统一视图骨架，杜绝切图瞬间视图替换闪烁与卡顿）
     @ViewBuilder
     private func mediaCardLayer(_ photoAsset: PhotoAsset, isCurrent: Bool, containerSize: CGSize) -> some View {
@@ -221,12 +226,19 @@ struct DraggablePhotoView: View {
             height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
         )
         let size = cardSize(for: photoAsset, in: available)
+        let imageSize = cardTargetSize
 
         switch photoAsset.mediaType {
         case .video:
             ZStack {
-                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                    .frame(width: size.width, height: size.height)
+                AssetImage(
+                    asset: photoAsset.asset,
+                    targetSize: imageSize,
+                    contentMode: .fit,
+                    highQuality: true,
+                    placeholderColor: Color(UIColor.secondarySystemFill)
+                )
+                .frame(width: size.width, height: size.height)
 
                 if isCurrent {
                     VideoPlayerView(asset: photoAsset.asset, isDragging: $isDragging)
@@ -245,8 +257,14 @@ struct DraggablePhotoView: View {
 
         case .livePhoto:
             ZStack {
-                AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                    .frame(width: size.width, height: size.height)
+                AssetImage(
+                    asset: photoAsset.asset,
+                    targetSize: imageSize,
+                    contentMode: .fit,
+                    highQuality: true,
+                    placeholderColor: Color(UIColor.secondarySystemFill)
+                )
+                .frame(width: size.width, height: size.height)
 
                 if isCurrent {
                     LivePhotoPlayerView(asset: photoAsset.asset)
@@ -264,16 +282,22 @@ struct DraggablePhotoView: View {
             .id(photoAsset.id)
 
         default:
-            AssetImage(asset: photoAsset.asset, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .fit, highQuality: true)
-                .frame(width: size.width, height: size.height)
-                .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
-                .frame(width: containerSize.width, height: containerSize.height)
-                .id(photoAsset.id)
+            AssetImage(
+                asset: photoAsset.asset,
+                targetSize: imageSize,
+                contentMode: .fit,
+                highQuality: true,
+                placeholderColor: Color(UIColor.secondarySystemFill)
+            )
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(cardShadowOpacity), radius: cardShadowRadius, x: 0, y: 4)
+            .frame(width: containerSize.width, height: containerSize.height)
+            .id(photoAsset.id)
         }
     }
     // MARK: - Gesture Handlers

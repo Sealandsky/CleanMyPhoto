@@ -19,7 +19,6 @@ class PhotoManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var isSelectMode: Bool = false
 
-    private let imageManager = PHCachingImageManager()
     private let maxPhotoCount = 50
     private var currentFetchOffset = 0
     private(set) var statisticsManager: StatisticsManager?
@@ -134,40 +133,60 @@ class PhotoManager: ObservableObject {
     func preloadAssets(photoIndex: Int? = nil, count: Int = 3) {
         guard !displayedPhotos.isEmpty else { return }
 
-        let index = photoIndex ?? 0
-        guard index != lastPreloadIndex else { return }
-        lastPreloadIndex = index
-
-        let startIndex = max(0, index - count)
-        let endIndex = min(displayedPhotos.count - 1, index + count)
-
-        guard startIndex <= endIndex else { return }
-
-        var assetsToPreload: [PHAsset] = []
-        for i in startIndex...endIndex {
-            assetsToPreload.append(displayedPhotos[i].asset)
-        }
-
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        for asset in assetsToPreload {
-            imageManager.startCachingImages(for: [asset], targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .aspectFit, options: options)
+        if let index = photoIndex {
+            // 全屏浏览模式：预热当前照片前后 count 张的高清全屏尺寸
+            guard index != lastPreloadIndex else { return }
+            lastPreloadIndex = index
+
+            let startIndex = max(0, index - count)
+            let endIndex = min(displayedPhotos.count - 1, index + count)
+            guard startIndex <= endIndex else { return }
+
+            var assetsToPreload: [PHAsset] = []
+            for i in startIndex...endIndex {
+                assetsToPreload.append(displayedPhotos[i].asset)
+            }
+
+            PhotoAssetImageManager.shared.startCachingImages(
+                for: assetsToPreload,
+                targetSize: ScreenSizeHelper.screenPhysicalSize,
+                contentMode: .aspectFit,
+                options: options
+            )
+        } else {
+            // 图库网格模式：预热最新获取或前排的网格缩略图尺寸
+            let countToPreload = min(displayedPhotos.count, 20)
+            let assetsToPreload = displayedPhotos.prefix(countToPreload).map(\.asset)
+
+            PhotoAssetImageManager.shared.startCachingImages(
+                for: assetsToPreload,
+                targetSize: CGSize(width: 400, height: 400),
+                contentMode: .aspectFill,
+                options: options
+            )
         }
     }
 
     // MARK: - Stop Caching
     func stopCachingAssets(excluding: [PHAsset]) {
-        imageManager.stopCachingImagesForAllAssets()
+        PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         // 只保留需要的图片在缓存中
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        imageManager.startCachingImages(for: excluding, targetSize: ScreenSizeHelper.screenPhysicalSize, contentMode: .aspectFit, options: options)
+        PhotoAssetImageManager.shared.startCachingImages(
+            for: excluding,
+            targetSize: ScreenSizeHelper.screenPhysicalSize,
+            contentMode: .aspectFit,
+            options: options
+        )
     }
 
     // MARK: - Update Displayed Photos
@@ -309,7 +328,7 @@ class PhotoManager: ObservableObject {
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        imageManager.requestImage(
+        _ = PhotoAssetImageManager.shared.requestImage(
             for: asset,
             targetSize: targetSize,
             contentMode: contentMode,

@@ -25,11 +25,20 @@ struct ScreenSizeHelper {
         activeScreen.scale
     }
 
-    /// 获取屏幕物理像素尺寸（考虑屏幕缩放因素）
-    /// - Returns: 屏幕的物理像素尺寸（例如 iPhone 14 Pro: 1179×2556）
+    /// 获取屏幕物理像素尺寸（例如 iPhone 14 Pro: 1179×2556）
     static var screenPhysicalSize: CGSize {
         let size = screenSize
         let scale = screenScale
         return CGSize(width: size.width * scale, height: size.height * scale)
     }
+
+    /// 适合详情/重温页大图展示的适度像素尺寸（宽度对齐屏幕宽度物理像素，高度约占屏幕 60% 物理像素，避免请求过大尺寸导致解码耗时与内存飙升）
+    static var cardPhysicalSize: CGSize {
+        let size = screenSize
+        let scale = screenScale
+        return CGSize(width: size.width * scale, height: size.height * 0.6 * scale)
+    }
+
+    /// 重温/详情卡片直接提取的 600x600 缩略图尺寸，单次直出无需二次请求
+    static let cardThumbnailSize = CGSize(width: 600, height: 600)
 }

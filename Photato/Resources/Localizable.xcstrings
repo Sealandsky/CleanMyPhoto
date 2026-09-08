@@ -615,7 +615,6 @@
       }
     },
     "Best" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1520,6 +1519,9 @@
         }
       }
     },
+    "No duplicate photos yet" : {
+
+    },
     "No internet connection. Please check your network and try again." : {
       "localizations" : {
         "en" : {
@@ -2073,6 +2075,9 @@
           }
         }
       }
+    },
+    "Scan Now" : {
+
     },
     "Scanning for large files..." : {
       "localizations" : {
@@ -2657,6 +2662,9 @@
           }
         }
       }
+    },
+    "Unknown Date" : {
+
     },
     "Unknown time" : {
       "extractionState" : "stale",
