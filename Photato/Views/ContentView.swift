@@ -29,15 +29,13 @@ struct ContentView: View {
             }
         }
         .task {
-            guard !photoManager.hasLoadedOnce else { return }
-
             if photoManager.authorizationStatus == .notDetermined {
                 await photoManager.requestAuthorization()
-            } else if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
-                await photoManager.fetchAllPhotos()
             }
 
+            // 首次进入 app 仅加载「全部」的图片，不加载分类下的图片
             if !discoverManager.hasLoadedOnce {
+                discoverManager.selectedFilter = .all
                 await discoverManager.refresh()
             }
         }
@@ -178,22 +176,44 @@ struct ContentView: View {
                 }
             }
         } label: {
+            filterMenuLabel
+        }
+        .tint(discoverManager.selectedFilter == .all ? .primary : .blue)
+    }
+
+    @ViewBuilder
+    private var filterMenuLabel: some View {
+        if discoverManager.selectedFilter == .all {
+            // 全部分类下不用加文本：纯图标排版，常规颜色
             if #available(iOS 26.0, *) {
-                // iOS 26+：toolbar 按钮由系统自动呈现 Liquid Glass 磨砂质感
-                Image(systemName: filterMenuIcon)
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundColor(.primary)
             } else {
-                // iOS 18：磨砂圆钮回退
-                Image(systemName: filterMenuIcon)
+                Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
             }
+        } else {
+            // 选中某个分类：变蓝色，文本+图标排版
+            HStack(spacing: 5) {
+                Text(discoverManager.selectedFilter.localizedText)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(.blue)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Capsule().fill(Color.blue.opacity(0.12)))
+                    .overlay(Capsule().stroke(Color.blue.opacity(0.25), lineWidth: 1))
+            }
         }
-    }
-
-    private var filterMenuIcon: String {
-        discoverManager.selectedFilter == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill"
     }
 }
 
