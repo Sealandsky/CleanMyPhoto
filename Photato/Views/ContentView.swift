@@ -212,7 +212,8 @@ struct ContentView: View {
                     .background(.ultraThinMaterial, in: Circle())
             }
         } else {
-            // 选中某个分类：文本+图标排版，由系统 .buttonStyle(.glass).tint(.blue) 渲染玻璃蓝底
+            // 选中某个分类：文本+图标排版，由系统 .buttonStyle(.glassProminent).tint(.blue) 渲染蓝色半透玻璃底，
+            // 保持图标文字自动变白与 liquid-glass 原生按压高亮变色逻辑，不手动设置 foregroundStyle
             HStack(spacing: 5) {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
