@@ -40,7 +40,7 @@ struct AlbumListView: View {
                 AlbumCellSkeleton()
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 12)
         .padding(.bottom, 12)
     }
 
@@ -59,6 +59,8 @@ struct AlbumListView: View {
                 .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
         }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: UIScreen.main.bounds.height * 0.7)
     }
 }
 

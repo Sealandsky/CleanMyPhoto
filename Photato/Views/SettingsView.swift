@@ -18,7 +18,7 @@ struct SettingsView: View {
 
     var body: some View {
         @Bindable var gridSettings = gridSettings
-        NavigationView {
+        NavigationStack {
             List {
                 // 会员卡片（独立展示）
                 Section {
@@ -217,7 +217,6 @@ struct SettingsView: View {
             .background(alignment: .top) {
                 TopBlurFadeBackground(height: 200)
             }
-            .scrollIndicators(.hidden)  // 隐藏滚动条
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)

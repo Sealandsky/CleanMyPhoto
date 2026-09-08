@@ -358,6 +358,22 @@
         }
       }
     },
+    "All" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部"
+          }
+        }
+      }
+    },
     "Analyzing %lld/%lld..." : {
       "localizations" : {
         "en" : {
@@ -933,6 +949,7 @@
       }
     },
     "Discover" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1027,6 +1044,25 @@
           }
         }
       }
+    },
+    "Favorites" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人收藏"
+          }
+        }
+      }
+    },
+    "Filter" : {
+
     },
     "Find duplicates, similar photos, screenshots and more" : {
       "extractionState" : "stale",
@@ -1210,6 +1246,7 @@
       }
     },
     "Library" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1269,6 +1306,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "实况照片"
+          }
+        }
+      }
+    },
+    "Live Photos (Filter)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实况"
           }
         }
       }
@@ -1406,6 +1459,22 @@
         }
       }
     },
+    "Memories" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memories"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回忆"
+          }
+        }
+      }
+    },
     "Monthly" : {
       "localizations" : {
         "en" : {
@@ -1534,6 +1603,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网络未连接，请检查网络后重试。"
+          }
+        }
+      }
+    },
+    "No media found for the selected format." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No media found for the selected format."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前筛选下无内容"
           }
         }
       }
@@ -1846,6 +1931,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "张照片"
+          }
+        }
+      }
+    },
+    "Photos (Filter)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片"
           }
         }
       }
@@ -2501,6 +2602,7 @@
       }
     },
     "Timeline" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
