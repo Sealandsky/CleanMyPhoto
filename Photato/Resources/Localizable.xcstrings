@@ -1045,6 +1045,25 @@
         }
       }
     },
+    "Favorites" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "个人收藏"
+          }
+        }
+      }
+    },
+    "Filter" : {
+
+    },
     "Find duplicates, similar photos, screenshots and more" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1917,6 +1936,7 @@
       }
     },
     "Photos (Filter)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
