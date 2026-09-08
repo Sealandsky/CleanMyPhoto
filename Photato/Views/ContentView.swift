@@ -184,32 +184,21 @@ struct ContentView: View {
     @ViewBuilder
     private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下：纯图标排版，系统导航栏提供原生的单层质感圆钮，绝不套两层
+            // 全部分类下：纯图标排版，系统原生菜单颜色
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
                 .frame(width: 32, height: 32)
         } else {
-            // 选中某个分类：文本+图标排版，整个按钮渲染为系统高亮蓝色半透胶囊，文字与图标反白
-            HStack(spacing: 5) {
+            // 选中某个分类：系统原生颜色，文本+图标排版（文字大一点，图标与默认态保持一致为 15pt）
+            HStack(spacing: 4) {
                 Text(discoverManager.selectedFilter.localizedText)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background {
-                if #available(iOS 26.0, *) {
-                    Capsule()
-                        .fill(Color.blue.opacity(0.85))
-                        .glassEffect(.regular.tint(.blue).interactive(), in: .capsule)
-                } else {
-                    Capsule()
-                        .fill(Color.blue)
-                }
-            }
+            .foregroundColor(.primary)
+            .frame(height: 32)
         }
     }
 }
