@@ -17,8 +17,6 @@ struct ContentView: View {
     @StateObject private var discoverManager = DiscoverManager()
     // 回忆页滚顶信号：递增驱动 DiscoverView 滚回顶部
     @State private var discoverScrollSignal = 0
-    // 筛选格式气泡弹窗开关
-    @State private var isShowingFilterPopover = false
 
     var body: some View {
         Group {
@@ -132,7 +130,7 @@ struct ContentView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    formatFilterButton
+                    formatFilterMenu
                 }
             }
             .navigationDestination(isPresented: $isFullscreenMode) {
@@ -161,111 +159,58 @@ struct ContentView: View {
         .background(Color(UIColor.systemGroupedBackground))
     }
 
-    // MARK: - 页面右上角格式筛选器（纯 Button + 原生 Popover 气泡浮层）
+    // MARK: - 页面右上角格式筛选器（原生系统下拉菜单）
     @ViewBuilder
-    private var formatFilterButton: some View {
-        let button = Button {
-            isShowingFilterPopover.toggle()
+    private var formatFilterMenu: some View {
+        Menu {
+            ForEach(MediaFormatFilter.allCases) { filter in
+                Button {
+                    Task {
+                        await discoverManager.setFilter(filter)
+                    }
+                } label: {
+                    if discoverManager.selectedFilter == filter {
+                        Label(filter.localizedText, systemImage: "checkmark")
+                    } else {
+                        Label(filter.localizedText, systemImage: filter.systemImage)
+                    }
+                }
+            }
         } label: {
-            filterButtonLabel
-        }
-        .popover(isPresented: $isShowingFilterPopover, arrowEdge: .top) {
-            filterPopoverContent
-                .presentationCompactAdaptation(.popover)
-        }
-
-        if discoverManager.selectedFilter != .all {
-            if #available(iOS 26.0, *) {
-                button
-                    .buttonStyle(.glassProminent)
-                    .tint(.blue)
-            } else {
-                button
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-            }
-        } else {
-            if #available(iOS 26.0, *) {
-                button
-                    .buttonStyle(.glass)
-            } else {
-                button
-                    .buttonStyle(.plain)
-            }
+            filterMenuLabel
         }
     }
 
     @ViewBuilder
-    private var filterButtonLabel: some View {
+    private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下不用加文本：纯图标排版，常规系统外观
-            if #available(iOS 26.0, *) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
-                    .frame(width: 36, height: 36)
-            } else {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(.primary)
-                    .frame(width: 36, height: 36)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
+            // 全部分类下：纯图标排版，系统导航栏提供原生的单层质感圆钮，绝不套两层
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundColor(.primary)
+                .frame(width: 32, height: 32)
         } else {
-            // 选中某个分类：文本+图标排版，由 .buttonStyle(.glassProminent) 自动染色与高亮
+            // 选中某个分类：文本+图标排版，整个按钮渲染为系统高亮蓝色半透胶囊，文字与图标反白
             HStack(spacing: 5) {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
             }
-        }
-    }
-
-    // MARK: - 筛选气泡弹窗内容（原生菜单质感）
-    private var filterPopoverContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(MediaFormatFilter.allCases) { filter in
-                let isSelected = discoverManager.selectedFilter == filter
-                Button {
-                    isShowingFilterPopover = false
-                    Task {
-                        await discoverManager.setFilter(filter)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: filter.systemImage)
-                            .font(.system(size: 16))
-                            .foregroundColor(.primary)
-                            .frame(width: 22, alignment: .center)
-
-                        Text(filter.localizedText)
-                            .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(.primary)
-
-                        Spacer(minLength: 16)
-
-                        if isSelected {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(.plain)
-
-                if filter != MediaFormatFilter.allCases.last {
-                    Divider()
-                        .padding(.horizontal, 16)
+            .foregroundColor(.white)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                if #available(iOS 26.0, *) {
+                    Capsule()
+                        .fill(Color.blue.opacity(0.85))
+                        .glassEffect(.regular.tint(.blue).interactive(), in: .capsule)
+                } else {
+                    Capsule()
+                        .fill(Color.blue)
                 }
             }
         }
-        .frame(minWidth: 180)
-        .padding(.vertical, 6)
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
