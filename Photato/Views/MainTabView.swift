@@ -160,54 +160,53 @@ struct MainTabView: View {
     /// 相簿列表/照片列表组件、数据加载、排序与跳转逻辑沿用原有实现，
     /// 照片点击后在 Tab 内叠加全屏浏览器（FullscreenPhotoBrowser 共享组件）。
     private var albumsTabContent: some View {
-        ZStack {
-            NavigationStack(path: $albumsPath) {
-                Group {
-                    if let albumMgr = albumManager {
-                        AlbumListView(albumManager: albumMgr) { album in
-                            selectedAlbum = album
-                            Task { [album] in
-                                await albumMgr.fetchPhotos(in: album)
-                                guard selectedAlbum?.id == album.id else { return }
-                                albumsPath.append(AlbumsDestination.albumPhotos(album.id))
-                            }
+        NavigationStack(path: $albumsPath) {
+            Group {
+                if let albumMgr = albumManager {
+                    AlbumListView(albumManager: albumMgr) { album in
+                        selectedAlbum = album
+                        Task { [album] in
+                            await albumMgr.fetchPhotos(in: album)
+                            guard selectedAlbum?.id == album.id else { return }
+                            albumsPath.append(AlbumsDestination.albumPhotos(album.id))
                         }
-                    } else {
-                        loadingView
                     }
+                } else {
+                    loadingView
                 }
-                .navigationTitle(String(localized: "Albums"))
-                .navigationBarTitleDisplayMode(.large)
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .background(alignment: .top) {
-                    TopBlurFadeBackground(height: 200)
+            }
+            .navigationTitle(String(localized: "Albums"))
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .background(alignment: .top) {
+                TopBlurFadeBackground(height: 200)
+            }
+            .task {
+                // 首次进入相簿 Tab 时创建管理器并拉取相簿列表（TabView 懒加载，
+                // 未选中该 Tab 前不会执行）
+                if albumManager == nil {
+                    albumManager = AlbumManager(photoManager: photoManager)
                 }
-                .task {
-                    // 首次进入相簿 Tab 时创建管理器并拉取相簿列表（TabView 懒加载，
-                    // 未选中该 Tab 前不会执行）
-                    if albumManager == nil {
-                        albumManager = AlbumManager(photoManager: photoManager)
-                    }
-                    if let albumMgr = albumManager, albumMgr.albums.isEmpty {
-                        await albumMgr.fetchUserAlbums()
-                    }
+                if let albumMgr = albumManager, albumMgr.albums.isEmpty {
+                    await albumMgr.fetchUserAlbums()
                 }
-                .navigationDestination(for: AlbumsDestination.self) { destination in
-                    switch destination {
-                    case .albumPhotos(let albumId):
-                        if let album = albumManager?.albums.first(where: { $0.id == albumId }),
-                           let albumMgr = albumManager {
-                            AlbumPhotoListView(
-                                albumManager: albumMgr,
-                                photoManager: photoManager,
-                                album: album,
-                                onPhotoSelect: { _ in }
-                            )
-                        }
+            }
+            .navigationDestination(for: AlbumsDestination.self) { destination in
+                switch destination {
+                case .albumPhotos(let albumId):
+                    if let album = albumManager?.albums.first(where: { $0.id == albumId }),
+                       let albumMgr = albumManager {
+                        AlbumPhotoListView(
+                            albumManager: albumMgr,
+                            photoManager: photoManager,
+                            album: album,
+                            onPhotoSelect: { _ in }
+                        )
                     }
                 }
             }
         }
+        .background(Color(UIColor.systemGroupedBackground))
     }
 
     // MARK: - Organize Tab
@@ -237,6 +236,7 @@ struct MainTabView: View {
                 }
             }
         }
+        .background(Color(UIColor.systemGroupedBackground))
     }
 
     // MARK: - Loading View（相簿管理器初始化中的占位）
