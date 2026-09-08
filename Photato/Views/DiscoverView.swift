@@ -22,18 +22,23 @@ final class DiscoverManager: ObservableObject {
     /// 是否还有未展示的资源（滚到底加载用）
     @Published private(set) var hasMorePhotos = false
 
+    /// 当前选中的媒体格式筛选器
+    @Published var selectedFilter: MediaFormatFilter = .all
+
     // 惰性洗牌池：pool[poolCursor...] 为尚未展示过的资源 id。
     // 只在抽取时交换对应位置，O(每批) 而非 O(全库)；不放回抽样，跨批次不重复。
     private var pool: [String] = []
     private var poolCursor = 0
     private var idToAsset: [String: PHAsset] = [:]
 
-    /// 重新随机抽取一批（下拉刷新 / 首次进入共用）。
+    /// 重新随机抽取一批（下拉刷新 / 首次进入 / 切换筛选共用）。
     /// .refreshable 的语义即"手指离开屏幕后才执行"，松手前不会触发本方法。
     func refresh() async {
         guard !isSampling else { return }
         isSampling = true
         defer { isSampling = false }
+
+        let currentFilter = selectedFilter
 
         // 后台线程枚举全库：惰性 fetchResult → 轻量 id 映射，不物化图片数据。
         // 每次刷新都重建快照，同步会话期间被删除的照片。
@@ -41,6 +46,9 @@ final class DiscoverManager: ObservableObject {
             let options = PHFetchOptions()
             options.includeHiddenAssets = false      // 与 PhotoManager 行为一致：不展示隐藏照片
             options.includeAllBurstAssets = false    // 与 PhotoManager 行为一致：排除连拍
+            if let predicate = currentFilter.predicate {
+                options.predicate = predicate
+            }
             let result = PHAsset.fetchAssets(with: options)
             var map: [String: PHAsset] = [:]
             map.reserveCapacity(result.count)
@@ -68,6 +76,13 @@ final class DiscoverManager: ObservableObject {
         photos = buildPhotoAssets(batch)
         hasMorePhotos = poolCursor < pool.count
         hasLoadedOnce = true
+    }
+
+    /// 切换格式筛选器并重新抽取
+    func setFilter(_ filter: MediaFormatFilter) async {
+        guard filter != selectedFilter else { return }
+        selectedFilter = filter
+        await refresh()
     }
 
     /// 滚动到底部：从未展示池中再随机抽一批追加（与图库页"最后一张 onAppear 加载"方式一致）
@@ -324,10 +339,16 @@ struct DiscoverView: View {
             .simultaneousGesture(pullGesture)
             .overlay(alignment: .top) { refreshIndicator }
             .scrollIndicators(.hidden)  // 隐藏滚动条
-            // 外部滚顶信号（双击「重温」Tab）：平滑滚动回最顶部，
+            // 外部滚顶信号（双击「回忆」Tab 或外部请求）：平滑滚动回最顶部，
             // edge 滚动落位 offset 0 → 大标题完全展开，无闪动
             .onChange(of: scrollToTopSignal) { _, newValue in
                 guard newValue > 0 else { return }
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    scrollPosition.scrollTo(edge: .top)
+                }
+            }
+            // 筛选条件变化时自动回滚到顶部
+            .onChange(of: manager.selectedFilter) { _, _ in
                 withAnimation(.easeInOut(duration: 0.35)) {
                     scrollPosition.scrollTo(edge: .top)
                 }
@@ -352,7 +373,7 @@ struct DiscoverView: View {
     private var emptyStateView: some View {
         ScrollView {
             VStack(spacing: 20) {
-                Image(systemName: "photo.on.rectangle.angled")
+                Image(systemName: manager.selectedFilter == .all ? "photo.on.rectangle.angled" : manager.selectedFilter.systemImage)
                     .font(.system(size: 60, design: .rounded))
                     .foregroundColor(.gray)
 
@@ -361,7 +382,7 @@ struct DiscoverView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
 
-                Text(String(localized: "Your photo library appears to be empty."))
+                Text(manager.selectedFilter == .all ? String(localized: "Your photo library appears to be empty.") : String(localized: "No media found for the selected format."))
                     .font(.system(.body, design: .rounded))
                     .foregroundColor(.secondary)
             }

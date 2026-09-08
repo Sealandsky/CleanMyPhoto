@@ -9,8 +9,8 @@ enum AppTab: String, CaseIterable {
     var localizedText: String {
         switch self {
         case .photos:
-            // 对齐设计稿：底部第一项显示「重温」（该 tab 内顶部分段默认选中发现页）
-            return String(localized: "Discover")
+            // 底部第一项显示「回忆」
+            return String(localized: "Memories")
         case .albums:
             return String(localized: "Albums")
         case .organize:
@@ -53,13 +53,12 @@ struct MainTabView: View {
     @State private var isFullscreenMode = false
     @State private var showTrash = false
 
-    // 导航路径：时间线子页在图库内；相簿二级页在本层（相簿已抽离为独立 Tab）
-    @State private var timelinePath = NavigationPath()
+    // 导航路径：相簿二级页在本层（相簿已抽离为独立 Tab）
     @State private var albumsPath = NavigationPath()
 
-    // 「重温」Tab 双击的滚顶信号（递增触发发现页滚回顶部）
+    // 「回忆」Tab 双击的滚顶信号（递增触发回忆页滚回顶部）
     @State private var discoverScrollToTop = 0
-    // 上次点击已选中「重温」Tab 的时间，用于双击窗口判定
+    // 上次点击已选中「回忆」Tab 的时间，用于双击窗口判定
     @State private var lastDiscoverTapAt: Date?
 
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
@@ -102,7 +101,7 @@ struct MainTabView: View {
                             accessorySystemImage: "trash",
                             // iOS 26+ 启用 Liquid Glass 背景；iOS 18 自动回退 systemBackground
                             prefersLiquidGlass: true,
-                            // 双击已选中的「重温」Tab：滚回发现页最顶部
+                            // 双击已选中的「回忆」Tab：滚回回忆页最顶部
                             // （单击不再触发；两次点击间隔 0.35s 内视为双击）
                             onReselect: { id in
                                 guard id == AppTab.photos.rawValue else { return }
@@ -137,7 +136,6 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             ContentView(
                 isFullscreenMode: $isFullscreenMode,
-                timelinePath: $timelinePath,
                 discoverScrollToTop: $discoverScrollToTop
             )
             .toolbar(.hidden, for: .tabBar)
@@ -264,7 +262,6 @@ struct MainTabView: View {
         isFullscreenMode ||
         photoManager.isSelectMode ||
         !albumsPath.isEmpty ||
-        !timelinePath.isEmpty ||
         !organizePath.isEmpty
     }
 }
