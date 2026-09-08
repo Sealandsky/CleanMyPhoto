@@ -4,7 +4,6 @@ import Photos
 // MARK: - Media Format Filter
 enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
     case all
-    case photo
     case video
     case livePhoto
     case screenshot
@@ -15,8 +14,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all:
             return String(localized: "All", defaultValue: "全部")
-        case .photo:
-            return String(localized: "Photos (Filter)", defaultValue: "图片")
         case .video:
             return String(localized: "Videos", defaultValue: "视频")
         case .livePhoto:
@@ -30,8 +27,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all:
             return "square.grid.2x2"
-        case .photo:
-            return "photo"
         case .video:
             return "video"
         case .livePhoto:
@@ -47,14 +42,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
             return NSPredicate(
                 format: "mediaType IN %@",
                 [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue]
-            )
-        case .photo:
-            // 排除实况和屏幕快照，仅保留普通静态照片
-            return NSPredicate(
-                format: "mediaType == %d AND (mediaSubtypes & %d) == 0 AND (mediaSubtypes & %d) == 0",
-                PHAssetMediaType.image.rawValue,
-                PHAssetMediaSubtype.photoLive.rawValue,
-                PHAssetMediaSubtype.photoScreenshot.rawValue
             )
         case .video:
             return NSPredicate(
