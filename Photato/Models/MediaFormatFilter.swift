@@ -4,11 +4,11 @@ import Photos
 // MARK: - Media Format Filter
 enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
     case all
-    case favorite
     case photo
     case video
     case livePhoto
     case screenshot
+    case favorite
 
     var id: String { rawValue }
 
@@ -16,8 +16,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all:
             return String(localized: "All", defaultValue: "全部")
-        case .favorite:
-            return String(localized: "Favorites", defaultValue: "个人收藏")
         case .photo:
             return String(localized: "Photos (Filter)", defaultValue: "图片")
         case .video:
@@ -26,6 +24,8 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
             return String(localized: "Live Photos (Filter)", defaultValue: "实况")
         case .screenshot:
             return String(localized: "Screenshots", defaultValue: "屏幕快照")
+        case .favorite:
+            return String(localized: "Favorites", defaultValue: "个人收藏")
         }
     }
 
@@ -33,8 +33,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all:
             return "square.grid.2x2"
-        case .favorite:
-            return "heart"
         case .photo:
             return "photo"
         case .video:
@@ -43,6 +41,8 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
             return "livephoto"
         case .screenshot:
             return "camera.viewfinder"
+        case .favorite:
+            return "heart"
         }
     }
 
@@ -51,11 +51,6 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
         case .all:
             return NSPredicate(
                 format: "mediaType IN %@",
-                [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue]
-            )
-        case .favorite:
-            return NSPredicate(
-                format: "mediaType IN %@ AND isFavorite == YES",
                 [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue]
             )
         case .photo:
@@ -81,6 +76,11 @@ enum MediaFormatFilter: String, CaseIterable, Identifiable, Sendable {
             return NSPredicate(
                 format: "(mediaSubtypes & %d) != 0",
                 PHAssetMediaSubtype.photoScreenshot.rawValue
+            )
+        case .favorite:
+            return NSPredicate(
+                format: "mediaType IN %@ AND isFavorite == YES",
+                [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue]
             )
         }
     }
