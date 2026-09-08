@@ -163,18 +163,22 @@ struct ContentView: View {
     @ViewBuilder
     private var formatFilterMenu: some View {
         Menu {
-            ForEach(MediaFormatFilter.allCases) { filter in
-                Button {
-                    Task {
-                        await discoverManager.setFilter(filter)
+            Picker(
+                selection: Binding(
+                    get: { discoverManager.selectedFilter },
+                    set: { newFilter in
+                        Task {
+                            await discoverManager.setFilter(newFilter)
+                        }
                     }
-                } label: {
-                    if discoverManager.selectedFilter == filter {
-                        Label(filter.localizedText, systemImage: "checkmark")
-                    } else {
-                        Label(filter.localizedText, systemImage: filter.systemImage)
-                    }
+                )
+            ) {
+                ForEach(MediaFormatFilter.allCases) { filter in
+                    Label(filter.localizedText, systemImage: filter.systemImage)
+                        .tag(filter)
                 }
+            } label: {
+                Text(String(localized: "Filter"))
             }
         } label: {
             filterMenuLabel
