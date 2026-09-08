@@ -25,13 +25,26 @@ final class DiscoverManager: ObservableObject {
     /// 当前选中的媒体格式筛选器
     @Published var selectedFilter: MediaFormatFilter = .all
 
+    // 筛选分类快照缓存：记录每个分类已加载的批次与洗牌池，避免重复切换时频繁刷新
+    private struct FilterSnapshot {
+        var photos: [PhotoAsset] = []
+        var totalCount: Int = 0
+        var hasLoadedOnce: Bool = false
+        var hasMorePhotos: Bool = false
+        var pool: [String] = []
+        var poolCursor: Int = 0
+        var idToAsset: [String: PHAsset] = [:]
+    }
+
+    private var filterSnapshots: [MediaFormatFilter: FilterSnapshot] = [:]
+
     // 惰性洗牌池：pool[poolCursor...] 为尚未展示过的资源 id。
     // 只在抽取时交换对应位置，O(每批) 而非 O(全库)；不放回抽样，跨批次不重复。
     private var pool: [String] = []
     private var poolCursor = 0
     private var idToAsset: [String: PHAsset] = [:]
 
-    /// 重新随机抽取一批（下拉刷新 / 首次进入 / 切换筛选共用）。
+    /// 重新随机抽取一批（下拉刷新 / 首次进入 / 某分类首次加载时调用）。
     /// .refreshable 的语义即"手指离开屏幕后才执行"，松手前不会触发本方法。
     func refresh() async {
         guard !isSampling else { return }
@@ -68,6 +81,15 @@ final class DiscoverManager: ObservableObject {
             photos = []
             hasMorePhotos = false
             hasLoadedOnce = true
+            filterSnapshots[currentFilter] = FilterSnapshot(
+                photos: [],
+                totalCount: 0,
+                hasLoadedOnce: true,
+                hasMorePhotos: false,
+                pool: [],
+                poolCursor: 0,
+                idToAsset: [:]
+            )
             return
         }
 
@@ -76,13 +98,50 @@ final class DiscoverManager: ObservableObject {
         photos = buildPhotoAssets(batch)
         hasMorePhotos = poolCursor < pool.count
         hasLoadedOnce = true
+
+        // 记录当前筛选分类的批次快照
+        filterSnapshots[currentFilter] = FilterSnapshot(
+            photos: photos,
+            totalCount: totalCount,
+            hasLoadedOnce: hasLoadedOnce,
+            hasMorePhotos: hasMorePhotos,
+            pool: pool,
+            poolCursor: poolCursor,
+            idToAsset: idToAsset
+        )
     }
 
-    /// 切换格式筛选器并重新抽取
+    /// 切换格式筛选器：若该分类之前已加载过，则保留上一次批次不刷新；仅首次进入该分类时刷新
     func setFilter(_ filter: MediaFormatFilter) async {
         guard filter != selectedFilter else { return }
+
+        // 1. 保存离开当前分类时的最新状态快照
+        filterSnapshots[selectedFilter] = FilterSnapshot(
+            photos: photos,
+            totalCount: totalCount,
+            hasLoadedOnce: hasLoadedOnce,
+            hasMorePhotos: hasMorePhotos,
+            pool: pool,
+            poolCursor: poolCursor,
+            idToAsset: idToAsset
+        )
+
         selectedFilter = filter
-        await refresh()
+
+        // 2. 检查目标分类是否已有加载记录
+        if let snapshot = filterSnapshots[filter], snapshot.hasLoadedOnce {
+            // 已加载过：直接恢复上一批次数据，不刷新
+            self.photos = snapshot.photos
+            self.totalCount = snapshot.totalCount
+            self.hasLoadedOnce = snapshot.hasLoadedOnce
+            self.hasMorePhotos = snapshot.hasMorePhotos
+            self.pool = snapshot.pool
+            self.poolCursor = snapshot.poolCursor
+            self.idToAsset = snapshot.idToAsset
+        } else {
+            // 首次加载该分类：发起抽样刷新
+            await refresh()
+        }
     }
 
     /// 滚动到底部：从未展示池中再随机抽一批追加（与图库页"最后一张 onAppear 加载"方式一致）
@@ -94,23 +153,38 @@ final class DiscoverManager: ObservableObject {
         let batch = drawBatch(count: Self.sampleCount)
         guard !batch.isEmpty else {
             hasMorePhotos = false
+            filterSnapshots[selectedFilter]?.hasMorePhotos = false
             return
         }
         let built = buildPhotoAssets(batch)
         photos += built
         hasMorePhotos = poolCursor < pool.count
+
+        // 同步更新快照
+        filterSnapshots[selectedFilter]?.photos = photos
+        filterSnapshots[selectedFilter]?.hasMorePhotos = hasMorePhotos
+        filterSnapshots[selectedFilter]?.poolCursor = poolCursor
     }
 
-    /// 全屏删除后同步移出批次（DraggablePhotoView 依赖外部数组收缩以滑动到下一张，
-    /// 与 Library 页 addToTrash 后 displayedPhotos 更新是同一模式）
+    /// 全屏删除后同步移出批次（同时清理所有缓存池，避免切回其他分类时仍残留已删除照片）
     func removePhoto(_ photo: PhotoAsset) {
         photos.removeAll { $0.id == photo.id }
+        for key in filterSnapshots.keys {
+            filterSnapshots[key]?.photos.removeAll { $0.id == photo.id }
+            filterSnapshots[key]?.idToAsset.removeValue(forKey: photo.id)
+            filterSnapshots[key]?.pool.removeAll { $0 == photo.id }
+        }
     }
 
-    /// 全屏收藏切换后同步批次内状态，保证返回网格/再次进入时心形角标一致
+    /// 全屏收藏切换后同步批次内状态
     func updateFavorite(photoID: String, isFavorite: Bool) {
         if let index = photos.firstIndex(where: { $0.id == photoID }) {
             photos[index].isFavorite = isFavorite
+        }
+        for key in filterSnapshots.keys {
+            if let index = filterSnapshots[key]?.photos.firstIndex(where: { $0.id == photoID }) {
+                filterSnapshots[key]?.photos[index].isFavorite = isFavorite
+            }
         }
     }
 

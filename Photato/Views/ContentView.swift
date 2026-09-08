@@ -178,13 +178,13 @@ struct ContentView: View {
         } label: {
             filterMenuLabel
         }
-        .tint(discoverManager.selectedFilter == .all ? .primary : .blue)
+        // 不加 .tint，保持下拉菜单样式不变，避免菜单项跟随变蓝
     }
 
     @ViewBuilder
     private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下不用加文本：纯图标排版，常规颜色
+            // 全部分类下不用加文本：纯图标排版，常规系统颜色
             if #available(iOS 26.0, *) {
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -197,22 +197,17 @@ struct ContentView: View {
                     .background(.ultraThinMaterial, in: Circle())
             }
         } else {
-            // 选中某个分类：变蓝色，文本+图标排版
+            // 选中某个分类：整个按钮变蓝色，保持系统效果，文本+图标排版
             HStack(spacing: 5) {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
             }
-            .foregroundColor(.blue)
-            .padding(.horizontal, 12)
+            .foregroundColor(.white)
+            .padding(.horizontal, 14)
             .frame(height: 36)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(Capsule().fill(Color.blue.opacity(0.12)))
-                    .overlay(Capsule().stroke(Color.blue.opacity(0.25), lineWidth: 1))
-            }
+            .background(Color.blue, in: Capsule())
         }
     }
 }
