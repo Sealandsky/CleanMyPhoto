@@ -841,7 +841,7 @@ private struct RelatedPhotosSection: View {
                         } label: {
                             AssetImage(
                                 asset: asset,
-                                targetSize: CGSize(width: 400, height: 400),
+                                targetSize: CGSize(width: 600, height: 600),
                                 contentMode: .fill
                             )
                             .frame(maxWidth: .infinity)

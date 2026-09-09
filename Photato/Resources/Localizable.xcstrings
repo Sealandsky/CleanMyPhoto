@@ -326,6 +326,38 @@
         }
       }
     },
+    "Add Photos from Library" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Photos from Library"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从图库挑选照片"
+          }
+        }
+      }
+    },
+    "Adding Photos..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding Photos..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在添加照片..."
+          }
+        }
+      }
+    },
     "AI Select" : {
       "localizations" : {
         "en" : {
@@ -338,6 +370,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 帮选"
+          }
+        }
+      }
+    },
+    "Album is Well Organized" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Album is Well Organized"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相簿已整理完毕"
           }
         }
       }
@@ -370,6 +418,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部"
+          }
+        }
+      }
+    },
+    "All matching photos in your library are already in this album." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All matching photos in your library are already in this album."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图库中相似的照片已全部收录，当前相簿内容很完整。"
           }
         }
       }
@@ -674,6 +738,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "闭眼/糊脸"
+          }
+        }
+      }
+    },
+    "Browse Fullscreen" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browse Fullscreen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏放映浏览"
           }
         }
       }
@@ -1524,6 +1605,22 @@
         }
       }
     },
+    "More Photos for This Album" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More Photos for This Album"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多适合这个相簿的照片"
+          }
+        }
+      }
+    },
     "Most Popular" : {
       "localizations" : {
         "en" : {
@@ -1623,6 +1720,23 @@
         }
       }
     },
+    "No More Matching Photos" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No More Matching Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无更多适合的照片"
+          }
+        }
+      }
+    },
     "No photo selected" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1668,6 +1782,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到照片。请确保相册中有照片。"
+          }
+        }
+      }
+    },
+    "No Photos in Album" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Photos in Album"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相簿内暂无照片"
           }
         }
       }
@@ -2881,6 +3011,38 @@
         }
       }
     },
+    "View All" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部"
+          }
+        }
+      }
+    },
+    "View All Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View All Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看全部照片"
+          }
+        }
+      }
+    },
     "Welcome to Photato" : {
       "localizations" : {
         "en" : {
@@ -2957,6 +3119,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您的照片库似乎是空的。"
+          }
+        }
+      }
+    },
+    "Your Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的照片"
           }
         }
       }

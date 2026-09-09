@@ -13,7 +13,7 @@ struct AlbumCell: View {
                         CachedAlbumCoverView(
                             albumID: album.id,
                             coverAsset: coverAsset,
-                            targetSize: CGSize(width: 300, height: 400)
+                            targetSize: CGSize(width: 600, height: 800)
                         )
                         .scaledToFill()
                     } else {

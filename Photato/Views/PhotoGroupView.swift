@@ -84,7 +84,7 @@ struct MonthCardView: View {
                     } else if let asset = monthAlbum.fetchResult?.firstObject ?? monthAlbum.assets.first {
                         AssetImage(
                             asset: asset,
-                            targetSize: CGSize(width: 300, height: 400),
+                            targetSize: CGSize(width: 600, height: 800),
                             contentMode: .fill
                         )
                         .scaledToFill()

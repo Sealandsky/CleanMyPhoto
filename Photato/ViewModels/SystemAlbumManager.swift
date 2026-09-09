@@ -15,7 +15,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        thumbnailSize = CGSize(width: 150 * ScreenSizeHelper.screenScale, height: 150 * ScreenSizeHelper.screenScale)
+        thumbnailSize = CGSize(width: 600, height: 600)
     }
 
     /// 加载所有年份相册
@@ -142,7 +142,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
 
         await withUnsafeContinuation { (continuation: UnsafeContinuation<Void, Never>) in
             var isResumed = false
-            imageManager.requestImage(for: asset, targetSize: CGSize(width: 400, height: 400), contentMode: .aspectFill, options: options) { image, info in
+            imageManager.requestImage(for: asset, targetSize: CGSize(width: 600, height: 600), contentMode: .aspectFill, options: options) { image, info in
                 if let image, !(info?[PHImageResultIsDegradedKey] as? Bool ?? false) {
                     Task { @MainActor in
                         guard var months = self.allMonthAlbums[album.year] else { return }
@@ -174,7 +174,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
 
             imageManager.requestImage(
                 for: asset,
-                targetSize: CGSize(width: 80, height: 80),
+                targetSize: CGSize(width: 600, height: 600),
                 contentMode: .aspectFill,
                 options: options
             ) { image, _ in
@@ -287,7 +287,7 @@ class SystemAlbumManager: NSObject, ObservableObject {
 
             imageManager.requestImage(
                 for: asset,
-                targetSize: CGSize(width: 400, height: 400),
+                targetSize: CGSize(width: 600, height: 600),
                 contentMode: .aspectFill,
                 options: options
             ) { image, info in
