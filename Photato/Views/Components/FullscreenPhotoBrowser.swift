@@ -648,7 +648,10 @@ struct FullscreenPhotoBrowser: View {
             }
         }
 
-        // 后台全量扫描定稿：有特征缓存时近乎瞬时；结果与已展示一致时跳过重写
+        // 后台全量扫描定稿：快速划动翻页时防抖 0.2s，避免连续发单引起后台队列拥堵
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        guard !Task.isCancelled else { return }
+
         let result: ([PHAsset], Error?) = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 matcher.findSimilar(to: photo.asset) { assets, error in

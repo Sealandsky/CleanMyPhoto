@@ -11,10 +11,10 @@ struct PhotoCell: View {
     @Environment(\.displayScale) private var displayScale
     @State private var imageLoaded = false
 
-    /// 缩略图请求像素下/上限：下限保证极小格子仍清晰，上限防止
-    /// 原比例瀑布流中的超长截图把请求尺寸顶到离谱的内存占用
-    private static let minPixelEdge: CGFloat = 600
-    private static let maxPixelEdge: CGFloat = 1400
+    /// 缩略图请求像素下/上限：下限贴合 Retina 3x 列宽（保证极小格子仍锐利清晰），
+    /// 上限防止瀑布流中超长截图把请求尺寸顶到离谱的内存占用
+    private static let minPixelEdge: CGFloat = 260
+    private static let maxPixelEdge: CGFloat = 900
 
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
     /// 否则用用户设置的固定比例。

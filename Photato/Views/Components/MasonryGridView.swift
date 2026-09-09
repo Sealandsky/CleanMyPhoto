@@ -16,7 +16,8 @@ struct MasonryGridContent<Content: View>: View {
     @ViewBuilder let cell: (PhotoAsset) -> Content
 
     /// 按归一化列高（每列宽度 = 1，高度 = Σ 1/宽高比）贪心分配
-    private var buckets: [[PhotoAsset]] {
+    private static func computeBuckets(photos: [PhotoAsset], columnCount: Int) -> [[PhotoAsset]] {
+        guard columnCount > 0 else { return [] }
         var columnHeights = [CGFloat](repeating: 0, count: columnCount)
         var result = [[PhotoAsset]](repeating: [], count: columnCount)
         for photo in photos {
@@ -28,11 +29,14 @@ struct MasonryGridContent<Content: View>: View {
     }
 
     var body: some View {
+        let buckets = Self.computeBuckets(photos: photos, columnCount: columnCount)
         HStack(alignment: .top, spacing: GridColumnHelper.spacing) {
             ForEach(0..<columnCount, id: \.self) { columnIndex in
                 LazyVStack(spacing: GridColumnHelper.spacing) {
-                    ForEach(buckets[columnIndex]) { photo in
-                        cell(photo)
+                    if columnIndex < buckets.count {
+                        ForEach(buckets[columnIndex]) { photo in
+                            cell(photo)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)

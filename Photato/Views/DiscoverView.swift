@@ -31,18 +31,18 @@ final class DiscoverManager: ObservableObject {
         var totalCount: Int = 0
         var hasLoadedOnce: Bool = false
         var hasMorePhotos: Bool = false
-        var pool: [String] = []
+        var pool: [Int] = []
         var poolCursor: Int = 0
-        var idToAsset: [String: PHAsset] = [:]
+        var fetchResult: PHFetchResult<PHAsset>? = nil
     }
 
     private var filterSnapshots: [MediaFormatFilter: FilterSnapshot] = [:]
 
-    // 惰性洗牌池：pool[poolCursor...] 为尚未展示过的资源 id。
+    // 惰性洗牌池：pool[poolCursor...] 为尚未展示过的资源索引。
     // 只在抽取时交换对应位置，O(每批) 而非 O(全库)；不放回抽样，跨批次不重复。
-    private var pool: [String] = []
+    private var pool: [Int] = []
     private var poolCursor = 0
-    private var idToAsset: [String: PHAsset] = [:]
+    private var fetchResult: PHFetchResult<PHAsset>? = nil
 
     /// 重新随机抽取一批（下拉刷新 / 首次进入 / 某分类首次加载时调用）。
     /// .refreshable 的语义即"手指离开屏幕后才执行"，松手前不会触发本方法。
@@ -53,27 +53,21 @@ final class DiscoverManager: ObservableObject {
 
         let currentFilter = selectedFilter
 
-        // 后台线程枚举全库：惰性 fetchResult → 轻量 id 映射，不物化图片数据。
-        // 每次刷新都重建快照，同步会话期间被删除的照片。
-        let (assetMap, count) = await Task.detached(priority: .userInitiated) { () -> ([String: PHAsset], Int) in
+        // 惰性获取 PHFetchResult，不将全库对象物化到字典，极大降低内存和启动耗时
+        let (result, count) = await Task.detached(priority: .userInitiated) { () -> (PHFetchResult<PHAsset>, Int) in
             let options = PHFetchOptions()
             options.includeHiddenAssets = false      // 与 PhotoManager 行为一致：不展示隐藏照片
             options.includeAllBurstAssets = false    // 与 PhotoManager 行为一致：排除连拍
             if let predicate = currentFilter.predicate {
                 options.predicate = predicate
             }
-            let result = PHAsset.fetchAssets(with: options)
-            var map: [String: PHAsset] = [:]
-            map.reserveCapacity(result.count)
-            result.enumerateObjects { asset, _, _ in
-                map[asset.localIdentifier] = asset
-            }
-            return (map, result.count)
+            let res = PHAsset.fetchAssets(with: options)
+            return (res, res.count)
         }.value
 
-        idToAsset = assetMap
+        fetchResult = result
         totalCount = count
-        pool = Array(assetMap.keys)
+        pool = Array(0..<count)
         poolCursor = 0
 
         // 空相册兜底：清空列表，由 View 层展示空状态占位 UI
@@ -88,7 +82,7 @@ final class DiscoverManager: ObservableObject {
                 hasMorePhotos: false,
                 pool: [],
                 poolCursor: 0,
-                idToAsset: [:]
+                fetchResult: result
             )
             return
         }
@@ -107,7 +101,7 @@ final class DiscoverManager: ObservableObject {
             hasMorePhotos: hasMorePhotos,
             pool: pool,
             poolCursor: poolCursor,
-            idToAsset: idToAsset
+            fetchResult: fetchResult
         )
     }
 
@@ -123,7 +117,7 @@ final class DiscoverManager: ObservableObject {
             hasMorePhotos: hasMorePhotos,
             pool: pool,
             poolCursor: poolCursor,
-            idToAsset: idToAsset
+            fetchResult: fetchResult
         )
 
         selectedFilter = filter
@@ -137,7 +131,7 @@ final class DiscoverManager: ObservableObject {
             self.hasMorePhotos = snapshot.hasMorePhotos
             self.pool = snapshot.pool
             self.poolCursor = snapshot.poolCursor
-            self.idToAsset = snapshot.idToAsset
+            self.fetchResult = snapshot.fetchResult
         } else {
             // 首次加载该分类：发起抽样刷新
             await refresh()
@@ -171,8 +165,6 @@ final class DiscoverManager: ObservableObject {
         photos.removeAll { $0.id == photo.id }
         for key in filterSnapshots.keys {
             filterSnapshots[key]?.photos.removeAll { $0.id == photo.id }
-            filterSnapshots[key]?.idToAsset.removeValue(forKey: photo.id)
-            filterSnapshots[key]?.pool.removeAll { $0 == photo.id }
         }
     }
 
@@ -193,6 +185,7 @@ final class DiscoverManager: ObservableObject {
     /// 惰性 Fisher-Yates 洗牌：只交换本批要消费的位置即得到不放回的随机样本，
     /// 单批复杂度 O(批大小)，全库洗牌成本分摊到各批；同张照片不会重复出现
     private func drawBatch(count: Int) -> [PHAsset] {
+        guard let fetchResult = fetchResult else { return [] }
         let n = min(count, pool.count - poolCursor)
         var result: [PHAsset] = []
         result.reserveCapacity(n)
@@ -200,8 +193,9 @@ final class DiscoverManager: ObservableObject {
             // 随机搭档 j 从 i 起在剩余区间取值，保证 swapAt 两个索引都合法
             let j = Int.random(in: i..<pool.count)
             pool.swapAt(i, j)
-            if let asset = idToAsset[pool[i]] {
-                result.append(asset)
+            let assetIndex = pool[i]
+            if assetIndex < fetchResult.count {
+                result.append(fetchResult.object(at: assetIndex))
             }
         }
         poolCursor += n

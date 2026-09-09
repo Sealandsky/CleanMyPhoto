@@ -181,12 +181,16 @@ final class PhotoQualityAnalyzer {
                             ))
                             doneInBatch += 1
                             let done = doneInBatch
+                            let currentTotal = batchStart + done
+                            let shouldUpdate = (currentTotal % 10 == 0) || (currentTotal == total) || (done == batch.count)
                             lock.unlock()
 
-                            // Per-photo progress (smooth), global count across the whole scan.
-                            DispatchQueue.main.async {
-                                self.computingProgress = Double(batchStart + done) / Double(total)
-                                self.currentStep = String(localized: "Analyzing \(batchStart + done)/\(total)...")
+                            // Throttled progress update to keep UI responsive and avoid main thread starvation
+                            if shouldUpdate {
+                                DispatchQueue.main.async {
+                                    self.computingProgress = Double(currentTotal) / Double(total)
+                                    self.currentStep = String(localized: "Analyzing \(currentTotal)/\(total)...")
+                                }
                             }
 
                             semaphore.signal()

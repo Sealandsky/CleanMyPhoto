@@ -158,6 +158,7 @@ final class PhotoSimilarityManager {
                         results.append(FingerprintData(
                             localIdentifier: asset.localIdentifier,
                             dhash: hash,
+                            dhashBits: Self.parseDHashBits(hash),
                             creationDate: asset.creationDate,
                             pixelWidth: Int32(asset.pixelWidth),
                             pixelHeight: Int32(asset.pixelHeight),
@@ -212,7 +213,7 @@ final class PhotoSimilarityManager {
 
                 guard otherDate.timeIntervalSince(date) <= windowSeconds else { break }
 
-                let dist = Self.hammingDistance(fp.dhash, other.dhash)
+                let dist = Self.hammingDistance(fp.dhashBits, other.dhashBits)
                 if dist <= threshold {
                     uf.union(fp.localIdentifier, other.localIdentifier)
                 }
@@ -246,7 +247,7 @@ final class PhotoSimilarityManager {
             } else {
                 dateKey = "none"
             }
-            let key = "\(fp.dhash)_\(dateKey)"
+            let key = "\(fp.dhashBits)_\(dateKey)"
             groups[key, default: []].append(fp.localIdentifier)
         }
 
@@ -339,10 +340,20 @@ final class PhotoSimilarityManager {
     private struct FingerprintData: Sendable {
         let localIdentifier: String
         let dhash: String
+        let dhashBits: UInt64
         let creationDate: Date?
         let pixelWidth: Int32
         let pixelHeight: Int32
         let fileSize: Int64
+    }
+
+    nonisolated static func parseDHashBits(_ dhash: String) -> UInt64 {
+        if dhash.count == 64 {
+            return UInt64(dhash, radix: 2) ?? 0
+        } else if !dhash.isEmpty {
+            return UInt64(dhash, radix: 16) ?? 0
+        }
+        return 0
     }
 
     private func loadCachedIdentifiers() -> Set<String> {
@@ -398,6 +409,7 @@ final class PhotoSimilarityManager {
             FingerprintData(
                 localIdentifier: fp.localIdentifier,
                 dhash: fp.dhash,
+                dhashBits: Self.parseDHashBits(fp.dhash),
                 creationDate: fp.creationDate,
                 pixelWidth: fp.pixelWidth,
                 pixelHeight: fp.pixelHeight,
@@ -472,13 +484,8 @@ final class PhotoSimilarityManager {
 
     // MARK: - Hamming Distance
 
-    nonisolated private static func hammingDistance(_ a: String, _ b: String) -> Int {
-        guard a.count == b.count else { return Int.max }
-        var distance = 0
-        for (c1, c2) in zip(a, b) {
-            if c1 != c2 { distance += 1 }
-        }
-        return distance
+    nonisolated private static func hammingDistance(_ a: UInt64, _ b: UInt64) -> Int {
+        (a ^ b).nonzeroBitCount
     }
 }
 

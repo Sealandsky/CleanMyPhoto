@@ -169,19 +169,32 @@ struct AlbumPhotoListView: View {
     // MARK: - Album Size Calculation
 
     private func calculateAlbumSize() {
+        let albumAssets = photos.map(\.asset)
         Task {
-            let totalSize = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-                for photo in photos {
-                    group.addTask {
-                        await PHAssetSizeHelper.getAssetSize(photo.asset)
+            let totalSize = await Task.detached(priority: .utility) {
+                await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                    let maxConcurrent = 16
+                    var running = 0
+                    var total: Int64 = 0
+
+                    for asset in albumAssets {
+                        if running >= maxConcurrent {
+                            if let size = await group.next() {
+                                total += size
+                                running -= 1
+                            }
+                        }
+                        group.addTask {
+                            await PHAssetSizeHelper.getAssetSize(asset)
+                        }
+                        running += 1
                     }
+                    for await size in group {
+                        total += size
+                    }
+                    return total
                 }
-                var total: Int64 = 0
-                for await size in group {
-                    total += size
-                }
-                return total
-            }
+            }.value
             SizeCache.save("album_\(album.id)", size: totalSize)
             let newText = ByteFormatter.format(totalSize)
             if newText != albumSizeText { albumSizeText = newText }
