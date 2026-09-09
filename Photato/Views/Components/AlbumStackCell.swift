@@ -2,15 +2,15 @@ import SwiftUI
 import Photos
 
 // MARK: - Album Stack Cell
-/// 相簿堆叠卡片：最多 3 张白色描边长方形照片像散开的一手照片般
-/// 从左到右扇形排开（彼此留有间隙，每张带投影），下方居中展示
-/// 相簿名称与照片数量。
+/// 相簿堆叠卡片：根据相簿素材数量智能呈现 1 张、2 张、3 张照片的相纸叠放效果
+/// 规格精准对齐 Figma 686:1312（Frame 27 组件集）：
 ///
 /// 堆叠规则（底层 → 顶层，从左到右）：
-/// - 3 张：底层最小且左倾（-13°）、中层直立微右倾（+6°）、顶层最大右倾（+10°）
-/// - 2 张：底层左倾（-12°）+ 顶层右倾（+10°）
-/// - 1 张：单张正面居中；0 张：灰色占位卡
-/// - 超过 3 张也只取最新的 3 张（数据由 AlbumModel.stackAssets 提供）
+/// - 3 张以上（Default 686:1311）：底层左倾（-15°）、中层微右倾（+4.5°）、顶层右倾（+5.8°）
+/// - 2 张（Variant2 686:1313）：底层偏左（-15°）+ 顶层偏右（+5.8°），左右优美平衡
+/// - 1 张（Variant3 686:1318）：单张居中微倾（-8.75°），呈现单张随手摆放的相纸自然质感
+/// - 0 张：灰色居中占位卡
+/// - 超过 3 张取最新的 3 张（旧→新升序，最新在最顶层）
 struct AlbumStackCell: View {
     let album: AlbumModel
 
@@ -22,7 +22,7 @@ struct AlbumStackCell: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                // 数量沿用原 AlbumCell 的纯数字展示
+                // 数量展示
                 Text("\(album.assetCount)")
                     .font(.system(size: 13, design: .rounded))
                     .foregroundColor(.secondary)
@@ -31,12 +31,40 @@ struct AlbumStackCell: View {
         }
     }
 
-    // MARK: - 堆叠区（规格来自 Figma photo-row 635:1326）
-    /// 设计稿精确布局（堆叠区 153.7×127，归一化百分比；堆叠区宽高比 1.21）：
-    /// - 底层（最旧）：x 2.6%  y 5.9%   60.7% × 92.6%  左倾约 -12°
-    /// - 中层：        x 31.2% y 0      50.0% × 85.3%  右倾约 +5°
-    /// - 顶层（最新）：x 44.1% y 13.5%  51.4% × 86.4%  右倾约 +9°
-    /// 三张互有间隙；白色描边 2.2pt + 柔和投影
+    // MARK: - 堆叠规格定义（精准对齐 Figma 686:1312 组件集）
+    private struct StackLayerSpec {
+        let cx: CGFloat
+        let cy: CGFloat
+        let angle: Double
+    }
+
+    private static func layerSpecs(for count: Int) -> [StackLayerSpec] {
+        switch count {
+        case 1:
+            // Variant3 (Figma 686:1318)：单张精确居中，自然微倾 -8.75°
+            return [
+                StackLayerSpec(cx: 0.5000, cy: 0.4970, angle: -8.75)
+            ]
+        case 2:
+            // Variant2 (Figma 686:1313)：双张照片左右展开（底层左倾 -15°，顶层右倾 +5.78°）
+            return [
+                StackLayerSpec(cx: 0.3941, cy: 0.4896, angle: -15.00),
+                StackLayerSpec(cx: 0.6510, cy: 0.5206, angle: 5.78)
+            ]
+        default:
+            // Default 3+ 张 (Figma 686:1311)：三张散开的一手照片
+            return [
+                StackLayerSpec(cx: 0.3295, cy: 0.5221, angle: -15.00),
+                StackLayerSpec(cx: 0.5620, cy: 0.4269, angle: 4.51),
+                StackLayerSpec(cx: 0.6976, cy: 0.5679, angle: 5.78)
+            ]
+        }
+    }
+
+    // MARK: - 堆叠区
+    /// 设计稿精确布局（堆叠区 153.71×127，归一化百分比；堆叠区宽高比 1.21）：
+    /// - 卡片未旋转物理尺寸：宽 68.90 (44.82%)，高 103.34 (81.37%)，标准 2:3 纵向相纸
+    /// - 白色描边 2.2pt + 柔和投影
     private var stackArea: some View {
         GeometryReader { geo in
             let width = geo.size.width
@@ -44,45 +72,39 @@ struct AlbumStackCell: View {
             let displayed = Array(album.stackAssets.suffix(3))
             let count = displayed.count
 
-            // 各层规格（x, y, w, h 均为堆叠区百分比；angle 为度）
-            let specs: [(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, angle: Double)] = [
-                (0.026, 0.059, 0.607, 0.926, -12),
-                (0.312, 0.000, 0.500, 0.853, 5),
-                (0.441, 0.135, 0.514, 0.864, 9),
-            ]
+            // 卡片尺寸与圆角（对齐设计稿 68.90 × 103.34，cornerRadius 8.25）
+            let cardW = width * 0.4482
+            let cardH = height * 0.8137
+            let cornerRadius = cardW * (8.25 / 68.90)
 
             ZStack {
                 if count == 0 {
-                    // 空相簿占位：取中层规格的尺寸居中
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    // 空相簿占位：单张卡片居中直立
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(Color(.systemGray5))
-                        .frame(width: width * 0.5, height: height * 0.853)
+                        .frame(width: cardW, height: cardH)
                         .overlay(
                             Image(systemName: "photo")
-                                .font(.system(size: 26, design: .rounded))
+                                .font(.system(size: 24, design: .rounded))
                                 .foregroundColor(.secondary)
                         )
-                        .offset(x: 0, y: height * 0.04)
+                        .position(x: width * 0.5, y: height * 0.5)
                 } else {
+                    let specs = Self.layerSpecs(for: count)
                     ForEach(0..<count, id: \.self) { index in
-                        // 显示张数：<3 时从顶层规格反向取用，保证顶层（最新照片）始终完整呈现
-                        let specIndex = count == 1 ? 2 : (count == 2 ? index + 1 : index)
-                        let s = specs[specIndex]
-                        // 设计稿百分比是含旋转的包围盒：卡片本体按 88% 缩放
-                        // （补偿 ±12° 旋转的包围盒放大），中心对齐包围盒中心
-                        let bodyW = width * s.w * 0.88
-                        let bodyH = height * s.h * 0.88
+                        let s = specs[index]
                         AlbumStackCoverImage(asset: displayed[index])
-                            .frame(width: bodyW, height: bodyH)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            // 白色描边 2.2：设计稿中每张照片的相纸白边
+                            .frame(width: cardW, height: cardH)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                            // 白色相纸白边 2.2pt
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                                     .strokeBorder(Color.white, lineWidth: 2.2)
                             )
-                            .shadow(color: .black.opacity(0.22), radius: 7, x: 0, y: 4)
+                            // 柔和自然投影（对齐 Figma: blur 14.09, y 11.56, black 15%）
+                            .shadow(color: .black.opacity(0.18), radius: 7, x: 0, y: 5)
                             .rotationEffect(.degrees(s.angle))
-                            .position(x: width * (s.x + s.w / 2), y: height * (s.y + s.h / 2))
+                            .position(x: width * s.cx, y: height * s.cy)
                     }
                 }
             }
@@ -130,7 +152,7 @@ private struct AlbumStackCoverImage: View {
 
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: CGSize(width: 500, height: 700),
+            targetSize: CGSize(width: 600, height: 800),
             contentMode: .aspectFill,
             options: options
         ) { img, info in

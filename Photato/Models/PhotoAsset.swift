@@ -28,6 +28,10 @@ struct PhotoAsset: Identifiable, Equatable {
         lhs.id == rhs.id && lhs.isFavorite == rhs.isFavorite
     }
 
+    var isVideo: Bool {
+        mediaType == .video
+    }
+
     // MARK: - Media Type Detection
 
     private static func detectMediaType(_ asset: PHAsset) -> AssetMediaType {

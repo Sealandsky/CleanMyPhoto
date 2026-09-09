@@ -23,7 +23,7 @@ enum AppTab: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .photos:
-            return "rectangle.3.group"
+            return "rectangle.3.group.fill"
         case .albums:
             return "photo.on.rectangle.angled"
         case .organize:
@@ -168,7 +168,7 @@ struct MainTabView: View {
                         Task { [album] in
                             await albumMgr.fetchPhotos(in: album)
                             guard selectedAlbum?.id == album.id else { return }
-                            albumsPath.append(AlbumsDestination.albumPhotos(album.id))
+                            albumsPath.append(AlbumsDestination.albumDetail(album.id))
                         }
                     }
                 } else {
@@ -193,7 +193,19 @@ struct MainTabView: View {
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
                 switch destination {
-                case .albumPhotos(let albumId):
+                case .albumDetail(let albumId):
+                    if let album = albumManager?.albums.first(where: { $0.id == albumId }),
+                       let albumMgr = albumManager {
+                        AlbumDetailView(
+                            albumManager: albumMgr,
+                            photoManager: photoManager,
+                            album: album,
+                            onViewAllTapped: {
+                                albumsPath.append(AlbumsDestination.albumAllPhotos(album.id))
+                            }
+                        )
+                    }
+                case .albumAllPhotos(let albumId):
                     if let album = albumManager?.albums.first(where: { $0.id == albumId }),
                        let albumMgr = albumManager {
                         AlbumPhotoListView(

@@ -13,7 +13,7 @@ struct PhotoCell: View {
 
     /// 缩略图请求像素下/上限：下限保证极小格子仍清晰，上限防止
     /// 原比例瀑布流中的超长截图把请求尺寸顶到离谱的内存占用
-    private static let minPixelEdge: CGFloat = 300
+    private static let minPixelEdge: CGFloat = 600
     private static let maxPixelEdge: CGFloat = 1400
 
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
@@ -125,7 +125,7 @@ struct PhotoCell: View {
         .foregroundColor(.white)
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(6)
     }
 
@@ -133,7 +133,7 @@ struct PhotoCell: View {
         Image(systemName: "heart.fill")
             .font(.system(size: 16, weight: .semibold, design: .rounded))
             .foregroundColor(.white)
-            .shadow(color: Color.black.opacity(0.45), radius: 2, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.65), radius: 2.5, x: 0, y: 1)
             .padding(7)
     }
 
@@ -143,7 +143,7 @@ struct PhotoCell: View {
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(6)
     }
 
@@ -153,7 +153,7 @@ struct PhotoCell: View {
             .foregroundColor(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(6)
     }
 }

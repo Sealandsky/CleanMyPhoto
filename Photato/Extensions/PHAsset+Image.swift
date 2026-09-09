@@ -40,7 +40,9 @@ final class PhotoImageCache {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.clearAll()
+            Task { @MainActor [weak self] in
+                self?.clearAll()
+            }
         }
     }
 

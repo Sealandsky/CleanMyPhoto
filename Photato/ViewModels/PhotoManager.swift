@@ -165,7 +165,7 @@ class PhotoManager: ObservableObject {
 
             PhotoAssetImageManager.shared.startCachingImages(
                 for: assetsToPreload,
-                targetSize: CGSize(width: 400, height: 400),
+                targetSize: CGSize(width: 600, height: 600),
                 contentMode: .aspectFill,
                 options: options
             )

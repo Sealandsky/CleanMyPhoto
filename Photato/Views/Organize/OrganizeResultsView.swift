@@ -808,7 +808,7 @@ private struct FileSizeBadge: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2.5)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                    .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .padding(6)
             }
         }

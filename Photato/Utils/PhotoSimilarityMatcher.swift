@@ -59,6 +59,8 @@ final class PhotoSimilarityMatcher {
     /// 0.3~0.8 同场景相似，>1 基本无关。0.6 兼顾查全率与噪声过滤。
     /// nonisolated：默认参数表达式在非隔离上下文求值
     nonisolated static let defaultMaxDistance: Float = 0.6
+    /// 相簿推荐相似度阈值：相簿推荐需涵盖同场景、同事件或同题材素材，0.72 兼顾主题相关度与查全率
+    nonisolated static let defaultAlbumMaxDistance: Float = 0.72
     /// 特征提取的缩略图边长：256px 直接命中本地缩略图缓存（iCloud 优化存储下
     /// 无需下载原图），基准与候选统一尺寸保证特征距离可比
     private static let inputPixelSize: CGFloat = 256
@@ -73,6 +75,8 @@ final class PhotoSimilarityMatcher {
     private let workQueue = DispatchQueue(label: "cn.bryan.photato.similarity-matcher", qos: .userInitiated)
     /// 当前有效任务令牌：仅在 workQueue 上读写（线程 confinement 保证安全）
     private var activeToken: UUID?
+    /// 相簿相似检索专用令牌：与单张照片检索互不冲突
+    private var albumActiveToken: UUID?
 
     /// 特征指纹缓存：磁盘（Core Data）持久层 + 会话级全量内存库
     private lazy var cache = FeaturePrintCache()
@@ -250,7 +254,7 @@ final class PhotoSimilarityMatcher {
         }
     }
 
-    /// 取消进行中的检索（如详情页已切换到其他照片）：
+    /// 取消进行中的单张素材检索：
     /// 在跑任务会尽快以 `.cancelled` 错误回调，后续新检索立即获得队列
     func cancel() {
         workQueue.async { [weak self] in
@@ -258,7 +262,213 @@ final class PhotoSimilarityMatcher {
         }
     }
 
+    // MARK: - Album Matching API
+
+    /// 检索与相簿现有素材视觉相符的照片（用于相簿二级页「更多适合这个相簿的照片」）。
+    ///
+    /// - Parameters:
+    ///   - albumAssets: 当前相簿已有照片集合（提取前 20 张作为基准特征）
+    ///   - excludingIDs: 需排除的 localIdentifier（包括当前相簿已有、待删除废纸篓等）
+    ///   - topN: 返回数量上限，默认 24
+    ///   - maxDistance: 相似度阈值（特征距离），默认 `defaultMaxDistance`
+    ///   - progress: 进度回调（已处理数 / 候选总数），主线程
+    ///   - completion: 完成回调（相似度从高到低的结果 + 错误），主线程
+    /// 检索与相簿现有素材视觉相符的照片（用于相簿二级页「更多适合这个相簿的照片」）。
+    ///
+    /// - Parameters:
+    ///   - albumAssets: 当前相簿已有照片集合（提取代表性图片作为基准特征）
+    ///   - excludingIDs: 需排除的 localIdentifier（包括当前相簿已有、待删除废纸篓等）
+    ///   - topN: 返回数量上限，默认 30
+    ///   - maxDistance: 相似度阈值（特征距离），默认 `defaultAlbumMaxDistance` (0.72)
+    ///   - progress: 进度回调（已处理数 / 候选总数），主线程
+    ///   - completion: 完成回调（相似度从高到低的结果 + 错误），主线程
+    func findSimilar(
+        toAlbumAssets albumAssets: [PHAsset],
+        excludingIDs: Set<String>,
+        topN: Int = 30,
+        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance,
+        progress: @escaping (_ processed: Int, _ total: Int) -> Void = { _, _ in },
+        completion: @escaping (_ results: [PHAsset], _ error: Error?) -> Void
+    ) {
+        workQueue.async { [weak self] in
+            guard let self else { return }
+
+            let token = UUID()
+            self.albumActiveToken = token
+
+            // 1. 相册权限校验
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard status == .authorized || status == .limited else {
+                self.finishAlbum([], MatcherError.photoAccessDenied(status), token: token, completion)
+                return
+            }
+
+            // 2. 基准特征提取：优先过滤图片类型（排除视频等不可直接提取的素材）
+            let imageAssets = albumAssets.filter { $0.mediaType == .image }
+            let candidateBaseAssets = imageAssets.isEmpty ? albumAssets : imageAssets
+            guard !candidateBaseAssets.isEmpty else {
+                self.finishAlbum([], nil, token: token, completion)
+                return
+            }
+
+            var basePrints: [VNFeaturePrintObservation] = []
+            for asset in candidateBaseAssets {
+                if let print = self.cachedOrCompute(asset) ?? self.computeFeaturePrintWithNetworkFallback(for: asset) {
+                    basePrints.append(print)
+                    if basePrints.count >= 20 { break }
+                }
+            }
+
+            guard !basePrints.isEmpty else {
+                self.finishAlbum([], MatcherError.baseFeatureUnavailable, token: token, completion)
+                return
+            }
+
+            // 3. 候选收集：全相册图片
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+            let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+
+            var candidates: [PHAsset] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                guard !excludingIDs.contains(asset.localIdentifier) else { return }
+                candidates.append(asset)
+            }
+
+            let total = candidates.count
+            guard total > 0 else {
+                self.finishAlbum([], nil, token: token, completion)
+                return
+            }
+
+            // 智能多级候选排序：
+            // 1. 相簿时间窗口（相簿照片拍摄前后 14 天内的素材）优先级最高（最可能遗落同批照片）
+            // 2. 已有特征缓存（内存/CoreData）零计算素材次之
+            // 3. 全库其余素材按创建时间倒序排
+            let albumDates = albumAssets.compactMap(\.creationDate)
+            let minWindow = albumDates.min()?.addingTimeInterval(-14 * 86400)
+            let maxWindow = albumDates.max()?.addingTimeInterval(14 * 86400)
+
+            candidates.sort { a, b in
+                let aDate = a.creationDate ?? .distantPast
+                let bDate = b.creationDate ?? .distantPast
+                let aInWindow = (minWindow != nil && maxWindow != nil && aDate >= minWindow! && aDate <= maxWindow!)
+                let bInWindow = (minWindow != nil && maxWindow != nil && bDate >= minWindow! && bDate <= maxWindow!)
+                if aInWindow != bInWindow { return aInWindow }
+
+                let aCached = self.cachedObservation(for: a) != nil
+                let bCached = self.cachedObservation(for: b) != nil
+                if aCached != bCached { return aCached }
+
+                return aDate > bDate
+            }
+
+            // 4. 逐一比对：计算候选素材与相簿各基准特征的最小距离
+            // 分两阶段：Phase 1 优先纯内存比对已缓存指纹；Phase 2 计算新素材
+            var scored: [(asset: PHAsset, distance: Float)] = []
+            var processed = 0
+            var uncomputedCount = 0
+            let maxUncomputedScan = 800 // 限制未索引图片的最大扫描张数，避免巨型相册卡死
+
+            for asset in candidates {
+                if self.albumActiveToken != token {
+                    self.finishAlbum([], MatcherError.cancelled, token: token, completion)
+                    return
+                }
+
+                // 尝试从内存/CoreData直接取
+                let isCached = self.cachedObservation(for: asset) != nil
+                if !isCached {
+                    uncomputedCount += 1
+                    // 如果已经获取到足够多极佳匹配且未索引素材过多，可提早收敛
+                    if scored.count >= topN * 2 && uncomputedCount > 200 {
+                        break
+                    }
+                    if uncomputedCount > maxUncomputedScan {
+                        break
+                    }
+                }
+
+                if let candidatePrint = autoreleasepool(invoking: { self.cachedOrCompute(asset) }) {
+                    var minDistance: Float = .greatestFiniteMagnitude
+                    for basePrint in basePrints {
+                        var distance: Float = .greatestFiniteMagnitude
+                        if (try? basePrint.computeDistance(&distance, to: candidatePrint)) != nil {
+                            if distance < minDistance {
+                                minDistance = distance
+                            }
+                        }
+                    }
+
+                    if minDistance <= maxDistance {
+                        scored.append((asset, minDistance))
+                    }
+                }
+
+                processed += 1
+                if processed % Self.progressStride == 0 || processed == total {
+                    let done = processed
+                    DispatchQueue.main.async { progress(done, total) }
+                }
+            }
+
+            // 5. 排序取前 topN（按距离升序，越近越相关）
+            let results = Array(scored
+                .sorted { $0.distance < $1.distance }
+                .prefix(max(0, topN))
+                .map(\.asset)
+                .filter { !excludingIDs.contains($0.localIdentifier) })
+
+            self.finishAlbum(results, nil, token: token, completion)
+        }
+    }
+
+    /// 异步获取相簿相似推荐照片
+    func findSimilar(
+        toAlbumAssets albumAssets: [PHAsset],
+        excludingIDs: Set<String>,
+        topN: Int = 30,
+        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance
+    ) async throws -> [PHAsset] {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                findSimilar(
+                    toAlbumAssets: albumAssets,
+                    excludingIDs: excludingIDs,
+                    topN: topN,
+                    maxDistance: maxDistance
+                ) { assets, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: assets)
+                    }
+                }
+            }
+        } onCancel: {
+            self.cancelAlbumSearch()
+        }
+    }
+
+    /// 取消进行中的相簿相似推荐检索
+    nonisolated func cancelAlbumSearch() {
+        workQueue.async { [weak self] in
+            self?.albumActiveToken = nil
+        }
+    }
+
     // MARK: - Private
+
+    /// 相簿检索统一完成出口
+    private func finishAlbum(
+        _ results: [PHAsset],
+        _ error: Error?,
+        token: UUID,
+        _ completion: @escaping ([PHAsset], Error?) -> Void
+    ) {
+        if error == nil, albumActiveToken != token { return }
+        DispatchQueue.main.async { completion(results, error) }
+    }
 
     /// 统一完成出口：每次调用保证回调一次。
     /// 「正常完成但令牌已被取代」时静默丢弃（新检索已接管结果语义），
@@ -384,6 +594,46 @@ final class PhotoSimilarityMatcher {
         options.isSynchronous = true
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = false
+        options.resizeMode = .fast
+
+        var cgImage: CGImage?
+        PHImageManager.default().requestImage(
+            for: asset,
+            targetSize: CGSize(width: maxPixel, height: maxPixel),
+            contentMode: .aspectFit,
+            options: options
+        ) { image, _ in
+            cgImage = image?.cgImage
+        }
+        return cgImage
+    }
+
+    /// 针对样本图的网络缩略图兜底（解决 iCloud 未全量下载时的样本缺失问题）
+    func computeFeaturePrintWithNetworkFallback(for asset: PHAsset) -> VNFeaturePrintObservation? {
+        guard let cgImage = localThumbnail(of: asset, maxPixel: Self.inputPixelSize)
+            ?? thumbnailWithNetworkAllowed(of: asset, maxPixel: Self.inputPixelSize) else {
+            return nil
+        }
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        let request = VNGenerateImageFeaturePrintRequest()
+        #if targetEnvironment(simulator)
+        request.usesCPUOnly = true
+        #endif
+        do {
+            try handler.perform([request])
+            if let observation = request.results?.first as? VNFeaturePrintObservation {
+                remember(observation, for: asset)
+                return observation
+            }
+        } catch {}
+        return nil
+    }
+
+    private func thumbnailWithNetworkAllowed(of asset: PHAsset, maxPixel: CGFloat) -> CGImage? {
+        let options = PHImageRequestOptions()
+        options.isSynchronous = true
+        options.deliveryMode = .fastFormat
+        options.isNetworkAccessAllowed = true
         options.resizeMode = .fast
 
         var cgImage: CGImage?
