@@ -102,13 +102,11 @@ struct CapsuleTabBar: View {
         if prefersLiquidGlass, #available(iOS 26.0, *) {
             Capsule()
                 .fill(Color.clear)
-                .glassEffect(.regular.tint(.black.opacity(0.45)).interactive(), in: .capsule)
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
+                .glassEffect(.regular.tint(.blue.opacity(0.8)).interactive(), in: .capsule)
                 .matchedGeometryEffect(id: "segment_slider", in: sliderNS)
         } else {
             Capsule()
-                .fill(Color.black.opacity(0.5))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
+                .fill(Color.blue.opacity(0.8))
                 .matchedGeometryEffect(id: "segment_slider", in: sliderNS)
         }
     }
