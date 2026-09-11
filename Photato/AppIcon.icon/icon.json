@@ -20,10 +20,10 @@
           "image-name" : "Image 5.png",
           "name" : "Image 5",
           "position" : {
-            "scale" : 0.6,
+            "scale" : 0.5,
             "translation-in-points" : [
               13.140624999999886,
-              407.05000000000007
+              427.1
             ]
           }
         },

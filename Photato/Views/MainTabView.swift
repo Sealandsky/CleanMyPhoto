@@ -20,23 +20,24 @@ enum AppTab: String, CaseIterable {
         }
     }
 
-    var systemImage: String {
+    func iconName(isSelected: Bool) -> String {
         switch self {
         case .photos:
-            return "rectangle.3.group.fill"
+            return isSelected ? "rectangle.3.group.fill" : "rectangle.3.group"
         case .albums:
-            return "photo.on.rectangle.angled"
+            return isSelected ? "photo.on.rectangle.angled.fill" : "photo.on.rectangle.angled"
         case .organize:
-            // sparkles.2 为 SF Symbols 7 符号（iOS 26+ 可用）；
-            // iOS 18 设备回退 sparkles，避免渲染空白
             if #available(iOS 26.0, *) {
                 return "sparkles.2"
             }
             return "sparkles"
         case .settings:
-            // 底部 TabBar 设置入口使用实心齿轮图标
-            return "gearshape.fill"
+            return isSelected ? "gearshape.fill" : "gearshape"
         }
+    }
+
+    var systemImage: String {
+        iconName(isSelected: false)
     }
 }
 
@@ -65,25 +66,25 @@ struct MainTabView: View {
                 isFullscreenMode: $isFullscreenMode
             )
             .tabItem {
-                Label(AppTab.photos.localizedText, systemImage: AppTab.photos.systemImage)
+                tabItemView(for: .photos)
             }
             .tag(AppTab.photos)
 
             albumsTabContent
                 .tabItem {
-                    Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
+                    tabItemView(for: .albums)
                 }
                 .tag(AppTab.albums)
 
             organizeTabContent
                 .tabItem {
-                    Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
+                    tabItemView(for: .organize)
                 }
                 .tag(AppTab.organize)
 
             SettingsView()
                 .tabItem {
-                    Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
+                    tabItemView(for: .settings)
                 }
                 .tag(AppTab.settings)
         }
@@ -101,6 +102,18 @@ struct MainTabView: View {
             TrashView(photoManager: photoManager)
                 // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
                 .presentationDetents([.medium, .large])
+        }
+    }
+
+    // MARK: - Tab Item View
+    @ViewBuilder
+    private func tabItemView(for tab: AppTab) -> some View {
+        let isSelected = selectedTab == tab
+        Label {
+            Text(tab.localizedText)
+        } icon: {
+            Image(systemName: tab.iconName(isSelected: isSelected))
+                .environment(\.symbolRenderingMode, isSelected ? .hierarchical : .monochrome)
         }
     }
 
