@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "appIcon_cleanmyphoto.png",
+      "filename" : "welcome_icon.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "appIcon_cleanmyphoto 1.png",
+      "filename" : "welcome_icon.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "appIcon_cleanmyphoto 2.png",
+      "filename" : "welcome_icon.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
