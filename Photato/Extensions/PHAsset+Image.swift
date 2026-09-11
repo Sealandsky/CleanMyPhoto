@@ -225,9 +225,10 @@ struct AssetImage: View {
 
         // 核心同步初始化：
         // 1. 若目标尺寸已在精确缓存中，第 0 帧直接展示；
-        // 2. 若未精确命中，同步取出已有任意缩略图/占位图垫底，第 0 毫秒即有图显示，绝不白闪
+        // 2. 方案 1（对标 iOS 原生相册）：列表模式（!highQuality）绝不拉伸历史旧缩略图垫底，直接以系统次级底色占位；
+        //    仅在 highQuality（如大图/清理卡片）且未命中精确缓存时，才取已有缩略图垫底平滑过渡
         let exactCached = PhotoImageCache.shared.get(for: asset.localIdentifier, targetSize: targetSize, isHighQuality: highQuality)
-        let placeholderCached = (exactCached == nil)
+        let placeholderCached: UIImage? = (exactCached == nil && highQuality)
             ? PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier)
             : nil
 
@@ -245,14 +246,14 @@ struct AssetImage: View {
             // 兜底色（默认使用系统次级填充底色，不使用纯白，暗黑与浅色模式皆温和自然）
             placeholderColor
 
-            // 占位缩略图层：若已有列表/过渡缩略图，在最终图像到达前稳定垫底，在主图淡入过程中始终保留，杜绝漏出底色或闪白
+            // 占位缩略图层：仅在 highQuality 模式下且有可用缩略图时垫底，列表模式下使用纯净系统次级底色
             if let placeholder = placeholderImage {
                 Image(uiImage: placeholder)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
             }
 
-            // 主图层：高清大图就绪时带有平滑淡入效果（0.18s），优雅无缝替换缩略图
+            // 主图层：清晰图就绪时平滑呈现，直接在纯净底色上淡入，杜绝先糊后清的拉伸感
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
@@ -260,14 +261,14 @@ struct AssetImage: View {
                     .transition(.opacity)
             }
 
-            // 无任何图可展示时的加载指示器
-            if isLoading && image == nil && placeholderImage == nil {
+            // 仅在 highQuality（大图预览）且完全无图时显示菊花指示器；列表网格使用纯净灰块占位，避免滚屏菊花闪烁
+            if isLoading && highQuality && image == nil && placeholderImage == nil {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: placeholderColor == .black ? .white : Color(.systemGray3)))
             }
         }
         .clipped()
-        .animation(.easeOut(duration: 0.18), value: image != nil)
+        .animation(.easeOut(duration: 0.15), value: image != nil)
         .onAppear {
             checkCacheAndLoad()
         }
@@ -276,9 +277,9 @@ struct AssetImage: View {
         }
         .onChange(of: asset.localIdentifier) { _, newID in
             cancelActiveRequests()
-            // 素材切换时同步检查缓存，优先保证画面连续性，不赋 nil 造成白屏跳动
+            // 素材切换时同步检查缓存，优先保证画面连续性
             let exactCached = PhotoImageCache.shared.get(for: newID, targetSize: targetSize, isHighQuality: highQuality)
-            let placeholderCached = (exactCached == nil)
+            let placeholderCached: UIImage? = (exactCached == nil && highQuality)
                 ? PhotoImageCache.shared.getPlaceholder(for: newID)
                 : nil
 
@@ -319,8 +320,8 @@ struct AssetImage: View {
             return
         }
 
-        // 2. 未命中精确尺寸时，先展示已有任意缩略图垫底，绝无白屏或菊花
-        if image == nil && placeholderImage == nil {
+        // 2. 仅在 highQuality 模式下且未命中精确尺寸时，允许取已有缩略图垫底；列表模式保持灰块占位
+        if highQuality && image == nil && placeholderImage == nil {
             if let placeholder = PhotoImageCache.shared.getPlaceholder(for: asset.localIdentifier) {
                 placeholderImage = placeholder
                 isLoading = false
@@ -388,24 +389,21 @@ struct AssetImage: View {
                 if let img = resultImage {
                     let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
                     if isDegraded {
-                        // 如果是中间降级帧，作为平滑过渡占位图显示，不直接赋给最终 image
-                        if self.image == nil {
-                            self.placeholderImage = img
-                            PhotoImageCache.shared.setPlaceholder(for: requestedAssetID, image: img)
-                            self.isLoading = false
-                        }
-                    } else {
-                        // 最终高清图到达，平滑淡入替换缩略图
-                        self.image = img
-                        self.isLoading = false
-                        PhotoImageCache.shared.set(
-                            for: self.asset.localIdentifier,
-                            targetSize: self.targetSize,
-                            isHighQuality: self.highQuality,
-                            image: img
-                        )
-                        self.onLoad?()
+                        // 方案 1: 忽略低清降级中间帧，不作为模糊图上屏，保持系统原生优雅灰色占位块直至高清图到达
+                        return
                     }
+
+                    // 最终高清图到达，直接呈现并清除占位图
+                    self.image = img
+                    self.placeholderImage = nil
+                    self.isLoading = false
+                    PhotoImageCache.shared.set(
+                        for: self.asset.localIdentifier,
+                        targetSize: self.targetSize,
+                        isHighQuality: self.highQuality,
+                        image: img
+                    )
+                    self.onLoad?()
                 } else if info?[PHImageErrorKey] != nil {
                     self.isLoading = false
                 }
