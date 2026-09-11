@@ -18,6 +18,7 @@ class PhotoManager: ObservableObject {
     @Published var hasLoadedOnce: Bool = false
     @Published var errorMessage: String?
     @Published var isSelectMode: Bool = false
+    @Published var showTrash: Bool = false
 
     private let maxPhotoCount = 50
     private var currentFetchOffset = 0

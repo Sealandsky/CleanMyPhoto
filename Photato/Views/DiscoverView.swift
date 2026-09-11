@@ -405,8 +405,7 @@ struct DiscoverView: View {
                         }
                 }
                 .padding(.horizontal, 12)
-                // 尾部高度占位：滚动到底时最后一行不被悬浮底栏遮挡
-                .padding(.bottom, 90)
+                .padding(.bottom, 12)
             }
             // 滚动位置绑定：支持按边缘滚到真正的顶部（offset 0）
             .scrollPosition($scrollPosition)

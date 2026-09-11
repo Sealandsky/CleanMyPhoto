@@ -8,8 +8,8 @@ struct ContentView: View {
     // 由 MainTabView 持有：全屏态控制底部栏显隐
     @Binding var isFullscreenMode: Bool
 
-    // 「回忆」Tab 再次点击的滚顶信号（MainTabView 递增传入）
-    @Binding var discoverScrollToTop: Int
+    // 「回忆」Tab 滚顶信号（外部可选传入，默认 0）
+    var discoverScrollToTop: Int = 0
 
     @State private var currentPhotoID: String? = nil
     @State private var scrollToPhotoID: String? = nil
@@ -130,6 +130,11 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     formatFilterMenu
+                    Button {
+                        photoManager.showTrash = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
                 }
             }
             .navigationDestination(isPresented: $isFullscreenMode) {
@@ -208,8 +213,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView(
-        isFullscreenMode: .constant(false),
-        discoverScrollToTop: .constant(0)
+        isFullscreenMode: .constant(false)
     )
     .environmentObject(PhotoManager())
     .environmentObject(StatisticsManager())

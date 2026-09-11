@@ -201,14 +201,6 @@ struct SettingsView: View {
                     }
                     .foregroundColor(.primary)
                 }
-
-                // 尾部高度占位：滚动到底时最后一行不被悬浮底栏遮挡
-                Section {
-                    Color.clear
-                        .frame(height: 74)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets())
-                }
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
             .navigationTitle(String(localized: "Settings"))
