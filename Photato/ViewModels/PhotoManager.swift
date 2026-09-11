@@ -141,6 +141,7 @@ class PhotoManager: ObservableObject {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
+        options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
@@ -166,6 +167,7 @@ class PhotoManager: ObservableObject {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
+        options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 

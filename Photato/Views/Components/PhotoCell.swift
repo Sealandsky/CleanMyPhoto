@@ -21,11 +21,17 @@ struct PhotoCell: View {
     var body: some View {
         GeometryReader { geometry in
             // 缩略图基准尺寸：采用统一的标准物理像素正方形尺寸（targetSize + .aspectFill），
-            // 消除不同卡片间的浮点微差，并与后台动态预热窗口的 targetSize 100% 精确咬合
-            let rawWidth = geometry.size.width * displayScale
-            let quantizedWidth = (rawWidth / 20.0).rounded(.up) * 20.0
-            let edge = min(max(quantizedWidth, GridColumnHelper.minPixelEdge), GridColumnHelper.maxPixelEdge)
-            let thumbnailSize = CGSize(width: edge, height: edge)
+            // 消除不同卡片间的浮点微差，并防御 GeometryReader 初始测量为 0 的抖动，与后台预热 100% 咬合
+            let thumbnailSize: CGSize = {
+                if geometry.size.width > 20 {
+                    let rawWidth = geometry.size.width * displayScale
+                    let quantizedWidth = (rawWidth / 20.0).rounded(.up) * 20.0
+                    let edge = min(max(quantizedWidth, GridColumnHelper.minPixelEdge), GridColumnHelper.maxPixelEdge)
+                    return CGSize(width: edge, height: edge)
+                } else {
+                    return GridColumnHelper.thumbnailPixelSize(columnCount: gridSettings.columnCount)
+                }
+            }()
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)

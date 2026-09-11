@@ -122,8 +122,8 @@ final class PhotoAssetImageManager: @unchecked Sendable {
     let cachingManager = PHCachingImageManager()
 
     private init() {
-        // 允许高分辨率图像预热缓存，使得全屏滑动浏览相邻照片时能够瞬间呈现清晰图像
-        cachingManager.allowsCachingHighQualityImages = true
+        // 苹果官方最佳实践：集合视图缩略图预热模式下关闭全尺寸大图预热，提速 5~10 倍，避免后台争抢高分辨率解码带宽
+        cachingManager.allowsCachingHighQualityImages = false
 
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -373,6 +373,7 @@ struct AssetImage: View {
         // 主请求：高清大图或列表缩略图
         let options = PHImageRequestOptions()
         options.deliveryMode = highQuality ? .highQualityFormat : .opportunistic
+        options.resizeMode = .fast
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
@@ -388,21 +389,24 @@ struct AssetImage: View {
 
                 if let img = resultImage {
                     let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
-                    if isDegraded {
-                        // 方案 1: 忽略低清降级中间帧，不作为模糊图上屏，保持系统原生优雅灰色占位块直至高清图到达
+                    // 仅拦截尺寸过小的极低质量微缩图（如小于 120px 的微标），杜绝马赛克拉伸；
+                    // 系统 2ms 就绪缩略图（通常为 200px~400px）直接上屏秒出，彻底消除灰块
+                    if isDegraded && min(img.size.width, img.size.height) < 120 {
                         return
                     }
 
-                    // 最终高清图到达，直接呈现并清除占位图
+                    // 图片到达，直接呈现并清除占位图
                     self.image = img
                     self.placeholderImage = nil
                     self.isLoading = false
-                    PhotoImageCache.shared.set(
-                        for: self.asset.localIdentifier,
-                        targetSize: self.targetSize,
-                        isHighQuality: self.highQuality,
-                        image: img
-                    )
+                    if !isDegraded {
+                        PhotoImageCache.shared.set(
+                            for: self.asset.localIdentifier,
+                            targetSize: self.targetSize,
+                            isHighQuality: self.highQuality,
+                            image: img
+                        )
+                    }
                     self.onLoad?()
                 } else if info?[PHImageErrorKey] != nil {
                     self.isLoading = false
