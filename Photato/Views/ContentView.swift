@@ -125,7 +125,10 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(.hidden, for: .navigationBar)
             .background(alignment: .top) {
-                TopBlurFadeBackground(height: 200)
+                if discoverManager.hasLoadedOnce && !discoverManager.photos.isEmpty {
+                    TopBlurFadeBackground(height: 200)
+                        .transition(.opacity)
+                }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {

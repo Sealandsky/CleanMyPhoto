@@ -216,6 +216,7 @@ struct DiscoverView: View {
     /// 滚顶信号：外部递增时网格滚回顶部（如双击「重温」Tab）
     var scrollToTopSignal: Int = 0
     @EnvironmentObject var photoManager: PhotoManager
+    @Environment(GridSettings.self) private var gridSettings
 
     // MARK: - 自绘下拉刷新（DragGesture 驱动，替代系统 refreshable）
     /// 方案说明：系统 refreshable 的转圈会"扣住"滚动偏移，其弹簧归位在
@@ -372,7 +373,7 @@ struct DiscoverView: View {
             if !isAuthorized {
                 permissionHint
             } else if !manager.hasLoadedOnce {
-                loadingView
+                skeletonGridView
             } else if manager.totalCount == 0 {
                 emptyStateView
             } else {
@@ -481,16 +482,27 @@ struct DiscoverView: View {
         .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
-    // MARK: - Loading
-    private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.primary)
-            Text(String(localized: "Loading photos..."))
-                .font(.system(.headline, design: .rounded))
-                .foregroundColor(.primary)
+    // MARK: - Skeleton Loading Grid
+    /// 骨架屏占位网格：在首批照片采样完成前提供与真实网格完全一致的骨架卡片流光动画，
+    /// 消除白屏等待与转菊花焦虑感，列数、圆角与间距与当前设置 100% 对齐。
+    private var skeletonGridView: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: GridColumnHelper.columns(count: gridSettings.columnCount),
+                spacing: GridColumnHelper.spacing
+            ) {
+                ForEach(0..<12, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemFill))
+                        .aspectRatio(gridSettings.isOriginalRatio ? 3.0 / 4.0 : gridSettings.aspectRatio, contentMode: .fit)
+                        .shimmering()
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 4)
         }
+        .scrollDisabled(true)
+        .scrollIndicators(.hidden)
     }
 
     // MARK: - Permission Hint
