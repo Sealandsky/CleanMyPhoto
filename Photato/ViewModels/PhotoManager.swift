@@ -130,12 +130,12 @@ class PhotoManager: ObservableObject {
     // MARK: - Preload Assets
     private var lastPreheatIndex: Int = -1
 
-    /// 首批素材初始预热：使用统一标准像素尺寸预热前排 24 张照片
+    /// 首批素材初始预热：使用统一标准像素尺寸预热前排 36~48 张照片（覆盖前 3~4 屏）
     func preloadInitialAssets(columnCount: Int = GridColumnHelper.defaultCount) {
         guard !displayedPhotos.isEmpty else { return }
         lastPreheatIndex = 0
 
-        let countToPreload = min(displayedPhotos.count, 24)
+        let countToPreload = min(displayedPhotos.count, max(36, columnCount * 12))
         let assetsToPreload = displayedPhotos.prefix(countToPreload).map(\.asset)
         let targetSize = GridColumnHelper.thumbnailPixelSize(columnCount: columnCount)
 
@@ -153,7 +153,7 @@ class PhotoManager: ObservableObject {
         )
     }
 
-    /// 列表滑动动态预热窗口：8 张步长节流、方向感知、前瞻预热 24 张，并自动回收远端旧缓存
+    /// 列表滑动动态预热窗口：8 张步长节流、方向感知、前瞻预热 48~60 张（覆盖连续划过 2~3 屏），并自动回收远端旧缓存
     func preheatAssets(around index: Int, in photos: [PhotoAsset], columnCount: Int) {
         guard !photos.isEmpty, index >= 0, index < photos.count else { return }
         // 步进节流：滑动跨度必须 >= 8 张（约 2~3 行）才触发一次批量预热，避免每张照片打断主线程
@@ -163,7 +163,8 @@ class PhotoManager: ObservableObject {
         lastPreheatIndex = index
 
         let targetSize = GridColumnHelper.thumbnailPixelSize(columnCount: columnCount)
-        let preheatBatchSize = 24
+        // 4 列紧凑模式前瞻 60 张，2/3 列模式前瞻 48 张，始终覆盖 2.5~4 屏的猛烈划动提前量
+        let preheatBatchSize = max(48, columnCount * 15)
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
@@ -193,9 +194,10 @@ class PhotoManager: ObservableObject {
             )
         }
 
-        // 2. 释放离开视口较远的旧切片（40 张以前），防止系统底层解码位图无限堆积
-        if isScrollingDown && index > 40 {
-            let stopRange = max(0, index - 70)..<(index - 40)
+        // 2. 释放离开视口较远的旧切片，防止系统底层解码位图无限堆积
+        let cleanupThreshold = preheatBatchSize + 16
+        if isScrollingDown && index > cleanupThreshold {
+            let stopRange = max(0, index - (cleanupThreshold + 40))..<(index - cleanupThreshold)
             if !stopRange.isEmpty {
                 let assetsToStop = stopRange.map { photos[$0].asset }
                 PhotoAssetImageManager.shared.stopCachingImages(
