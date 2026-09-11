@@ -13,11 +13,10 @@ import AVKit
 import Combine
 
 // MARK: - Image Memory Cache
-@MainActor
-final class PhotoImageCache {
+final class PhotoImageCache: @unchecked Sendable {
     static let shared = PhotoImageCache()
 
-    /// 缩略图/中图缓存：条目较多，控制在 100MB 以内
+    /// 缩略图/中图缓存：条目较多，控制在 200MB 以内（覆盖 150+ 张缩略图，顺畅支持 10+ 屏往返翻滚）
     private let thumbnailCache = NSCache<NSString, UIImage>()
     /// 高清大图缓存：全屏高清大图，上限 20 张，最大内存占用 150MB
     private let highResCache = NSCache<NSString, UIImage>()
@@ -25,8 +24,8 @@ final class PhotoImageCache {
     private let placeholderMap = NSCache<NSString, UIImage>()
 
     init() {
-        thumbnailCache.countLimit = 300
-        thumbnailCache.totalCostLimit = 100 * 1024 * 1024
+        thumbnailCache.countLimit = 500
+        thumbnailCache.totalCostLimit = 200 * 1024 * 1024
 
         highResCache.countLimit = 20
         highResCache.totalCostLimit = 150 * 1024 * 1024
@@ -38,11 +37,9 @@ final class PhotoImageCache {
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.clearAll()
-            }
+            self?.clearAll()
         }
     }
 
@@ -253,12 +250,12 @@ struct AssetImage: View {
                     .aspectRatio(contentMode: contentMode)
             }
 
-            // 主图层：清晰图就绪时平滑呈现，直接在纯净底色上淡入，杜绝先糊后清的拉伸感
+            // 主图层：清晰图就绪时平滑呈现，列表缩略图无延时直出，杜绝淡入期灰块显露；大图模式保持优雅淡入
             if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
-                    .transition(.opacity)
+                    .transition(highQuality ? .opacity : .identity)
             }
 
             // 仅在 highQuality（大图预览）且完全无图时显示菊花指示器；列表网格使用纯净灰块占位，避免滚屏菊花闪烁
@@ -268,7 +265,7 @@ struct AssetImage: View {
             }
         }
         .clipped()
-        .animation(.easeOut(duration: 0.15), value: image != nil)
+        .animation(highQuality ? .easeOut(duration: 0.15) : nil, value: image != nil)
         .onAppear {
             checkCacheAndLoad()
         }
@@ -399,14 +396,12 @@ struct AssetImage: View {
                     self.image = img
                     self.placeholderImage = nil
                     self.isLoading = false
-                    if !isDegraded {
-                        PhotoImageCache.shared.set(
-                            for: self.asset.localIdentifier,
-                            targetSize: self.targetSize,
-                            isHighQuality: self.highQuality,
-                            image: img
-                        )
-                    }
+                    PhotoImageCache.shared.set(
+                        for: self.asset.localIdentifier,
+                        targetSize: self.targetSize,
+                        isHighQuality: self.highQuality,
+                        image: img
+                    )
                     self.onLoad?()
                 } else if info?[PHImageErrorKey] != nil {
                     self.isLoading = false

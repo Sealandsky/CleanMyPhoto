@@ -77,6 +77,7 @@ struct AlbumPhotoListView: View {
                 }
             }
             .onAppear {
+                photoManager.preloadInitialAssets(columnCount: gridSettings.columnCount)
                 albumSizeText = SizeCache.load("album_\(album.id)") ?? ""
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

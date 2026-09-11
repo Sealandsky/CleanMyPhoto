@@ -119,6 +119,7 @@ struct PhotoListView: View {
                 selectionManager.isSelectMode ? swipeSelectGesture(proxy: proxy) : nil
             )
             .onAppear {
+                photoManager.preloadInitialAssets(columnCount: gridSettings.columnCount)
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         withTransaction(Transaction(animation: nil)) {
@@ -126,6 +127,9 @@ struct PhotoListView: View {
                         }
                     }
                 }
+            }
+            .onChange(of: gridSettings.columnCount) { _, newCount in
+                photoManager.preloadInitialAssets(columnCount: newCount)
             }
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
