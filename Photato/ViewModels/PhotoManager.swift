@@ -148,7 +148,7 @@ class PhotoManager: ObservableObject {
                 ) { image, info in
                     guard let image = image else { return }
                     let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
-                    if isDegraded && min(image.size.width, image.size.height) < 120 { return }
+                    if isDegraded && max(image.size.width, image.size.height) < 100 { return }
                     PhotoImageCache.shared.set(
                         for: asset.localIdentifier,
                         targetSize: targetSize,
