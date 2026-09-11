@@ -83,45 +83,47 @@ struct MainTabView: View {
                     }
                 }
                 .overlay(alignment: .bottom) {
-                    if !shouldHideBottomBar {
-                        // 底栏：胶囊分段 Tab 组 + 完全独立的圆形回收站按钮
-                        // （浮在页面内容之上，不在 TabBar 胶囊内）
-                        CapsuleTabBar(
-                            segments: AppTab.allCases.map { tab in
-                                CapsuleSegment(
-                                    id: tab.rawValue,
-                                    title: tab.localizedText,
-                                    systemImage: tab.systemImage
-                                )
-                            },
-                            selectionID: Binding(
-                                get: { selectedTab.rawValue },
-                                set: { selectedTab = AppTab(rawValue: $0) ?? selectedTab }
-                            ),
-                            accessorySystemImage: "trash",
-                            // iOS 26+ 启用 Liquid Glass 背景；iOS 18 自动回退 systemBackground
-                            prefersLiquidGlass: true,
-                            // 双击已选中的「回忆」Tab：滚回回忆页最顶部
-                            // （单击不再触发；两次点击间隔 0.35s 内视为双击）
-                            onReselect: { id in
-                                guard id == AppTab.photos.rawValue else { return }
-                                let now = Date()
-                                if let last = lastDiscoverTapAt,
-                                   now.timeIntervalSince(last) < 0.35 {
-                                    lastDiscoverTapAt = nil
-                                    discoverScrollToTop += 1
-                                } else {
-                                    lastDiscoverTapAt = now
-                                }
-                            },
-                            onAccessoryTap: { showTrash = true }
-                        )
-                        // 下沉到系统 TabBar 的标准位置
-                        .offset(y: sink)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    Group {
+                        if !shouldHideBottomBar {
+                            // 底栏：胶囊分段 Tab 组 + 完全独立的圆形回收站按钮
+                            // （浮在页面内容之上，不在 TabBar 胶囊内）
+                            CapsuleTabBar(
+                                segments: AppTab.allCases.map { tab in
+                                    CapsuleSegment(
+                                        id: tab.rawValue,
+                                        title: tab.localizedText,
+                                        systemImage: tab.systemImage
+                                    )
+                                },
+                                selectionID: Binding(
+                                    get: { selectedTab.rawValue },
+                                    set: { selectedTab = AppTab(rawValue: $0) ?? selectedTab }
+                                ),
+                                accessorySystemImage: "trash",
+                                // iOS 26+ 启用 Liquid Glass 背景；iOS 18 自动回退 systemBackground
+                                prefersLiquidGlass: true,
+                                // 双击已选中的「回忆」Tab：滚回回忆页最顶部
+                                // （单击不再触发；两次点击间隔 0.35s 内视为双击）
+                                onReselect: { id in
+                                    guard id == AppTab.photos.rawValue else { return }
+                                    let now = Date()
+                                    if let last = lastDiscoverTapAt,
+                                       now.timeIntervalSince(last) < 0.35 {
+                                        lastDiscoverTapAt = nil
+                                        discoverScrollToTop += 1
+                                    } else {
+                                        lastDiscoverTapAt = now
+                                    }
+                                },
+                                onAccessoryTap: { showTrash = true }
+                            )
+                            // 下沉到系统 TabBar 的标准位置
+                            .offset(y: sink)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.2), value: shouldHideBottomBar)
                 }
-                .animation(.easeInOut(duration: 0.2), value: shouldHideBottomBar)
                 .sheet(isPresented: $showTrash) {
                     TrashView(photoManager: photoManager)
                         // 默认半屏（medium）呈现，用户上滑展开为全屏（large）

@@ -238,9 +238,8 @@ struct DiscoverView: View {
     /// 是否已收到本轮手势的首个事件
     @State private var sawFirstGestureEvent = false
     /// 滚动位置（iOS 18 ScrollPosition）：双击回顶时按"边缘"滚到真正的
-    /// offset 0——大标题完全展开且带平滑动画。锚点式 scrollTo 在本机
-    /// 落位停在标题折叠处、重建令牌有闪动，边缘滚动是两者的正解
-    @State private var scrollPosition = ScrollPosition(edge: .top)
+    /// offset 0——大标题完全展开且带平滑动画。不预设 edge: .top 避免状态刷新时强制回顶位移
+    @State private var scrollPosition = ScrollPosition()
     /// 行业标准触发距离（手指滑动行程约 175pt），配合非线性阻尼曲线防误触
     private static let triggerTravelDistance: CGFloat = 175
 
@@ -418,6 +417,9 @@ struct DiscoverView: View {
             } action: { wasAtTop, isNowAtTop in
                 if wasAtTop != isNowAtTop {
                     isAtTop = isNowAtTop
+                }
+                if !isNowAtTop && scrollPosition.edge != nil {
+                    scrollPosition = ScrollPosition()
                 }
             }
             // 自绘下拉刷新手势（与滚动共存）+ 指示器浮层
