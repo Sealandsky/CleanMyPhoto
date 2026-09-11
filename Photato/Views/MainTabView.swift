@@ -82,7 +82,7 @@ struct MainTabView: View {
                         await organizeManager.quickAnalysis()
                     }
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+                .overlay(alignment: .bottom) {
                     if !shouldHideBottomBar {
                         // 底栏：胶囊分段 Tab 组 + 完全独立的圆形回收站按钮
                         // （浮在页面内容之上，不在 TabBar 胶囊内）

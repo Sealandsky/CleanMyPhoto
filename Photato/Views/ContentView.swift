@@ -49,7 +49,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: photoManager.isSelectMode)
-        .animation(.easeInOut(duration: 0.2), value: isFullscreenMode)
         // 「回忆」Tab 再次点击：触发滚顶
         .onChange(of: discoverScrollToTop) { _, _ in
             discoverScrollSignal += 1
