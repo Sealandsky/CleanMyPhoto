@@ -55,8 +55,7 @@ struct PhotoAsset: Identifiable, Equatable {
     }
 
     private static func isGIF(_ asset: PHAsset) -> Bool {
-        PHAssetResource.assetResources(for: asset)
-            .contains { $0.uniformTypeIdentifier == "com.compuserve.gif" }
+        asset.playbackStyle == .imageAnimated
     }
 
     // MARK: - Original Aspect Ratio
@@ -73,12 +72,16 @@ struct PhotoAsset: Identifiable, Equatable {
 
     // MARK: - Video Duration
 
-    var videoDuration: String? {
-        guard asset.mediaType == .video else { return nil }
+    private static let videoDurationFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.minute, .second]
         formatter.zeroFormattingBehavior = .pad
         formatter.unitsStyle = .positional
-        return formatter.string(from: asset.duration)
+        return formatter
+    }()
+
+    var videoDuration: String? {
+        guard asset.mediaType == .video else { return nil }
+        return Self.videoDurationFormatter.string(from: asset.duration)
     }
 }

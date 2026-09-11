@@ -13,26 +13,42 @@ import SwiftUI
 struct MasonryGridContent<Content: View>: View {
     let photos: [PhotoAsset]
     let columnCount: Int
-    @ViewBuilder let cell: (PhotoAsset) -> Content
+    @ViewBuilder let cell: (PhotoAsset, Int) -> Content
 
-    /// 按归一化列高（每列宽度 = 1，高度 = Σ 1/宽高比）贪心分配
-    private var buckets: [[PhotoAsset]] {
+    init(photos: [PhotoAsset], columnCount: Int, @ViewBuilder cell: @escaping (PhotoAsset, Int) -> Content) {
+        self.photos = photos
+        self.columnCount = columnCount
+        self.cell = cell
+    }
+
+    init(photos: [PhotoAsset], columnCount: Int, @ViewBuilder cell: @escaping (PhotoAsset) -> Content) {
+        self.photos = photos
+        self.columnCount = columnCount
+        self.cell = { photo, _ in cell(photo) }
+    }
+
+    /// 按归一化列高（每列宽度 = 1，高度 = Σ 1/宽高比）贪心分配，并保留全局索引
+    private static func computeBuckets(photos: [PhotoAsset], columnCount: Int) -> [[(photo: PhotoAsset, index: Int)]] {
+        guard columnCount > 0 else { return [] }
         var columnHeights = [CGFloat](repeating: 0, count: columnCount)
-        var result = [[PhotoAsset]](repeating: [], count: columnCount)
-        for photo in photos {
+        var result = [[(photo: PhotoAsset, index: Int)]](repeating: [], count: columnCount)
+        for (index, photo) in photos.enumerated() {
             let shortest = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
-            result[shortest].append(photo)
+            result[shortest].append((photo, index))
             columnHeights[shortest] += 1.0 / photo.pixelAspectRatio
         }
         return result
     }
 
     var body: some View {
+        let buckets = Self.computeBuckets(photos: photos, columnCount: columnCount)
         HStack(alignment: .top, spacing: GridColumnHelper.spacing) {
             ForEach(0..<columnCount, id: \.self) { columnIndex in
                 LazyVStack(spacing: GridColumnHelper.spacing) {
-                    ForEach(buckets[columnIndex]) { photo in
-                        cell(photo)
+                    if columnIndex < buckets.count {
+                        ForEach(buckets[columnIndex], id: \.photo.id) { item in
+                            cell(item.photo, item.index)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -45,28 +61,39 @@ struct MasonryGridContent<Content: View>: View {
 /// 自适应图片网格：各图片列表页统一使用的布局容器，替换原有 LazyVGrid。
 /// - 固定比例模式：LazyVGrid，行为与原实现完全一致
 /// - 原比例模式（设置-显示-原比例）：瀑布流，按图片真实宽高比展示
-///
-/// cell 闭包内容与原 ForEach 内的 cell 写法完全相同（含手势、分页 onAppear 等），
-/// 页面从 LazyVGrid 迁移到本组件只需替换外层容器，cell 定义零改动。
+/// - 支持 (photo, index) 全局序号传递，服务滑动窗口前瞻预热
 struct AdaptivePhotoGrid<Content: View, Footer: View>: View {
     let photos: [PhotoAsset]
-    @ViewBuilder var cell: (PhotoAsset) -> Content
+    @ViewBuilder var cell: (PhotoAsset, Int) -> Content
     @ViewBuilder var footer: Footer
 
     @Environment(GridSettings.self) private var gridSettings
 
-    /// 常规初始化：无 footer
-    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset) -> Content) where Footer == EmptyView {
+    /// 带全局序号初始化：无 footer
+    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset, Int) -> Content) where Footer == EmptyView {
         self.photos = photos
         self.cell = cell
         self.footer = EmptyView()
     }
 
-    /// 带 footer 初始化：分页加载指示器等追加内容
-    /// （固定比例下作为网格最后一个 item；瀑布流下铺满整行放在列内容之后）
-    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset) -> Content, @ViewBuilder footer: () -> Footer) {
+    /// 常规初始化：无 footer（兼容单参数闭包）
+    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset) -> Content) where Footer == EmptyView {
+        self.photos = photos
+        self.cell = { photo, _ in cell(photo) }
+        self.footer = EmptyView()
+    }
+
+    /// 带全局序号与 footer 初始化
+    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset, Int) -> Content, @ViewBuilder footer: () -> Footer) {
         self.photos = photos
         self.cell = cell
+        self.footer = footer()
+    }
+
+    /// 常规初始化：带 footer（兼容单参数闭包）
+    init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset) -> Content, @ViewBuilder footer: () -> Footer) {
+        self.photos = photos
+        self.cell = { photo, _ in cell(photo) }
         self.footer = footer()
     }
 
@@ -78,8 +105,8 @@ struct AdaptivePhotoGrid<Content: View, Footer: View>: View {
             }
         } else {
             LazyVGrid(columns: GridColumnHelper.columns(count: gridSettings.columnCount), spacing: GridColumnHelper.spacing) {
-                ForEach(photos) { photo in
-                    cell(photo)
+                ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                    cell(photo, index)
                 }
                 footer
             }

@@ -88,7 +88,7 @@ struct AlbumDetailView: View {
                 morePhotosSection
             }
             .padding(.top, 12)
-            .padding(.bottom, 90) // 底部边距防止遮挡
+            .padding(.bottom, 24)
         }
         .refreshable {
             await loadRecommendations(force: true)

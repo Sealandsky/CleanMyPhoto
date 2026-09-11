@@ -44,7 +44,7 @@ struct PhotoListView: View {
                     .frame(height: 0)
 
                     // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流（设置-显示-图片比例）
-                    AdaptivePhotoGrid(photos: photos) { photo in
+                    AdaptivePhotoGrid(photos: photos) { photo, index in
                         PhotoCell(
                             photo: photo,
                             isSelected: selectionManager.isSelected(photo.id),
@@ -78,7 +78,8 @@ struct PhotoListView: View {
                             }
                         }
                         .onAppear {
-                            if photo.id == photos.last?.id {
+                            photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
+                            if index >= photos.count - 2 {
                                 Task {
                                     await photoManager.fetchMorePhotos()
                                 }
@@ -91,7 +92,7 @@ struct PhotoListView: View {
                                 .padding()
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 4)
 
                     if photoManager.isLoadingMore {
                         ProgressView()
@@ -118,6 +119,7 @@ struct PhotoListView: View {
                 selectionManager.isSelectMode ? swipeSelectGesture(proxy: proxy) : nil
             )
             .onAppear {
+                photoManager.preloadInitialAssets(columnCount: gridSettings.columnCount)
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         withTransaction(Transaction(animation: nil)) {
@@ -125,6 +127,9 @@ struct PhotoListView: View {
                         }
                     }
                 }
+            }
+            .onChange(of: gridSettings.columnCount) { _, newCount in
+                photoManager.preloadInitialAssets(columnCount: newCount)
             }
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }

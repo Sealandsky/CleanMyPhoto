@@ -1990,13 +1990,26 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Photato 需要获取你的相册权限，以便帮你清理无用照片。"
+            "value" : "图豆需要获取你的相册权限，以便帮你清理无用照片。"
           }
         }
       }
     },
     "Photato Pro" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photato Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图豆 Pro"
+          }
+        }
+      }
     },
     "Photo Access Required" : {
       "localizations" : {
@@ -2759,7 +2772,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如需使用 Photato，请前往设置开启相册访问权限。"
+            "value" : "如需使用图豆，请前往设置开启相册访问权限。"
           }
         }
       }
@@ -3054,7 +3067,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "欢迎使用 Photato"
+            "value" : "欢迎使用图豆"
           }
         }
       }

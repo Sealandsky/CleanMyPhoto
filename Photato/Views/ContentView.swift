@@ -8,8 +8,8 @@ struct ContentView: View {
     // 由 MainTabView 持有：全屏态控制底部栏显隐
     @Binding var isFullscreenMode: Bool
 
-    // 「回忆」Tab 再次点击的滚顶信号（MainTabView 递增传入）
-    @Binding var discoverScrollToTop: Int
+    // 「回忆」Tab 滚顶信号（外部可选传入，默认 0）
+    var discoverScrollToTop: Int = 0
 
     @State private var currentPhotoID: String? = nil
     @State private var scrollToPhotoID: String? = nil
@@ -49,7 +49,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: photoManager.isSelectMode)
-        .animation(.easeInOut(duration: 0.2), value: isFullscreenMode)
         // 「回忆」Tab 再次点击：触发滚顶
         .onChange(of: discoverScrollToTop) { _, _ in
             discoverScrollSignal += 1
@@ -126,11 +125,19 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(.hidden, for: .navigationBar)
             .background(alignment: .top) {
-                TopBlurFadeBackground(height: 200)
+                if discoverManager.hasLoadedOnce && !discoverManager.photos.isEmpty {
+                    TopBlurFadeBackground(height: 200)
+                        .transition(.opacity)
+                }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     formatFilterMenu
+                    Button {
+                        photoManager.showTrash = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
                 }
             }
             .navigationDestination(isPresented: $isFullscreenMode) {
@@ -209,8 +216,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView(
-        isFullscreenMode: .constant(false),
-        discoverScrollToTop: .constant(0)
+        isFullscreenMode: .constant(false)
     )
     .environmentObject(PhotoManager())
     .environmentObject(StatisticsManager())

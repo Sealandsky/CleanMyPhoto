@@ -32,7 +32,7 @@ struct AlbumPhotoListView: View {
                         .padding(.bottom, 8)
                     }
                     // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
-                    AdaptivePhotoGrid(photos: photos) { photo in
+                    AdaptivePhotoGrid(photos: photos) { photo, index in
                         PhotoCell(
                             photo: photo,
                             isSelected: selectionManager.isSelected(photo.id),
@@ -57,8 +57,11 @@ struct AlbumPhotoListView: View {
                                 selectionManager.toggle(photo.id)
                             }
                         }
+                        .onAppear {
+                            photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
+                        }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 4)
                 }
             }
             .background(Color(UIColor.systemGroupedBackground))
@@ -74,6 +77,7 @@ struct AlbumPhotoListView: View {
                 }
             }
             .onAppear {
+                photoManager.preloadInitialAssets(columnCount: gridSettings.columnCount)
                 albumSizeText = SizeCache.load("album_\(album.id)") ?? ""
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -169,19 +173,32 @@ struct AlbumPhotoListView: View {
     // MARK: - Album Size Calculation
 
     private func calculateAlbumSize() {
+        let albumAssets = photos.map(\.asset)
         Task {
-            let totalSize = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-                for photo in photos {
-                    group.addTask {
-                        await PHAssetSizeHelper.getAssetSize(photo.asset)
+            let totalSize = await Task.detached(priority: .utility) {
+                await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                    let maxConcurrent = 16
+                    var running = 0
+                    var total: Int64 = 0
+
+                    for asset in albumAssets {
+                        if running >= maxConcurrent {
+                            if let size = await group.next() {
+                                total += size
+                                running -= 1
+                            }
+                        }
+                        group.addTask {
+                            await PHAssetSizeHelper.getAssetSize(asset)
+                        }
+                        running += 1
                     }
+                    for await size in group {
+                        total += size
+                    }
+                    return total
                 }
-                var total: Int64 = 0
-                for await size in group {
-                    total += size
-                }
-                return total
-            }
+            }.value
             SizeCache.save("album_\(album.id)", size: totalSize)
             let newText = ByteFormatter.format(totalSize)
             if newText != albumSizeText { albumSizeText = newText }

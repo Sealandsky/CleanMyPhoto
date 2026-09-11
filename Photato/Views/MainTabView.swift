@@ -49,109 +49,61 @@ struct MainTabView: View {
     @State private var organizeManager = PhotoOrganizeManager()
     @State private var organizePath = NavigationPath()
 
-    // 由本层持有：全屏态驱动底部垃圾桶按钮显隐；回收站 sheet 全局唯一入口
+    // 由本层持有：全屏态同步
     @State private var isFullscreenMode = false
-    @State private var showTrash = false
 
     // 导航路径：相簿二级页在本层（相簿已抽离为独立 Tab）
     @State private var albumsPath = NavigationPath()
-
-    // 「回忆」Tab 双击的滚顶信号（递增触发回忆页滚回顶部）
-    @State private var discoverScrollToTop = 0
-    // 上次点击已选中「回忆」Tab 的时间，用于双击窗口判定
-    @State private var lastDiscoverTapAt: Date?
 
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
 
     var body: some View {
-        GeometryReader { geo in
-            // 设备底部安全区高度（Home Indicator 约 34pt；iPad 通常为 0）
-            let bottomInset = geo.safeAreaInsets.bottom
-            // 底栏视觉下沉量：控件距屏底约 14pt（系统 TabBar 标准位置）
-            let sink = max(0, bottomInset - 8)
-            tabContent
-                .task {
-                    // 启动预热：提前把相似照片特征库载入内存，
-                    // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
-                    PhotoSimilarityMatcher.shared.prewarm()
-
-                    // 后台低优先级预热整理页快速缓存，避免首次切 Tab 时等待
-                    Task(priority: .utility) {
-                        await organizeManager.quickAnalysis()
-                    }
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if !shouldHideBottomBar {
-                        // 底栏：胶囊分段 Tab 组 + 完全独立的圆形回收站按钮
-                        // （浮在页面内容之上，不在 TabBar 胶囊内）
-                        CapsuleTabBar(
-                            segments: AppTab.allCases.map { tab in
-                                CapsuleSegment(
-                                    id: tab.rawValue,
-                                    title: tab.localizedText,
-                                    systemImage: tab.systemImage
-                                )
-                            },
-                            selectionID: Binding(
-                                get: { selectedTab.rawValue },
-                                set: { selectedTab = AppTab(rawValue: $0) ?? selectedTab }
-                            ),
-                            accessorySystemImage: "trash",
-                            // iOS 26+ 启用 Liquid Glass 背景；iOS 18 自动回退 systemBackground
-                            prefersLiquidGlass: true,
-                            // 双击已选中的「回忆」Tab：滚回回忆页最顶部
-                            // （单击不再触发；两次点击间隔 0.35s 内视为双击）
-                            onReselect: { id in
-                                guard id == AppTab.photos.rawValue else { return }
-                                let now = Date()
-                                if let last = lastDiscoverTapAt,
-                                   now.timeIntervalSince(last) < 0.35 {
-                                    lastDiscoverTapAt = nil
-                                    discoverScrollToTop += 1
-                                } else {
-                                    lastDiscoverTapAt = now
-                                }
-                            },
-                            onAccessoryTap: { showTrash = true }
-                        )
-                        // 下沉到系统 TabBar 的标准位置
-                        .offset(y: sink)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-                .animation(.easeInOut(duration: 0.2), value: shouldHideBottomBar)
-                .sheet(isPresented: $showTrash) {
-                    TrashView(photoManager: photoManager)
-                        // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
-                        .presentationDetents([.medium, .large])
-                }
-        }
-    }
-
-    // MARK: - Tab Pages
-    // 系统 TabBar 永久隐藏（其胶囊无法只占左侧宽度），底部栏由 CapsuleTabBar 自绘接管
-    private var tabContent: some View {
         TabView(selection: $selectedTab) {
             ContentView(
-                isFullscreenMode: $isFullscreenMode,
-                discoverScrollToTop: $discoverScrollToTop
+                isFullscreenMode: $isFullscreenMode
             )
-            .toolbar(.hidden, for: .tabBar)
+            .tabItem {
+                Label(AppTab.photos.localizedText, systemImage: AppTab.photos.systemImage)
+            }
             .tag(AppTab.photos)
 
             albumsTabContent
-                .toolbar(.hidden, for: .tabBar)
+                .tabItem {
+                    Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
+                }
                 .tag(AppTab.albums)
 
             organizeTabContent
-                .toolbar(.hidden, for: .tabBar)
+                .tabItem {
+                    Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
+                }
                 .tag(AppTab.organize)
 
             SettingsView()
-                .toolbar(.hidden, for: .tabBar)
+                .tabItem {
+                    Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
+                }
                 .tag(AppTab.settings)
+        }
+        .task {
+            // 稍作延迟（0.4s），避开冷启动首帧渲染与「回忆」页首批照片采样的瞬时 IO 竞争
+            try? await Task.sleep(nanoseconds: 400_000_000)
+
+            // 启动预热：提前把相似照片特征库载入内存，
+            // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
+            PhotoSimilarityMatcher.shared.prewarm()
+
+            // 后台低优先级预热整理页快速缓存，避免首次切 Tab 时等待
+            Task(priority: .utility) {
+                await organizeManager.quickAnalysis()
+            }
+        }
+        .sheet(isPresented: $photoManager.showTrash) {
+            TrashView(photoManager: photoManager)
+                // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -180,6 +132,15 @@ struct MainTabView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .background(alignment: .top) {
                 TopBlurFadeBackground(height: 200)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        photoManager.showTrash = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                }
             }
             .task {
                 // 首次进入相簿 Tab 时创建管理器并拉取相簿列表（TabView 懒加载，
@@ -237,6 +198,15 @@ struct MainTabView: View {
             .background(alignment: .top) {
                 TopBlurFadeBackground(height: 200)
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        photoManager.showTrash = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                }
+            }
             .navigationDestination(for: OrganizeDestination.self) { destination in
                 switch destination {
                 case .categoryResults(let category):
@@ -265,16 +235,6 @@ struct MainTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(UIColor.systemGroupedBackground))
         .ignoresSafeArea()
-    }
-
-    // MARK: - Bottom Bar Visibility
-    /// 对齐原系统 TabBar 行为：全屏浏览、滑动多选、任一二级页（相簿列表 push /
-    /// 时间线月视图 / 整理结果）中隐藏底部栏
-    private var shouldHideBottomBar: Bool {
-        isFullscreenMode ||
-        photoManager.isSelectMode ||
-        !albumsPath.isEmpty ||
-        !organizePath.isEmpty
     }
 }
 

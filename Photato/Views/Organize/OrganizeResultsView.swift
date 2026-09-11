@@ -697,11 +697,15 @@ struct OrganizeResultsView: View {
             selectedSizeText = ByteFormatter.format(0)
             return
         }
+        let selectedAssets = selected.map(\.asset)
         Task {
-            var total: Int64 = 0
-            for photo in selected {
-                total += await PHAssetSizeHelper.getAssetSize(photo.asset)
-            }
+            let total = await Task.detached(priority: .userInitiated) {
+                var sum: Int64 = 0
+                for asset in selectedAssets {
+                    sum += PHAssetSizeHelper.getFileSize(asset)
+                }
+                return sum
+            }.value
             selectedSizeText = ByteFormatter.format(total)
         }
     }
@@ -733,12 +737,22 @@ struct OrganizeResultsView: View {
                 assets.append(asset)
             }
             return await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                let maxConcurrent = 16
+                var running = 0
+                var total: Int64 = 0
+
                 for asset in assets {
+                    if running >= maxConcurrent {
+                        if let size = await group.next() {
+                            total += size
+                            running -= 1
+                        }
+                    }
                     group.addTask {
                         await PHAssetSizeHelper.getAssetSize(asset)
                     }
+                    running += 1
                 }
-                var total: Int64 = 0
                 for await size in group {
                     total += size
                 }
