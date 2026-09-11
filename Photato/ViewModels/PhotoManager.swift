@@ -128,21 +128,87 @@ class PhotoManager: ObservableObject {
     }
 
     // MARK: - Preload Assets
-    private var lastPreloadIndex: Int = -1
+    private var lastPreheatIndex: Int = -1
 
-    func preloadAssets(photoIndex: Int? = nil, count: Int = 3) {
+    /// 首批素材初始预热：使用统一标准像素尺寸预热前排 24 张照片
+    func preloadInitialAssets(columnCount: Int = GridColumnHelper.defaultCount) {
         guard !displayedPhotos.isEmpty else { return }
+        lastPreheatIndex = 0
+
+        let countToPreload = min(displayedPhotos.count, 24)
+        let assetsToPreload = displayedPhotos.prefix(countToPreload).map(\.asset)
+        let targetSize = GridColumnHelper.thumbnailPixelSize(columnCount: columnCount)
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
 
-        if let index = photoIndex {
-            // 全屏浏览模式：预热当前照片前后 count 张的高清全屏尺寸
-            guard index != lastPreloadIndex else { return }
-            lastPreloadIndex = index
+        PhotoAssetImageManager.shared.startCachingImages(
+            for: assetsToPreload,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: options
+        )
+    }
 
+    /// 列表滑动动态预热窗口：8 张步长节流、方向感知、前瞻预热 24 张，并自动回收远端旧缓存
+    func preheatAssets(around index: Int, in photos: [PhotoAsset], columnCount: Int) {
+        guard !photos.isEmpty, index >= 0, index < photos.count else { return }
+        // 步进节流：滑动跨度必须 >= 8 张（约 2~3 行）才触发一次批量预热，避免每张照片打断主线程
+        guard lastPreheatIndex < 0 || abs(index - lastPreheatIndex) >= 8 else { return }
+
+        let isScrollingDown = index >= lastPreheatIndex
+        lastPreheatIndex = index
+
+        let targetSize = GridColumnHelper.thumbnailPixelSize(columnCount: columnCount)
+        let preheatBatchSize = 24
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.isNetworkAccessAllowed = true
+        options.isSynchronous = false
+
+        // 1. 预热前方切片
+        let prewarmRange: Range<Int>
+        if isScrollingDown {
+            let start = min(photos.count, index + 1)
+            let end = min(photos.count, start + preheatBatchSize)
+            prewarmRange = start..<end
+        } else {
+            let end = max(0, index)
+            let start = max(0, end - preheatBatchSize)
+            prewarmRange = start..<end
+        }
+
+        if !prewarmRange.isEmpty {
+            let assetsToPrewarm = prewarmRange.map { photos[$0].asset }
+            PhotoAssetImageManager.shared.startCachingImages(
+                for: assetsToPrewarm,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: options
+            )
+        }
+
+        // 2. 释放离开视口较远的旧切片（40 张以前），防止系统底层解码位图无限堆积
+        if isScrollingDown && index > 40 {
+            let stopRange = max(0, index - 70)..<(index - 40)
+            if !stopRange.isEmpty {
+                let assetsToStop = stopRange.map { photos[$0].asset }
+                PhotoAssetImageManager.shared.stopCachingImages(
+                    for: assetsToStop,
+                    targetSize: targetSize,
+                    contentMode: .aspectFill,
+                    options: options
+                )
+            }
+        }
+    }
+
+    /// 兼容旧版预热接口
+    func preloadAssets(photoIndex: Int? = nil, count: Int = 3) {
+        if let index = photoIndex {
             let startIndex = max(0, index - count)
             let endIndex = min(displayedPhotos.count - 1, index + count)
             guard startIndex <= endIndex else { return }
@@ -152,6 +218,11 @@ class PhotoManager: ObservableObject {
                 assetsToPreload.append(displayedPhotos[i].asset)
             }
 
+            let options = PHImageRequestOptions()
+            options.deliveryMode = .opportunistic
+            options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
+
             PhotoAssetImageManager.shared.startCachingImages(
                 for: assetsToPreload,
                 targetSize: ScreenSizeHelper.screenPhysicalSize,
@@ -159,16 +230,7 @@ class PhotoManager: ObservableObject {
                 options: options
             )
         } else {
-            // 图库网格模式：预热最新获取或前排的网格缩略图尺寸
-            let countToPreload = min(displayedPhotos.count, 20)
-            let assetsToPreload = displayedPhotos.prefix(countToPreload).map(\.asset)
-
-            PhotoAssetImageManager.shared.startCachingImages(
-                for: assetsToPreload,
-                targetSize: CGSize(width: 600, height: 600),
-                contentMode: .aspectFill,
-                options: options
-            )
+            preloadInitialAssets()
         }
     }
 
@@ -192,6 +254,7 @@ class PhotoManager: ObservableObject {
     // MARK: - Update Displayed Photos
     private func updateDisplayedPhotos() {
         displayedPhotos = allPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+        lastPreheatIndex = -1
         updateStatistics()
     }
 

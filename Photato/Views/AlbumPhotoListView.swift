@@ -32,7 +32,7 @@ struct AlbumPhotoListView: View {
                         .padding(.bottom, 8)
                     }
                     // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
-                    AdaptivePhotoGrid(photos: photos) { photo in
+                    AdaptivePhotoGrid(photos: photos) { photo, index in
                         PhotoCell(
                             photo: photo,
                             isSelected: selectionManager.isSelected(photo.id),
@@ -56,6 +56,9 @@ struct AlbumPhotoListView: View {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectionManager.toggle(photo.id)
                             }
+                        }
+                        .onAppear {
+                            photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
                         }
                     }
                     .padding(.horizontal, 12)

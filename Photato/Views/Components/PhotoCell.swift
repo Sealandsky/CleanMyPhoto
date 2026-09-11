@@ -11,11 +11,6 @@ struct PhotoCell: View {
     @Environment(\.displayScale) private var displayScale
     @State private var imageLoaded = false
 
-    /// 缩略图请求像素下/上限：下限贴合 Retina 3x 列宽（保证极小格子仍锐利清晰），
-    /// 上限防止瀑布流中超长截图把请求尺寸顶到离谱的内存占用
-    private static let minPixelEdge: CGFloat = 260
-    private static let maxPixelEdge: CGFloat = 900
-
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
     /// 否则用用户设置的固定比例。
     private var cardAspectRatio: CGFloat {
@@ -25,14 +20,12 @@ struct PhotoCell: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // 缩略图按实际渲染尺寸 × 屏幕倍率请求像素，以 20px 步进向上量化规整，
-            // 消除不同卡片间的浮点亚像素微差，最大化 PhotoKit 与内存缓存命中率
+            // 缩略图基准尺寸：采用统一的标准物理像素正方形尺寸（targetSize + .aspectFill），
+            // 消除不同卡片间的浮点微差，并与后台动态预热窗口的 targetSize 100% 精确咬合
             let rawWidth = geometry.size.width * displayScale
-            let rawHeight = geometry.size.height * displayScale
             let quantizedWidth = (rawWidth / 20.0).rounded(.up) * 20.0
-            let quantizedHeight = (rawHeight / 20.0).rounded(.up) * 20.0
-            let pixelWidth = min(max(quantizedWidth, Self.minPixelEdge), Self.maxPixelEdge)
-            let pixelHeight = min(max(quantizedHeight, Self.minPixelEdge), Self.maxPixelEdge)
+            let edge = min(max(quantizedWidth, GridColumnHelper.minPixelEdge), GridColumnHelper.maxPixelEdge)
+            let thumbnailSize = CGSize(width: edge, height: edge)
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -40,7 +33,7 @@ struct PhotoCell: View {
 
                 AssetImage(
                     asset: photo.asset,
-                    targetSize: CGSize(width: pixelWidth, height: pixelHeight),
+                    targetSize: thumbnailSize,
                     contentMode: .fill,
                     placeholderColor: Color(UIColor.secondarySystemFill),
                     onLoad: { imageLoaded = true }

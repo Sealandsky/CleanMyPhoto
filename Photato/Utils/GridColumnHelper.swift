@@ -39,16 +39,35 @@ final class GridSettings {
     }
 }
 
-enum GridColumnHelper {
-    static let columnStorageKey = "gridColumnCount"
-    static let ratioStorageKey = "gridAspectRatio"
-    static let originalRatioStorageKey = "gridIsOriginalRatio"
+enum GridColumnHelper: Sendable {
+    nonisolated static let columnStorageKey = "gridColumnCount"
+    nonisolated static let ratioStorageKey = "gridAspectRatio"
+    nonisolated static let originalRatioStorageKey = "gridIsOriginalRatio"
     /// 默认 2 列：大格更契合原比例瀑布流的浏览体验
-    static let defaultCount = 2
-    static let defaultRatio: CGFloat = 3.0 / 4.0
-    static let spacing: CGFloat = 4
+    nonisolated static let defaultCount = 2
+    nonisolated static let defaultRatio: CGFloat = 3.0 / 4.0
+    nonisolated static let spacing: CGFloat = 4
+    nonisolated static let horizontalPadding: CGFloat = 12 * 2
+    nonisolated static let minPixelEdge: CGFloat = 260
+    nonisolated static let maxPixelEdge: CGFloat = 900
 
     static func columns(count: Int) -> [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+    }
+
+    /// 计算指定列数下网格单元格对应的物理像素基准尺寸（正方形 targetSize + .aspectFill）
+    /// 确保无论是 2 列、3 列、4 列还是瀑布流，预热与渲染的 PhotoKit targetSize 键值 100% 绝对一致
+    static func thumbnailPixelSize(
+        columnCount: Int,
+        screenWidth: CGFloat = ScreenSizeHelper.screenSize.width,
+        scale: CGFloat = ScreenSizeHelper.screenScale
+    ) -> CGSize {
+        let safeColumns = max(1, columnCount)
+        let totalSpacing = spacing * CGFloat(safeColumns - 1)
+        let cellPointWidth = (screenWidth - horizontalPadding - totalSpacing) / CGFloat(safeColumns)
+        let rawPixel = cellPointWidth * scale
+        let quantized = (rawPixel / 20.0).rounded(.up) * 20.0
+        let edge = min(max(quantized, minPixelEdge), maxPixelEdge)
+        return CGSize(width: edge, height: edge)
     }
 }
