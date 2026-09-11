@@ -404,8 +404,8 @@ struct DiscoverView: View {
                             }
                         }
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
             }
             // 滚动位置绑定：支持按边缘滚到真正的顶部（offset 0）
             .scrollPosition($scrollPosition)

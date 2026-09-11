@@ -92,7 +92,7 @@ struct PhotoListView: View {
                                 .padding()
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 4)
 
                     if photoManager.isLoadingMore {
                         ProgressView()

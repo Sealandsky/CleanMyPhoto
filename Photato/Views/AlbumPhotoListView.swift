@@ -61,7 +61,7 @@ struct AlbumPhotoListView: View {
                             photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 4)
                 }
             }
             .background(Color(UIColor.systemGroupedBackground))

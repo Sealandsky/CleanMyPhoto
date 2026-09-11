@@ -47,7 +47,7 @@ enum GridColumnHelper: Sendable {
     nonisolated static let defaultCount = 2
     nonisolated static let defaultRatio: CGFloat = 3.0 / 4.0
     nonisolated static let spacing: CGFloat = 4
-    nonisolated static let horizontalPadding: CGFloat = 12 * 2
+    nonisolated static let horizontalPadding: CGFloat = 4 * 2
     nonisolated static let minPixelEdge: CGFloat = 260
     nonisolated static let maxPixelEdge: CGFloat = 900
 
