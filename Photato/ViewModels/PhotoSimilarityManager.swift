@@ -195,39 +195,66 @@ final class PhotoSimilarityManager {
     // MARK: - Private: Group Computation
 
     nonisolated private static func computeSimilarGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
-        let sorted = fingerprints.sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+        // 过滤无指纹的脏数据并按拍摄时间升序排布
+        let sorted = fingerprints
+            .filter { $0.dhashBits != 0 }
+            .sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
 
-        let uf = UnionFind()
-        for fp in sorted { uf.add(fp.localIdentifier) }
+        guard sorted.count > 1 else { return [] }
 
-        let threshold = 10
-        let windowSeconds: TimeInterval = 3 * 86400
+        var usedIndices = Set<Int>()
+        var clusterGroups: [[String]] = []
 
+        // 锚点贪心聚类 + 簇直径硬约束：杜绝并查集无限制传递（雪球效应）
         for i in 0..<sorted.count {
-            let fp = sorted[i]
-            let date = fp.creationDate ?? .distantPast
+            if usedIndices.contains(i) { continue }
+
+            let anchor = sorted[i]
+            let anchorDate = anchor.creationDate ?? .distantPast
+            var clusterMembers = [anchor]
+            var clusterIndices = [i]
 
             for j in (i + 1)..<sorted.count {
-                let other = sorted[j]
-                let otherDate = other.creationDate ?? .distantPast
+                if usedIndices.contains(j) { continue }
 
-                guard otherDate.timeIntervalSince(date) <= windowSeconds else { break }
+                let candidate = sorted[j]
+                let candDate = candidate.creationDate ?? .distantPast
+                let dtAnchor = candDate.timeIntervalSince(anchorDate)
 
-                let dist = Self.hammingDistance(fp.dhashBits, other.dhashBits)
-                if dist <= threshold {
-                    uf.union(fp.localIdentifier, other.localIdentifier)
+                // 跨场景阻断：时间差超过 3 分钟绝对不作为同场景相似组
+                guard dtAnchor >= 0 else { continue }
+                guard dtAnchor <= 180 else { break }
+
+                let lastDate = clusterMembers.last!.creationDate ?? .distantPast
+                let dtLast = candDate.timeIntervalSince(lastDate)
+
+                // 分级时间阈值：超短时抓拍 (<=15s) 放宽至 11，同场景摆拍 (<=3min) 收紧至 7
+                let tau: Int = (dtLast <= 15 || dtAnchor <= 15) ? 11 : 7
+                let distToAnchor = Self.hammingDistance(candidate.dhashBits, anchor.dhashBits)
+                guard distToAnchor <= tau else { continue }
+
+                // 簇直径硬约束：新照片与簇内所有已有照片的最大汉明距离必须 <= 12，防止连环串联
+                var isConsistentWithAll = true
+                for member in clusterMembers {
+                    if Self.hammingDistance(candidate.dhashBits, member.dhashBits) > 12 {
+                        isConsistentWithAll = false
+                        break
+                    }
                 }
+
+                if isConsistentWithAll {
+                    clusterMembers.append(candidate)
+                    clusterIndices.append(j)
+                }
+            }
+
+            if clusterMembers.count >= 2 {
+                clusterGroups.append(clusterMembers.map(\.localIdentifier))
+                usedIndices.formUnion(clusterIndices)
             }
         }
 
-        var groups: [String: [String]] = [:]
-        for fp in sorted {
-            let root = uf.find(fp.localIdentifier)
-            groups[root, default: []].append(fp.localIdentifier)
-        }
-
-        return groups.values
-            .filter { $0.count > 1 }
+        return clusterGroups
             .sorted { $0.count > $1.count }
             .map { ids in
                 OrganizeScanGroup(
@@ -241,13 +268,15 @@ final class PhotoSimilarityManager {
     nonisolated private static func computeDuplicateGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
         var groups: [String: [String]] = [:]
         for fp in fingerprints {
-            let dateKey: String
-            if let date = fp.creationDate {
-                dateKey = "\(Int(date.timeIntervalSince1970 / 2) * 2)"
-            } else {
-                dateKey = "none"
+            guard fp.dhashBits != 0 else {
+                // 指纹为 0 时（如纯黑/白图）仅同日两秒内归并，防止跨月纯色图误伤
+                let dateKey = fp.creationDate.map { "\(Int($0.timeIntervalSince1970 / 2) * 2)" } ?? "none"
+                let key = "zero_\(fp.pixelWidth)x\(fp.pixelHeight)_\(dateKey)"
+                groups[key, default: []].append(fp.localIdentifier)
+                continue
             }
-            let key = "\(fp.dhashBits)_\(dateKey)"
+            // 真实有效指纹且尺寸完全一致：判定为确定性重复照片（支持跨时间保存的相同文件）
+            let key = "\(fp.dhashBits)_\(fp.pixelWidth)x\(fp.pixelHeight)"
             groups[key, default: []].append(fp.localIdentifier)
         }
 
@@ -486,41 +515,5 @@ final class PhotoSimilarityManager {
 
     nonisolated private static func hammingDistance(_ a: UInt64, _ b: UInt64) -> Int {
         (a ^ b).nonzeroBitCount
-    }
-}
-
-// MARK: - Union-Find
-
-private final class UnionFind {
-    private var parent: [String: String] = [:]
-    private var rank: [String: Int] = [:]
-
-    func add(_ x: String) {
-        if parent[x] == nil {
-            parent[x] = x
-            rank[x] = 0
-        }
-    }
-
-    func find(_ x: String) -> String {
-        if parent[x] != x {
-            parent[x] = find(parent[x]!)
-        }
-        return parent[x]!
-    }
-
-    func union(_ x: String, _ y: String) {
-        let rootX = find(x)
-        let rootY = find(y)
-        guard rootX != rootY else { return }
-
-        if rank[rootX]! < rank[rootY]! {
-            parent[rootX] = rootY
-        } else if rank[rootX]! > rank[rootY]! {
-            parent[rootY] = rootX
-        } else {
-            parent[rootY] = rootX
-            rank[rootX]! += 1
-        }
     }
 }

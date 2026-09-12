@@ -505,7 +505,7 @@ final class PhotoOrganizeManager {
             }
 
             if let best = displayGroup.loadedPhotos.max(by: {
-                $0.asset.pixelWidth * $0.asset.pixelHeight < $1.asset.pixelWidth * $1.asset.pixelHeight
+                Self.evaluateBestPhotoScore(for: $0) < Self.evaluateBestPhotoScore(for: $1)
             }) {
                 displayGroup.bestPhotoId = best.id
             }
@@ -542,6 +542,28 @@ final class PhotoOrganizeManager {
                 categoryPageStates[category] = state
             }
         }
+    }
+
+    /// 评估分组中最优保留照片得分（综合收藏保护、实况照片、分辨率与细节体积）
+    private static func evaluateBestPhotoScore(for photo: PhotoAsset) -> Double {
+        var score: Double = 0
+        // 1. 用户收藏：最高权重（+10,000分），绝对保护用户已标记红心的素材
+        if photo.isFavorite {
+            score += 10_000
+        }
+        // 2. 实况照片：次高权重（+1,000分），具备动态与声音，价值高于普通静态图
+        if photo.mediaType == .livePhoto {
+            score += 1_000
+        }
+        // 3. 分辨率（百万像素，每百万像素 10 分）
+        let megapixels = Double(photo.asset.pixelWidth * photo.asset.pixelHeight) / 1_000_000.0
+        score += megapixels * 10.0
+        // 4. 文件体积（同分辨率下体积越大通常代表高频细节更丰富、压缩更轻）
+        if let size = PHAssetSizeHelper.getCachedSize(for: photo.asset) {
+            let mb = Double(size) / (1024.0 * 1024.0)
+            score += min(mb * 2.0, 50.0)
+        }
+        return score
     }
 
     func groups(for category: OrganizeCategory) -> [OrganizeGroupDisplay] {
