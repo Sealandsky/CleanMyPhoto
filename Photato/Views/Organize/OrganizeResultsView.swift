@@ -10,7 +10,7 @@ struct OrganizeResultsView: View {
     @State private var selectedSizeText = ByteFormatter.format(0)
     @State private var categorySizeText = ""
 
-    // 日期分节：相似/重复簇按天细分；平铺分类按天分组、无日期按月归类
+    // 日期分节：相似/重复按拍摄日聚合分节；其他分类按拍摄年月归类
     @State private var dateSections: [DateSection] = []
     @State private var sectionSizes: [String: Int64] = [:]
     @State private var cachedAllPhotos: [PhotoAsset] = []
@@ -447,7 +447,7 @@ struct OrganizeResultsView: View {
     // MARK: - 日期分节构建
 
     /// 相似/重复：按拍摄日期归类聚合分节（日期倒序，不带组标号）；
-    /// 平铺分类：全部照片按天分组；无拍摄日期的按月归类（回退修改时间）
+    /// 平铺分类：全部照片按拍摄年月归类分节（日期倒序）
     private func rebuildDateSections() {
         var newSections = Self.buildDateSections(
             category: category,
@@ -456,7 +456,8 @@ struct OrganizeResultsView: View {
             pendingDeletionIDs: photoManager.pendingDeletionIDs
         )
         for i in 0..<newSections.count {
-            if let size = sectionSizes[newSections[i].id] {
+            let key = "\(newSections[i].id)_\(newSections[i].photos.count)"
+            if let size = sectionSizes[key] ?? sectionSizes[newSections[i].id] {
                 newSections[i].totalSize = size
             }
         }
@@ -532,20 +533,10 @@ struct OrganizeResultsView: View {
             return sections
         } else {
             let flatPhotos = photos.filter { !pendingDeletionIDs.contains($0.id) }
-            let sections = createDateSections(
+            return createMonthSections(
                 in: flatPhotos,
                 idPrefix: "flat-\(category.rawValue)"
             )
-            // 跨组合并：仅平铺分类按同日合并相邻节
-            var merged: [DateSection] = []
-            for section in sections {
-                if let last = merged.last, last.title == section.title {
-                    merged[merged.count - 1].photos.append(contentsOf: section.photos)
-                } else {
-                    merged.append(section)
-                }
-            }
-            return merged
         }
     }
 
@@ -568,52 +559,29 @@ struct OrganizeResultsView: View {
         }
     }
 
-    /// 将照片按拍摄日（降序）分节；无拍摄日期的按月归类（回退修改时间）
-    private static func createDateSections(in photos: [PhotoAsset], idPrefix: String) -> [DateSection] {
-        var dayBuckets: [Date: [PhotoAsset]] = [:]
+    /// 平铺分类：按拍摄年月（降序）归类分节；无拍摄日期的按修改年月归类
+    private static func createMonthSections(in photos: [PhotoAsset], idPrefix: String) -> [DateSection] {
         var monthBuckets: [Date: [PhotoAsset]] = [:]
+        let calendar = Calendar.current
 
         for photo in photos {
-            if let created = photo.asset.creationDate {
-                dayBuckets[Calendar.current.startOfDay(for: created), default: []].append(photo)
-            } else if let modified = photo.asset.modificationDate {
-                let month = Calendar.current.date(
-                    from: Calendar.current.dateComponents([.year, .month], from: modified)
-                ) ?? modified
-                monthBuckets[month, default: []].append(photo)
-            }
+            let targetDate = photo.asset.creationDate ?? photo.asset.modificationDate ?? .distantPast
+            let components = calendar.dateComponents([.year, .month], from: targetDate)
+            let monthStart = calendar.date(from: components) ?? targetDate
+            monthBuckets[monthStart, default: []].append(photo)
         }
 
         var sections: [DateSection] = []
-        for day in dayBuckets.keys.sorted(by: >) {
-            let photos = dayBuckets[day]!
-            sections.append(DateSection(
-                id: "\(idPrefix)-day-\(day.timeIntervalSince1970)",
-                groupID: idPrefix,
-                title: day.formatted(date: .long, time: .omitted),
-                photos: photos
-            ))
-        }
         for month in monthBuckets.keys.sorted(by: >) {
-            let photos = monthBuckets[month]!
+            let monthPhotos = monthBuckets[month]!
             sections.append(DateSection(
                 id: "\(idPrefix)-month-\(month.timeIntervalSince1970)",
                 groupID: idPrefix,
                 title: month.formatted(Date.FormatStyle().year().month()),
-                photos: photos
+                photos: monthPhotos
             ))
         }
-
-        // 相邻同日期节合并：不同簇可能落在同一天，避免重复日期头
-        var merged: [DateSection] = []
-        for section in sections {
-            if let last = merged.last, last.title == section.title {
-                merged[merged.count - 1].photos.append(contentsOf: section.photos)
-            } else {
-                merged.append(section)
-            }
-        }
-        return merged
+        return sections
     }
 
     /// 补齐各分节合计大小（后台异步计算，单次主线程批量赋值更新）
@@ -622,7 +590,7 @@ struct OrganizeResultsView: View {
         Task(priority: .utility) {
             var newSizes: [String: Int64] = [:]
             for section in sections {
-                let key = section.id
+                let key = "\(section.id)_\(section.photos.count)"
                 guard sectionSizes[key] == nil else { continue }
                 var total: Int64 = 0
                 for photo in section.photos {
@@ -638,7 +606,8 @@ struct OrganizeResultsView: View {
                     sectionSizes[key] = size
                 }
                 for i in 0..<dateSections.count {
-                    if let s = newSizes[dateSections[i].id] {
+                    let key = "\(dateSections[i].id)_\(dateSections[i].photos.count)"
+                    if let s = sectionSizes[key] {
                         dateSections[i].totalSize = s
                     }
                 }
