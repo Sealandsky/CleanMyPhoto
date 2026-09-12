@@ -13,6 +13,7 @@ final class PhotoOrganizeManager {
     var categoryPageStates: [OrganizeCategory: OrganizeCategoryPageState] = [:]
     var hasLoadedInitialData = false
     var isQuickAnalyzing: Bool = false
+    var completedCategories: Set<OrganizeCategory> = []
 
     let similarityManager = PhotoSimilarityManager()
     let qualityAnalyzer = PhotoQualityAnalyzer()
@@ -215,6 +216,7 @@ final class PhotoOrganizeManager {
             isAnalyzing = true
             analysisProgress = 0
             currentStep = ""
+            completedCategories.removeAll()
             scanResults.removeAll()
             categoryStats.removeAll()
             categoryPageStates.removeAll()
@@ -231,18 +233,21 @@ final class PhotoOrganizeManager {
 
             currentStep = String(localized: "Scanning for metadata...")
             await scanMetadataCategories(from: fetchResult)
+            completedCategories.formUnion([.screenshots, .livePhotos, .videos])
             analysisProgress = 1.0 / totalSteps
 
             guard !Task.isCancelled else { return }
 
             currentStep = String(localized: "Scanning for large files...")
             await scanLargeFiles(from: fetchResult)
+            completedCategories.insert(.largeFiles)
             analysisProgress = 2.0 / totalSteps
 
             guard !Task.isCancelled else { return }
 
             currentStep = String(localized: "Scanning for low quality...")
             await scanLowQuality(from: fetchResult)
+            completedCategories.insert(.lowQuality)
             analysisProgress = 3.0 / totalSteps
 
             guard !Task.isCancelled else { return }
@@ -256,6 +261,7 @@ final class PhotoOrganizeManager {
             categoryStats[.similar] = similar.reduce(0) { $0 + $1.localIdentifiers.count }
             scanResults[.duplicates] = duplicates
             categoryStats[.duplicates] = duplicates.reduce(0) { $0 + $1.localIdentifiers.count }
+            completedCategories.formUnion([.similar, .duplicates])
 
             guard !Task.isCancelled else { return }
 
@@ -269,6 +275,7 @@ final class PhotoOrganizeManager {
                 scanResults[.poorFace] = [pf]
                 categoryStats[.poorFace] = pf.localIdentifiers.count
             }
+            completedCategories.formUnion([.blurry, .poorFace])
             analysisProgress = 5.0 / totalSteps
 
             analysisProgress = 1.0
@@ -284,6 +291,7 @@ final class PhotoOrganizeManager {
         isAnalyzing = false
         analysisProgress = 0
         currentStep = ""
+        completedCategories.removeAll()
     }
 
     // MARK: - Scan: Metadata Categories (single pass)
@@ -361,7 +369,9 @@ final class PhotoOrganizeManager {
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
-            analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            if index % 20 == 0 || index == total - 1 {
+                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            }
 
             let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
             // 判定条件：真实大小 >= 10MB，或者超高分辨率(>=24MP)且大小 >= 6MB
@@ -399,7 +409,9 @@ final class PhotoOrganizeManager {
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
-            analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            if index % 20 == 0 || index == total - 1 {
+                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            }
             let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
             if size <= maxFileSize {
                 lowQuality.append((candidate.identifier, candidate.resolution))
@@ -603,7 +615,9 @@ final class PhotoOrganizeManager {
     }
 
     func isCategoryAnalyzing(_ category: OrganizeCategory) -> Bool {
-        if isAnalyzing { return true }
+        if isAnalyzing {
+            return !completedCategories.contains(category)
+        }
         if isQuickAnalyzing && (categoryStats[category] == nil || categoryStats[category] == 0) {
             return true
         }

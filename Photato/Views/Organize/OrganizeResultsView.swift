@@ -13,6 +13,9 @@ struct OrganizeResultsView: View {
     // 日期分节：相似/重复簇按天细分；平铺分类按天分组、无日期按月归类
     @State private var dateSections: [DateSection] = []
     @State private var sectionSizes: [String: Int64] = [:]
+    @State private var cachedAllPhotos: [PhotoAsset] = []
+    @State private var photoIndexMap: [String: Int] = [:]
+    @State private var sizeCalculationTask: Task<Void, Never>? = nil
 
     // 详情页（大图浏览：复用共享组件 FullscreenPhotoBrowser）
     @State private var isFullscreenMode = false
@@ -78,6 +81,9 @@ struct OrganizeResultsView: View {
     }
 
     private var allPhotos: [PhotoAsset] {
+        if !cachedAllPhotos.isEmpty {
+            return cachedAllPhotos
+        }
         if isGroupedMode {
             return dateSections.flatMap { $0.photos }
         } else {
@@ -152,10 +158,15 @@ struct OrganizeResultsView: View {
                 await calculateCategorySize()
             }
         }
-        .onChange(of: allPhotos) { _, newPhotos in
-            // 分页加载/删除后分节跟随重建（尺寸缓存按键复用，不重复计算）
+        .onChange(of: displayedPhotos.count) { _, _ in
             rebuildDateSections()
-            if newPhotos.isEmpty && isFullscreenMode {
+        }
+        .onChange(of: displayedGroups.count) { _, _ in
+            rebuildDateSections()
+        }
+        .onChange(of: photoManager.pendingDeletionIDs) { _, _ in
+            rebuildDateSections()
+            if cachedAllPhotos.isEmpty && isFullscreenMode {
                 isFullscreenMode = false
             }
         }
@@ -354,25 +365,19 @@ struct OrganizeResultsView: View {
     }
 
     private func toggleSectionSelection(_ section: DateSection) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let allSelected = isSectionAllSelected(section)
+        let sectionIds = section.photos.map(\.id)
         withAnimation(.easeInOut(duration: 0.15)) {
             if allSelected {
-                for photo in section.photos {
-                    if selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+                selectionManager.deselectAll(sectionIds)
             } else {
-                for photo in section.photos {
-                    if !selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+                selectionManager.selectAll(sectionIds)
             }
         }
     }
 
-    /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小
+    /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小，滑动动态预热
     private func organizePhotoCell(_ photo: PhotoAsset) -> some View {
         PhotoCell(photo: photo, usesSquareRatio: true)
             .overlay(alignment: .bottomTrailing) {
@@ -405,12 +410,18 @@ struct OrganizeResultsView: View {
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         selectionManager.toggle(photo.id)
                     }
             }
             .contentShape(Rectangle())
             .onTapGesture {
                 openFullscreen(photo)
+            }
+            .onAppear {
+                if let globalIndex = photoIndexMap[photo.id] {
+                    photoManager.preheatAssets(around: globalIndex, in: cachedAllPhotos, columnCount: 3)
+                }
             }
     }
 
@@ -450,6 +461,23 @@ struct OrganizeResultsView: View {
             }
         }
         dateSections = newSections
+
+        // 同步缓存扁平列表与全局索引表，驱动 O(1) 预热与极速全选
+        let flat: [PhotoAsset]
+        if isGroupedMode {
+            flat = newSections.flatMap { $0.photos }
+        } else {
+            flat = displayedPhotos
+        }
+        cachedAllPhotos = flat
+
+        var indexMap: [String: Int] = [:]
+        indexMap.reserveCapacity(flat.count)
+        for (idx, p) in flat.enumerated() {
+            indexMap[p.id] = idx
+        }
+        photoIndexMap = indexMap
+
         computeSectionSizes()
     }
 
@@ -583,10 +611,11 @@ struct OrganizeResultsView: View {
         return merged
     }
 
-    /// 补齐各分节合计大小（异步读缓存尺寸，不阻塞渲染）
+    /// 补齐各分节合计大小（后台异步计算，单次主线程批量赋值更新）
     private func computeSectionSizes() {
         let sections = dateSections
-        Task {
+        Task(priority: .utility) {
+            var newSizes: [String: Int64] = [:]
             for section in sections {
                 let key = section.id
                 guard sectionSizes[key] == nil else { continue }
@@ -594,9 +623,19 @@ struct OrganizeResultsView: View {
                 for photo in section.photos {
                     total += await PHAssetSizeHelper.getAssetSize(photo.asset)
                 }
-                sectionSizes[key] = total
-                if let idx = dateSections.firstIndex(where: { $0.id == key }) {
-                    dateSections[idx].totalSize = total
+                newSizes[key] = total
+            }
+
+            guard !newSizes.isEmpty else { return }
+
+            await MainActor.run {
+                for (key, size) in newSizes {
+                    sectionSizes[key] = size
+                }
+                for i in 0..<dateSections.count {
+                    if let s = newSizes[dateSections[i].id] {
+                        dateSections[i].totalSize = s
+                    }
                 }
             }
         }
@@ -620,14 +659,12 @@ struct OrganizeResultsView: View {
     }
 
     private func toggleSelectAll() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if selectionManager.count == allPhotos.count {
             selectionManager.clearSelection()
         } else {
-            for photo in allPhotos {
-                if !selectionManager.isSelected(photo.id) {
-                    selectionManager.toggle(photo.id)
-                }
-            }
+            let allIds = allPhotos.map(\.id)
+            selectionManager.selectAll(allIds)
         }
     }
 
@@ -663,19 +700,20 @@ struct OrganizeResultsView: View {
         .padding(.bottom, 16)
     }
 
-    /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删）
+    /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删），单次批量更新并触觉反馈
     private func aiAutoSelect() {
         guard isGroupedMode else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            for group in displayedGroups {
-                let photos = filtered(group.loadedPhotos)
-                guard photos.count >= 2 else { continue }
-                for photo in photos where photo.id != group.bestPhotoId {
-                    if !selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        var idsToSelect: [String] = []
+        for group in displayedGroups {
+            let photos = filtered(group.loadedPhotos)
+            guard photos.count >= 2 else { continue }
+            for photo in photos where photo.id != group.bestPhotoId {
+                idsToSelect.append(photo.id)
             }
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectionManager.selectAll(idsToSelect)
         }
     }
 
@@ -690,22 +728,63 @@ struct OrganizeResultsView: View {
         selectionManager.clearSelection()
     }
 
-    /// 选中合计大小：异步累加（PHAssetSizeHelper 内部有缓存，重复查询开销小）
+    /// 选中合计大小：带 0.1s 防抖、内存缓存优先、未缓存 16 并发计算
     private func updateSelectedSize() {
+        sizeCalculationTask?.cancel()
+
         let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
         guard !selected.isEmpty else {
             selectedSizeText = ByteFormatter.format(0)
             return
         }
+
         let selectedAssets = selected.map(\.asset)
-        Task {
+        sizeCalculationTask = Task {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
+
             let total = await Task.detached(priority: .userInitiated) {
+                var uncachedAssets: [PHAsset] = []
                 var sum: Int64 = 0
+
                 for asset in selectedAssets {
-                    sum += PHAssetSizeHelper.getFileSize(asset)
+                    if let cached = PHAssetSizeHelper.getCachedSize(for: asset) {
+                        sum += cached
+                    } else {
+                        uncachedAssets.append(asset)
+                    }
                 }
-                return sum
+
+                guard !uncachedAssets.isEmpty else { return sum }
+
+                let uncachedSum = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                    let maxConcurrent = 16
+                    var running = 0
+                    var groupTotal: Int64 = 0
+
+                    for asset in uncachedAssets {
+                        if running >= maxConcurrent {
+                            if let s = await group.next() {
+                                groupTotal += s
+                                running -= 1
+                            }
+                        }
+                        group.addTask {
+                            PHAssetSizeHelper.getFileSize(asset)
+                        }
+                        running += 1
+                    }
+
+                    for await s in group {
+                        groupTotal += s
+                    }
+                    return groupTotal
+                }
+
+                return sum + uncachedSum
             }.value
+
+            guard !Task.isCancelled else { return }
             selectedSizeText = ByteFormatter.format(total)
         }
     }
