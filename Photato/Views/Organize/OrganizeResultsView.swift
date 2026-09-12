@@ -446,7 +446,7 @@ struct OrganizeResultsView: View {
 
     // MARK: - 日期分节构建
 
-    /// 相似/重复：每个簇按天细分（跨天的簇拆成多个日期节，日期降序）；
+    /// 相似/重复：按拍摄日期归类聚合分节（日期倒序，不带组标号）；
     /// 平铺分类：全部照片按天分组；无拍摄日期的按月归类（回退修改时间）
     private func rebuildDateSections() {
         var newSections = Self.buildDateSections(
@@ -488,40 +488,45 @@ struct OrganizeResultsView: View {
         pendingDeletionIDs: Set<String>
     ) -> [DateSection] {
         if category == .similar || category == .duplicates {
-            var sections: [DateSection] = []
+            // 按日期归类分组：同日的多组聚合成同一个日期分节，不再标注「组 1」、「组 2」
+            var dateMap: [String: (date: Date, photos: [PhotoAsset], size: Int64)] = [:]
+            var dateOrder: [String] = []
 
-            // 统计每个基准日期出现的次数，以便在同日有多组时区分标注「组 1」、「组 2」
-            var dateCountMap: [String: Int] = [:]
             for group in groups {
                 let validPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
                 guard validPhotos.count >= 2 else { continue }
+
                 let dateKey = primaryDateString(for: validPhotos)
-                dateCountMap[dateKey, default: 0] += 1
+                let sampleDate = validPhotos.compactMap { $0.asset.creationDate }.first ?? .distantPast
+
+                if var existing = dateMap[dateKey] {
+                    existing.photos.append(contentsOf: validPhotos)
+                    existing.size += group.totalSize
+                    if sampleDate > existing.date {
+                        existing.date = sampleDate
+                    }
+                    dateMap[dateKey] = existing
+                } else {
+                    dateMap[dateKey] = (date: sampleDate, photos: validPhotos, size: group.totalSize)
+                    dateOrder.append(dateKey)
+                }
             }
 
-            var dateIndexMap: [String: Int] = [:]
-            for group in groups {
-                let groupPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
-                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
-                guard groupPhotos.count >= 2 else { continue }
+            // 按日期倒序排列各分节（最新日期在前）
+            let sortedKeys = dateOrder.sorted {
+                (dateMap[$0]?.date ?? .distantPast) > (dateMap[$1]?.date ?? .distantPast)
+            }
 
-                let baseDate = primaryDateString(for: groupPhotos)
-                let totalForDate = dateCountMap[baseDate] ?? 1
-                let title: String
-                if totalForDate > 1 {
-                    let currentIndex = (dateIndexMap[baseDate] ?? 0) + 1
-                    dateIndexMap[baseDate] = currentIndex
-                    title = "\(baseDate) · 组 \(currentIndex)"
-                } else {
-                    title = baseDate
-                }
-
+            var sections: [DateSection] = []
+            for dateKey in sortedKeys {
+                guard let item = dateMap[dateKey], !item.photos.isEmpty else { continue }
                 sections.append(DateSection(
-                    id: "group-\(group.id)",
-                    groupID: group.id,
-                    title: title,
-                    photos: groupPhotos,
-                    totalSize: group.totalSize
+                    id: "date-\(category.rawValue)-\(dateKey)",
+                    groupID: "date-\(category.rawValue)-\(dateKey)",
+                    title: dateKey,
+                    photos: item.photos,
+                    totalSize: item.size
                 ))
             }
             return sections
