@@ -86,18 +86,20 @@ struct SettingsView: View {
                             value: statisticsManager.deletedPhotosText)
 
                     StatRow(icon: "tray.full",
-                            title: String(localized: "In Trash"),
+                            title: String(localized: "Pending Photos"),
                             value: statisticsManager.trashCountText)
 
                     StatRow(icon: "externaldrive",
                             title: String(localized: "Space Saved"),
                             value: statisticsManager.storageSpaceSavedText)
                 }
+                .listRowBackground(Color.cardBackground)
 
                 // 显示设置
                 Section(String(localized: "Display")) {
                     HStack {
                         Image(systemName: "square.grid.2x2")
+                            .foregroundColor(.blue)
                             .frame(width: 30)
 
                         Text(String(localized: "Grid Layout"))
@@ -125,6 +127,7 @@ struct SettingsView: View {
 
                     HStack {
                         Image(systemName: "rectangle.split.3x1")
+                            .foregroundColor(.blue)
                             .frame(width: 30)
 
                         Text(String(localized: "Photo Ratio"))
@@ -157,6 +160,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .listRowBackground(Color.cardBackground)
 
                 // 关于
                 Section(String(localized: "About")) {
@@ -201,6 +205,7 @@ struct SettingsView: View {
                     }
                     .foregroundColor(.primary)
                 }
+                .listRowBackground(Color.cardBackground)
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
             .navigationTitle(String(localized: "Settings"))

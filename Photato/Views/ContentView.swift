@@ -133,11 +133,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     formatFilterMenu
-                    Button {
-                        photoManager.showTrash = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
+                    PendingPhotosEntryButton()
                 }
             }
             .navigationDestination(isPresented: $isFullscreenMode) {

@@ -6,7 +6,7 @@ struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     let onAlbumSelect: (AlbumModel) -> Void
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
 
     var body: some View {
         ScrollView {
@@ -15,7 +15,7 @@ struct AlbumListView: View {
             } else if albumManager.albums.isEmpty {
                 emptyAlbumsView
             } else {
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(albumManager.albums) { album in
                         // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
                         AlbumStackCell(album: album)
@@ -24,8 +24,9 @@ struct AlbumListView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
         }
         .background(Color(UIColor.systemGroupedBackground))
@@ -34,13 +35,14 @@ struct AlbumListView: View {
 
     // MARK: - Skeleton Grid
     private var skeletonGrid: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
+        LazyVGrid(columns: columns, spacing: 8) {
             ForEach(0..<6, id: \.self) { _ in
                 AlbumCellSkeleton()
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 24)
     }
 
     private var emptyAlbumsView: some View {
@@ -66,19 +68,30 @@ struct AlbumListView: View {
 // MARK: - Album Cell Skeleton
 struct AlbumCellSkeleton: View {
     var body: some View {
-        VStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.gray.opacity(0.3))
-                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+        VStack(spacing: 0) {
+            Spacer().frame(height: 20)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.gray.opacity(0.18))
+                .frame(width: 80, height: 80)
+            Spacer(minLength: 8)
             VStack(spacing: 4) {
-                Rectangle().fill(Color.gray.opacity(0.3))
-                    .frame(height: 12)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 14)
                     .padding(.horizontal, 24)
-                Rectangle().fill(Color.gray.opacity(0.2))
-                    .frame(height: 10)
-                    .padding(.horizontal, 40)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(height: 12)
+                    .padding(.horizontal, 44)
             }
+            Spacer().frame(height: 16)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(AlbumStackCell.cardBackgroundColor)
+        )
         .shimmering()
     }
 }

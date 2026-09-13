@@ -35,6 +35,27 @@ final class SelectionManager {
         isSelectMode = false
     }
 
+    // MARK: - Batch Selection (O(1) 集合运算，单次状态变更通知)
+
+    func selectAll(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        selectedIDs.formUnion(ids)
+        isSelectMode = true
+    }
+
+    func deselectAll(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        selectedIDs.subtract(ids)
+        if selectedIDs.isEmpty {
+            isSelectMode = false
+        }
+    }
+
+    func setSelection(_ ids: Set<String>) {
+        selectedIDs = ids
+        isSelectMode = !ids.isEmpty
+    }
+
     // MARK: - Swipe Multi-Select
 
     /// The initial selection state when drag begins — used to determine select vs deselect

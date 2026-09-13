@@ -1,17 +1,20 @@
 import Photos
 
+/// 全部 nonisolated：方法为纯计算（无共享可变状态），
+/// 供 Task.detached / 后台任务组直接调用，不产生主线程回跳
 enum PHAssetSizeHelper {
-    private static let cache: NSCache<NSString, NSNumber> = {
+    /// NSCache 自身线程安全；nonisolated(unsafe) 允许从 nonisolated 方法直接访问
+    private nonisolated(unsafe) static let cache: NSCache<NSString, NSNumber> = {
         let cache = NSCache<NSString, NSNumber>()
         cache.countLimit = 10000
         return cache
     }()
 
-    static func getCachedSize(for asset: PHAsset) -> Int64? {
+    nonisolated static func getCachedSize(for asset: PHAsset) -> Int64? {
         cache.object(forKey: asset.localIdentifier as NSString)?.int64Value
     }
 
-    static func getAssetSize(_ asset: PHAsset) async -> Int64 {
+    nonisolated static func getAssetSize(_ asset: PHAsset) async -> Int64 {
         if let cached = getCachedSize(for: asset) {
             return cached
         }
@@ -43,7 +46,7 @@ enum PHAssetSizeHelper {
         return 0
     }
 
-    static func getFileSize(_ asset: PHAsset) -> Int64 {
+    nonisolated static func getFileSize(_ asset: PHAsset) -> Int64 {
         if let cached = getCachedSize(for: asset) {
             return cached
         }

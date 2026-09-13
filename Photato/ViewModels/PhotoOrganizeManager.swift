@@ -13,6 +13,7 @@ final class PhotoOrganizeManager {
     var categoryPageStates: [OrganizeCategory: OrganizeCategoryPageState] = [:]
     var hasLoadedInitialData = false
     var isQuickAnalyzing: Bool = false
+    var completedCategories: Set<OrganizeCategory> = []
 
     let similarityManager = PhotoSimilarityManager()
     let qualityAnalyzer = PhotoQualityAnalyzer()
@@ -27,9 +28,9 @@ final class PhotoOrganizeManager {
         categoryStats[category] ?? 0
     }
 
-    /// 废片数量：给定功能分类下去重后的唯一照片数。
+    /// 可清理照片数量：给定功能分类下去重后的唯一照片数。
     /// 分类之间互相重叠（如重复组几乎必然也在相似组里，一张模糊截图同时
-    /// 计入截图与模糊），简单求和会重复计数导致废片数大于照片总数，
+    /// 计入截图与模糊），简单求和会重复计数导致可清理照片数大于照片总数，
     /// 因此按 localIdentifier 取并集口径
     func uniqueJunkCount(categories: [OrganizeCategory]) -> Int {
         var ids = Set<String>()
@@ -138,25 +139,29 @@ final class PhotoOrganizeManager {
             loadFlatCategoryFromCache(.lowQuality, ids: summary.lowQualityIds)
 
             if !summary.similarGroups.isEmpty {
-                scanResults[.similar] = summary.similarGroups.map { ids in
+                let loaded = summary.similarGroups.map { item in
                     OrganizeScanGroup(
                         category: .similar,
-                        title: String(localized: "\(ids.count) similar"),
-                        localIdentifiers: ids
+                        title: String(localized: "\(item.localIdentifiers.count) similar"),
+                        localIdentifiers: item.localIdentifiers,
+                        sampleDate: item.sampleDate
                     )
                 }
-                categoryStats[.similar] = summary.similarGroups.reduce(0) { $0 + $1.count }
+                scanResults[.similar] = loaded.sorted { ($0.sampleDate ?? .distantPast) > ($1.sampleDate ?? .distantPast) }
+                categoryStats[.similar] = loaded.reduce(0) { $0 + $1.localIdentifiers.count }
             }
 
             if !summary.duplicateGroups.isEmpty {
-                scanResults[.duplicates] = summary.duplicateGroups.map { ids in
+                let loaded = summary.duplicateGroups.map { item in
                     OrganizeScanGroup(
                         category: .duplicates,
-                        title: String(localized: "\(ids.count) duplicates"),
-                        localIdentifiers: ids
+                        title: String(localized: "\(item.localIdentifiers.count) duplicates"),
+                        localIdentifiers: item.localIdentifiers,
+                        sampleDate: item.sampleDate
                     )
                 }
-                categoryStats[.duplicates] = summary.duplicateGroups.reduce(0) { $0 + $1.count }
+                scanResults[.duplicates] = loaded.sorted { ($0.sampleDate ?? .distantPast) > ($1.sampleDate ?? .distantPast) }
+                categoryStats[.duplicates] = loaded.reduce(0) { $0 + $1.localIdentifiers.count }
             }
 
             loadFlatCategoryFromCache(.blurry, ids: summary.blurryIds)
@@ -179,8 +184,12 @@ final class PhotoOrganizeManager {
         let lowQualityIds = identifiers(for: .lowQuality)
         let blurryIds = identifiers(for: .blurry)
         let poorFaceIds = identifiers(for: .poorFace)
-        let similarGroups = scanResults[.similar]?.map { $0.localIdentifiers } ?? []
-        let duplicateGroups = scanResults[.duplicates]?.map { $0.localIdentifiers } ?? []
+        let similarGroups = scanResults[.similar]?.map {
+            OrganizeCacheGroupItem(localIdentifiers: $0.localIdentifiers, sampleDate: $0.sampleDate)
+        } ?? []
+        let duplicateGroups = scanResults[.duplicates]?.map {
+            OrganizeCacheGroupItem(localIdentifiers: $0.localIdentifiers, sampleDate: $0.sampleDate)
+        } ?? []
 
         let summary = OrganizeCacheSummary(
             version: OrganizeCacheSummary.currentVersion,
@@ -215,6 +224,7 @@ final class PhotoOrganizeManager {
             isAnalyzing = true
             analysisProgress = 0
             currentStep = ""
+            completedCategories.removeAll()
             scanResults.removeAll()
             categoryStats.removeAll()
             categoryPageStates.removeAll()
@@ -231,18 +241,21 @@ final class PhotoOrganizeManager {
 
             currentStep = String(localized: "Scanning for metadata...")
             await scanMetadataCategories(from: fetchResult)
+            completedCategories.formUnion([.screenshots, .livePhotos, .videos])
             analysisProgress = 1.0 / totalSteps
 
             guard !Task.isCancelled else { return }
 
             currentStep = String(localized: "Scanning for large files...")
             await scanLargeFiles(from: fetchResult)
+            completedCategories.insert(.largeFiles)
             analysisProgress = 2.0 / totalSteps
 
             guard !Task.isCancelled else { return }
 
             currentStep = String(localized: "Scanning for low quality...")
             await scanLowQuality(from: fetchResult)
+            completedCategories.insert(.lowQuality)
             analysisProgress = 3.0 / totalSteps
 
             guard !Task.isCancelled else { return }
@@ -256,6 +269,7 @@ final class PhotoOrganizeManager {
             categoryStats[.similar] = similar.reduce(0) { $0 + $1.localIdentifiers.count }
             scanResults[.duplicates] = duplicates
             categoryStats[.duplicates] = duplicates.reduce(0) { $0 + $1.localIdentifiers.count }
+            completedCategories.formUnion([.similar, .duplicates])
 
             guard !Task.isCancelled else { return }
 
@@ -269,6 +283,7 @@ final class PhotoOrganizeManager {
                 scanResults[.poorFace] = [pf]
                 categoryStats[.poorFace] = pf.localIdentifiers.count
             }
+            completedCategories.formUnion([.blurry, .poorFace])
             analysisProgress = 5.0 / totalSteps
 
             analysisProgress = 1.0
@@ -284,6 +299,7 @@ final class PhotoOrganizeManager {
         isAnalyzing = false
         analysisProgress = 0
         currentStep = ""
+        completedCategories.removeAll()
     }
 
     // MARK: - Scan: Metadata Categories (single pass)
@@ -361,7 +377,9 @@ final class PhotoOrganizeManager {
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
-            analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            if index % 20 == 0 || index == total - 1 {
+                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            }
 
             let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
             // 判定条件：真实大小 >= 10MB，或者超高分辨率(>=24MP)且大小 >= 6MB
@@ -399,7 +417,9 @@ final class PhotoOrganizeManager {
 
         for (index, candidate) in candidates.enumerated() {
             guard !Task.isCancelled else { break }
-            analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            if index % 20 == 0 || index == total - 1 {
+                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
+            }
             let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
             if size <= maxFileSize {
                 lowQuality.append((candidate.identifier, candidate.resolution))
@@ -481,7 +501,8 @@ final class PhotoOrganizeManager {
             var displayGroup = OrganizeGroupDisplay(
                 id: scanGroup.id,
                 title: scanGroup.title,
-                localIdentifiers: scanGroup.localIdentifiers
+                localIdentifiers: scanGroup.localIdentifiers,
+                sampleDate: scanGroup.sampleDate
             )
 
             for identifier in scanGroup.localIdentifiers {
@@ -493,7 +514,7 @@ final class PhotoOrganizeManager {
             }
 
             if let best = displayGroup.loadedPhotos.max(by: {
-                $0.asset.pixelWidth * $0.asset.pixelHeight < $1.asset.pixelWidth * $1.asset.pixelHeight
+                Self.evaluateBestPhotoScore(for: $0) < Self.evaluateBestPhotoScore(for: $1)
             }) {
                 displayGroup.bestPhotoId = best.id
             }
@@ -530,6 +551,28 @@ final class PhotoOrganizeManager {
                 categoryPageStates[category] = state
             }
         }
+    }
+
+    /// 评估分组中最优保留照片得分（综合收藏保护、实况照片、分辨率与细节体积）
+    private static func evaluateBestPhotoScore(for photo: PhotoAsset) -> Double {
+        var score: Double = 0
+        // 1. 用户收藏：最高权重（+10,000分），绝对保护用户已标记红心的素材
+        if photo.isFavorite {
+            score += 10_000
+        }
+        // 2. 实况照片：次高权重（+1,000分），具备动态与声音，价值高于普通静态图
+        if photo.mediaType == .livePhoto {
+            score += 1_000
+        }
+        // 3. 分辨率（百万像素，每百万像素 10 分）
+        let megapixels = Double(photo.asset.pixelWidth * photo.asset.pixelHeight) / 1_000_000.0
+        score += megapixels * 10.0
+        // 4. 文件体积（同分辨率下体积越大通常代表高频细节更丰富、压缩更轻）
+        if let size = PHAssetSizeHelper.getCachedSize(for: photo.asset) {
+            let mb = Double(size) / (1024.0 * 1024.0)
+            score += min(mb * 2.0, 50.0)
+        }
+        return score
     }
 
     func groups(for category: OrganizeCategory) -> [OrganizeGroupDisplay] {
@@ -603,7 +646,9 @@ final class PhotoOrganizeManager {
     }
 
     func isCategoryAnalyzing(_ category: OrganizeCategory) -> Bool {
-        if isAnalyzing { return true }
+        if isAnalyzing {
+            return !completedCategories.contains(category)
+        }
         if isQuickAnalyzing && (categoryStats[category] == nil || categoryStats[category] == 0) {
             return true
         }

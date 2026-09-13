@@ -153,6 +153,10 @@ struct FullscreenPhotoBrowser: View {
                 .animation(.easeInOut(duration: 0.22), value: captionTitle)
                 .animation(.easeInOut(duration: 0.22), value: captionSubtitle)
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                // 待处理照片入口：数量以文本实时展示，删除后立即增加
+                PendingPhotosEntryButton()
+            }
         }
         .toolbar(.hidden, for: .tabBar)
         .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
@@ -276,9 +280,8 @@ struct FullscreenPhotoBrowser: View {
         HStack {
             HStack(spacing: 10) {
                 favoriteButton
-                addToAlbumButton
                 shareButton
-                moreButton
+                // 「添加」「更多」为占位入口，能力接入前暂时隐藏
             }
             Spacer()
             deleteButton
@@ -340,32 +343,50 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // 删除：沿用 deleteTrigger 触发既有删除流转（收藏拦截提示不变）；
-    // 图标红色 #FF383C 对齐 Figma 的破坏性操作标识
+    // 红色 tint 玻璃 + 白色图标（对齐待处理照片页「全部删除」），尺寸与收藏/分享一致
     private var deleteButton: some View {
-        glassActionButton {
+        glassActionButton(tint: .red) {
             Image(systemName: "trash")
-                .foregroundColor(Color(red: 1.0, green: 0.22, blue: 0.235))
+                .foregroundColor(.white)
         } action: {
             deleteTrigger += 1
         }
     }
 
-    /// 系统 Liquid Glass 圆形按钮：iOS 26+ 使用系统 glassEffect（含触摸高亮），
-    /// iOS 18 回退 ultraThinMaterial 圆形底。默认 50pt 按钮 / 19pt semibold
-    /// 图标，对齐 Figma 标注；深浅色对比度由系统材质保证
+    /// 系统 Liquid Glass 圆形按钮：统一在固定尺寸 frame 上叠加 glassEffect，
+    /// 保证各按钮几何尺寸完全一致（默认 50pt / 19pt semibold 图标，对齐 Figma 标注）。
+    /// 传入 tint 时为着色玻璃（删除等强调操作，图标需自配白色）；iOS 18 回退——
+    /// 有 tint 用实色圆底，否则 ultraThinMaterial 圆形底
     @ViewBuilder
     private func glassActionButton<Content: View>(
         size: CGFloat = 50,
         iconSize: CGFloat = 19,
+        tint: Color? = nil,
         @ViewBuilder content: @escaping () -> Content,
         action: @escaping () -> Void
     ) -> some View {
         if #available(iOS 26.0, *) {
+            if let tint {
+                Button(action: action) {
+                    content()
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .frame(width: size, height: size)
+                        .glassEffect(.regular.tint(tint).interactive(), in: Circle())
+                }
+            } else {
+                Button(action: action) {
+                    content()
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .frame(width: size, height: size)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+            }
+        } else if let tint {
             Button(action: action) {
                 content()
                     .font(.system(size: iconSize, weight: .semibold))
                     .frame(width: size, height: size)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .background(tint, in: Circle())
             }
         } else {
             Button(action: action) {

@@ -10,9 +10,16 @@ struct OrganizeResultsView: View {
     @State private var selectedSizeText = ByteFormatter.format(0)
     @State private var categorySizeText = ""
 
-    // 日期分节：相似/重复簇按天细分；平铺分类按天分组、无日期按月归类
+    // 删除反馈轻提示（显示约 2 秒后自动淡出）
+    @State private var deleteToastText: String?
+    @State private var deleteToastDismissTask: Task<Void, Never>?
+
+    // 日期分节：相似/重复按拍摄日聚合分节；其他分类按拍摄年月归类
     @State private var dateSections: [DateSection] = []
     @State private var sectionSizes: [String: Int64] = [:]
+    @State private var cachedAllPhotos: [PhotoAsset] = []
+    @State private var photoIndexMap: [String: Int] = [:]
+    @State private var sizeCalculationTask: Task<Void, Never>? = nil
 
     // 详情页（大图浏览：复用共享组件 FullscreenPhotoBrowser）
     @State private var isFullscreenMode = false
@@ -45,23 +52,6 @@ struct OrganizeResultsView: View {
                 .foregroundColor(.secondary)
 
             Spacer()
-
-            if isGroupedMode {
-                Button {
-                    aiAutoSelect()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(String(localized: "AI Select"))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .tint(.primary)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -78,6 +68,9 @@ struct OrganizeResultsView: View {
     }
 
     private var allPhotos: [PhotoAsset] {
+        if !cachedAllPhotos.isEmpty {
+            return cachedAllPhotos
+        }
         if isGroupedMode {
             return dateSections.flatMap { $0.photos }
         } else {
@@ -114,9 +107,36 @@ struct OrganizeResultsView: View {
                 .allowsHitTesting(isDeleteButtonVisible)
                 .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
         }
+        .overlay(alignment: .top) { deleteToast }
         .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
-            toolbarContent
+            if isGroupedMode {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        aiAutoSelect()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(String(localized: "AI Select"))
+                                .font(.system(size: 15))
+                        }
+                    }
+                    .disabled(allPhotos.isEmpty)
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectionManager.count == allPhotos.count && !allPhotos.isEmpty
+                         ? String(localized: "Deselect All")
+                         : String(localized: "Select All"))
+                        .font(.system(size: 15))
+                }
+                .disabled(allPhotos.isEmpty)
+            }
         }
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.large)
@@ -126,16 +146,16 @@ struct OrganizeResultsView: View {
             fullscreenBrowserDestination
         }
         .confirmationDialog(
-            String(localized: "Delete \(selectionManager.count) photos?"),
+            String(localized: "Add \(selectionManager.count) photos to Pending Photos?"),
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Delete \(selectionManager.count) Photos"), role: .destructive) {
+            Button(String(localized: "Add to Pending Photos"), role: .destructive) {
                 deleteSelected()
             }
             Button(String(localized: "Cancel"), role: .cancel) { }
         } message: {
-            Text(String(localized: "\(selectionManager.count) photos will be permanently deleted and cannot be recovered. Total \(selectedSizeText)"))
+            Text(String(localized: "\(selectionManager.count) photos will be moved to the Trash and can be restored there. Total \(selectedSizeText)"))
         }
         .onAppear {
             if dateSections.isEmpty {
@@ -152,10 +172,15 @@ struct OrganizeResultsView: View {
                 await calculateCategorySize()
             }
         }
-        .onChange(of: allPhotos) { _, newPhotos in
-            // 分页加载/删除后分节跟随重建（尺寸缓存按键复用，不重复计算）
+        .onChange(of: displayedPhotos.count) { _, _ in
             rebuildDateSections()
-            if newPhotos.isEmpty && isFullscreenMode {
+        }
+        .onChange(of: displayedGroups.count) { _, _ in
+            rebuildDateSections()
+        }
+        .onChange(of: photoManager.pendingDeletionIDs) { _, _ in
+            rebuildDateSections()
+            if cachedAllPhotos.isEmpty && isFullscreenMode {
                 isFullscreenMode = false
             }
         }
@@ -354,25 +379,19 @@ struct OrganizeResultsView: View {
     }
 
     private func toggleSectionSelection(_ section: DateSection) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let allSelected = isSectionAllSelected(section)
+        let sectionIds = section.photos.map(\.id)
         withAnimation(.easeInOut(duration: 0.15)) {
             if allSelected {
-                for photo in section.photos {
-                    if selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+                selectionManager.deselectAll(sectionIds)
             } else {
-                for photo in section.photos {
-                    if !selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+                selectionManager.selectAll(sectionIds)
             }
         }
     }
 
-    /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小
+    /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小，滑动动态预热
     private func organizePhotoCell(_ photo: PhotoAsset) -> some View {
         PhotoCell(photo: photo, usesSquareRatio: true)
             .overlay(alignment: .bottomTrailing) {
@@ -405,12 +424,18 @@ struct OrganizeResultsView: View {
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         selectionManager.toggle(photo.id)
                     }
             }
             .contentShape(Rectangle())
             .onTapGesture {
                 openFullscreen(photo)
+            }
+            .onAppear {
+                if let globalIndex = photoIndexMap[photo.id] {
+                    photoManager.preheatAssets(around: globalIndex, in: cachedAllPhotos, columnCount: 3)
+                }
             }
     }
 
@@ -435,8 +460,8 @@ struct OrganizeResultsView: View {
 
     // MARK: - 日期分节构建
 
-    /// 相似/重复：每个簇按天细分（跨天的簇拆成多个日期节，日期降序）；
-    /// 平铺分类：全部照片按天分组；无拍摄日期的按月归类（回退修改时间）
+    /// 相似/重复：按拍摄日期归类聚合分节（日期倒序，不带组标号）；
+    /// 平铺分类：全部照片按拍摄年月归类分节（日期倒序）
     private func rebuildDateSections() {
         var newSections = Self.buildDateSections(
             category: category,
@@ -445,11 +470,29 @@ struct OrganizeResultsView: View {
             pendingDeletionIDs: photoManager.pendingDeletionIDs
         )
         for i in 0..<newSections.count {
-            if let size = sectionSizes[newSections[i].id] {
+            let key = "\(newSections[i].id)_\(newSections[i].photos.count)"
+            if let size = sectionSizes[key] ?? sectionSizes[newSections[i].id] {
                 newSections[i].totalSize = size
             }
         }
         dateSections = newSections
+
+        // 同步缓存扁平列表与全局索引表，驱动 O(1) 预热与极速全选
+        let flat: [PhotoAsset]
+        if isGroupedMode {
+            flat = newSections.flatMap { $0.photos }
+        } else {
+            flat = displayedPhotos
+        }
+        cachedAllPhotos = flat
+
+        var indexMap: [String: Int] = [:]
+        indexMap.reserveCapacity(flat.count)
+        for (idx, p) in flat.enumerated() {
+            indexMap[p.id] = idx
+        }
+        photoIndexMap = indexMap
+
         computeSectionSizes()
     }
 
@@ -460,74 +503,86 @@ struct OrganizeResultsView: View {
         pendingDeletionIDs: Set<String>
     ) -> [DateSection] {
         if category == .similar || category == .duplicates {
-            var sections: [DateSection] = []
+            // 每个分组保持完全独立，绝不把不同分组的照片合并在同一个九宫格内
+            // 统计每个单日内出现的分组数量，若同日仅有 1 组显示单日期，若有多组则自然显示日期与时间
+            var dayCountMap: [String: Int] = [:]
 
-            // 统计每个基准日期出现的次数，以便在同日有多组时区分标注「组 1」、「组 2」
-            var dateCountMap: [String: Int] = [:]
+            var validGroups: [(group: OrganizeGroupDisplay, photos: [PhotoAsset], sampleDate: Date, dayKey: String)] = []
+
             for group in groups {
                 let validPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
+                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
                 guard validPhotos.count >= 2 else { continue }
-                let dateKey = primaryDateString(for: validPhotos)
-                dateCountMap[dateKey, default: 0] += 1
+
+                let sampleDate = validPhotos.compactMap { $0.asset.creationDate }.max()
+                    ?? group.sampleDate
+                    ?? .distantPast
+                let dayKey = sampleDate == .distantPast ? "unknown" : sampleDate.formatted(date: .long, time: .omitted)
+                dayCountMap[dayKey, default: 0] += 1
+
+                validGroups.append((group: group, photos: validPhotos, sampleDate: sampleDate, dayKey: dayKey))
             }
 
-            var dateIndexMap: [String: Int] = [:]
-            for group in groups {
-                let groupPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
-                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
-                guard groupPhotos.count >= 2 else { continue }
+            // 按拍摄时间倒序排列各分组（最新在前）
+            let sortedGroups = validGroups.sorted { $0.sampleDate > $1.sampleDate }
 
-                let baseDate = primaryDateString(for: groupPhotos)
-                let totalForDate = dateCountMap[baseDate] ?? 1
-                let title: String
-                if totalForDate > 1 {
-                    let currentIndex = (dateIndexMap[baseDate] ?? 0) + 1
-                    dateIndexMap[baseDate] = currentIndex
-                    title = "\(baseDate) · 组 \(currentIndex)"
-                } else {
-                    title = baseDate
-                }
+            // 预统计同日多组的时间标题重名情况（如果在同一分钟内，则精确到秒）
+            var titleCountMap: [String: Int] = [:]
+            for item in sortedGroups {
+                let isMultiOnSameDay = (dayCountMap[item.dayKey] ?? 0) > 1
+                let title = primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: false)
+                titleCountMap[title, default: 0] += 1
+            }
+
+            var sections: [DateSection] = []
+            for item in sortedGroups {
+                let isMultiOnSameDay = (dayCountMap[item.dayKey] ?? 0) > 1
+                let baseTitle = primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: false)
+                let hasCollision = (titleCountMap[baseTitle] ?? 0) > 1
+                let finalTitle = hasCollision
+                    ? primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: true)
+                    : baseTitle
 
                 sections.append(DateSection(
-                    id: "group-\(group.id)",
-                    groupID: group.id,
-                    title: title,
-                    photos: groupPhotos,
-                    totalSize: group.totalSize
+                    id: "group-\(category.rawValue)-\(item.group.id)",
+                    groupID: item.group.id,
+                    title: finalTitle,
+                    photos: item.photos,
+                    totalSize: item.group.totalSize
                 ))
             }
             return sections
         } else {
             let flatPhotos = photos.filter { !pendingDeletionIDs.contains($0.id) }
-            let sections = createDateSections(
+            return createMonthSections(
                 in: flatPhotos,
                 idPrefix: "flat-\(category.rawValue)"
             )
-            // 跨组合并：仅平铺分类按同日合并相邻节
-            var merged: [DateSection] = []
-            for section in sections {
-                if let last = merged.last, last.title == section.title {
-                    merged[merged.count - 1].photos.append(contentsOf: section.photos)
-                } else {
-                    merged.append(section)
-                }
-            }
-            return merged
         }
     }
 
-    /// 提取一组照片的主日期文案（同日显示单日期，跨天显示区间）
-    private static func primaryDateString(for photos: [PhotoAsset]) -> String {
+    /// 提取一组照片的主日期文案：同日单组显示日期，同日多组自然显示日期+时间，跨天显示区间
+    private static func primaryDateString(
+        for photos: [PhotoAsset],
+        showTimeIfSameDay: Bool = false,
+        includeSeconds: Bool = false
+    ) -> String {
         let dates = photos.compactMap { $0.asset.creationDate }.sorted()
         guard let first = dates.first else {
             return String(localized: "Unknown Date")
         }
         guard let last = dates.last else {
-            return first.formatted(date: .long, time: .omitted)
+            let timeStyle: Date.FormatStyle.TimeStyle = includeSeconds ? .standard : .shortened
+            return first.formatted(date: .long, time: showTimeIfSameDay ? timeStyle : .omitted)
         }
         let cal = Calendar.current
         if cal.isDate(first, inSameDayAs: last) {
-            return first.formatted(date: .long, time: .omitted)
+            if showTimeIfSameDay {
+                let timeStyle: Date.FormatStyle.TimeStyle = includeSeconds ? .standard : .shortened
+                return first.formatted(date: .long, time: timeStyle)
+            } else {
+                return first.formatted(date: .long, time: .omitted)
+            }
         } else {
             let fStr = first.formatted(date: .long, time: .omitted)
             let lStr = last.formatted(date: .long, time: .omitted)
@@ -535,99 +590,71 @@ struct OrganizeResultsView: View {
         }
     }
 
-    /// 将照片按拍摄日（降序）分节；无拍摄日期的按月归类（回退修改时间）
-    private static func createDateSections(in photos: [PhotoAsset], idPrefix: String) -> [DateSection] {
-        var dayBuckets: [Date: [PhotoAsset]] = [:]
+    /// 平铺分类：按拍摄年月（降序）归类分节；无拍摄日期的按修改年月归类
+    private static func createMonthSections(in photos: [PhotoAsset], idPrefix: String) -> [DateSection] {
         var monthBuckets: [Date: [PhotoAsset]] = [:]
+        let calendar = Calendar.current
 
         for photo in photos {
-            if let created = photo.asset.creationDate {
-                dayBuckets[Calendar.current.startOfDay(for: created), default: []].append(photo)
-            } else if let modified = photo.asset.modificationDate {
-                let month = Calendar.current.date(
-                    from: Calendar.current.dateComponents([.year, .month], from: modified)
-                ) ?? modified
-                monthBuckets[month, default: []].append(photo)
-            }
+            let targetDate = photo.asset.creationDate ?? photo.asset.modificationDate ?? .distantPast
+            let components = calendar.dateComponents([.year, .month], from: targetDate)
+            let monthStart = calendar.date(from: components) ?? targetDate
+            monthBuckets[monthStart, default: []].append(photo)
         }
 
         var sections: [DateSection] = []
-        for day in dayBuckets.keys.sorted(by: >) {
-            let photos = dayBuckets[day]!
-            sections.append(DateSection(
-                id: "\(idPrefix)-day-\(day.timeIntervalSince1970)",
-                groupID: idPrefix,
-                title: day.formatted(date: .long, time: .omitted),
-                photos: photos
-            ))
-        }
         for month in monthBuckets.keys.sorted(by: >) {
-            let photos = monthBuckets[month]!
+            let monthPhotos = monthBuckets[month]!
             sections.append(DateSection(
                 id: "\(idPrefix)-month-\(month.timeIntervalSince1970)",
                 groupID: idPrefix,
                 title: month.formatted(Date.FormatStyle().year().month()),
-                photos: photos
+                photos: monthPhotos
             ))
         }
-
-        // 相邻同日期节合并：不同簇可能落在同一天，避免重复日期头
-        var merged: [DateSection] = []
-        for section in sections {
-            if let last = merged.last, last.title == section.title {
-                merged[merged.count - 1].photos.append(contentsOf: section.photos)
-            } else {
-                merged.append(section)
-            }
-        }
-        return merged
+        return sections
     }
 
-    /// 补齐各分节合计大小（异步读缓存尺寸，不阻塞渲染）
+    /// 补齐各分节合计大小（后台异步计算，单次主线程批量赋值更新）
     private func computeSectionSizes() {
         let sections = dateSections
-        Task {
+        Task(priority: .utility) {
+            var newSizes: [String: Int64] = [:]
             for section in sections {
-                let key = section.id
+                let key = "\(section.id)_\(section.photos.count)"
                 guard sectionSizes[key] == nil else { continue }
                 var total: Int64 = 0
                 for photo in section.photos {
                     total += await PHAssetSizeHelper.getAssetSize(photo.asset)
                 }
-                sectionSizes[key] = total
-                if let idx = dateSections.firstIndex(where: { $0.id == key }) {
-                    dateSections[idx].totalSize = total
+                newSizes[key] = total
+            }
+
+            guard !newSizes.isEmpty else { return }
+
+            await MainActor.run {
+                for (key, size) in newSizes {
+                    sectionSizes[key] = size
+                }
+                for i in 0..<dateSections.count {
+                    let key = "\(dateSections[i].id)_\(dateSections[i].photos.count)"
+                    if let s = sectionSizes[key] {
+                        dateSections[i].totalSize = s
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Toolbar（右上角：全选 / 取消全选）
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                toggleSelectAll()
-            } label: {
-                Text(selectionManager.count == allPhotos.count && !allPhotos.isEmpty
-                     ? String(localized: "Deselect All")
-                     : String(localized: "Select All"))
-                    .font(.system(size: 15))
-            }
-            .disabled(allPhotos.isEmpty)
-        }
-    }
 
     private func toggleSelectAll() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if selectionManager.count == allPhotos.count {
             selectionManager.clearSelection()
         } else {
-            for photo in allPhotos {
-                if !selectionManager.isSelected(photo.id) {
-                    selectionManager.toggle(photo.id)
-                }
-            }
+            let allIds = allPhotos.map(\.id)
+            selectionManager.selectAll(allIds)
         }
     }
 
@@ -635,9 +662,9 @@ struct OrganizeResultsView: View {
 
     private var deleteButtonTitle: String {
         if !selectedSizeText.isEmpty && selectedSizeText != ByteFormatter.format(0) {
-            return String(localized: "Delete \(selectionManager.count) Photos (\(selectedSizeText))")
+            return String(localized: "Add \(selectionManager.count) Photos to Pending Photos (\(selectedSizeText))")
         } else {
-            return String(localized: "Delete \(selectionManager.count) Photos")
+            return String(localized: "Add \(selectionManager.count) Photos to Pending Photos")
         }
     }
 
@@ -663,49 +690,129 @@ struct OrganizeResultsView: View {
         .padding(.bottom, 16)
     }
 
-    /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删）
+    /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删），单次批量更新并触觉反馈
     private func aiAutoSelect() {
         guard isGroupedMode else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            for group in displayedGroups {
-                let photos = filtered(group.loadedPhotos)
-                guard photos.count >= 2 else { continue }
-                for photo in photos where photo.id != group.bestPhotoId {
-                    if !selectionManager.isSelected(photo.id) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        var idsToSelect: [String] = []
+        for group in displayedGroups {
+            let photos = filtered(group.loadedPhotos)
+            guard photos.count >= 2 else { continue }
+            for photo in photos where photo.id != group.bestPhotoId {
+                idsToSelect.append(photo.id)
             }
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectionManager.selectAll(idsToSelect)
         }
     }
 
     // MARK: - Helpers
 
-    /// 执行删除：所选照片全部移入回收站，并清空选中状态
+    /// 执行删除：所选照片全部移入待处理照片，并清空选中状态
+    /// （震动反馈由 addToTrash 统一触发；toast 在全屏浏览时不可见，返回后仍短暂可见）
     private func deleteSelected() {
         let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
-        for photo in selected {
-            photoManager.addToTrash(photo)
-        }
+        guard !selected.isEmpty else { return }
+        photoManager.addToTrash(selected)
         selectionManager.clearSelection()
+        showDeleteToast(count: selected.count)
     }
 
-    /// 选中合计大小：异步累加（PHAssetSizeHelper 内部有缓存，重复查询开销小）
+    // MARK: - Delete Toast（删除后「已移入待处理照片」轻提示）
+
+    private func showDeleteToast(count: Int) {
+        deleteToastText = String(localized: "Moved \(count) photos to Pending Photos")
+        deleteToastDismissTask?.cancel()
+        deleteToastDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                deleteToastText = nil
+            }
+        }
+    }
+
+    private var deleteToast: some View {
+        VStack {
+            if let text = deleteToastText {
+                HStack(spacing: 6) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(text)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            Spacer()
+        }
+        .padding(.top, 8)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: deleteToastText)
+        .allowsHitTesting(false)
+    }
+
+    /// 选中合计大小：带 0.1s 防抖、内存缓存优先、未缓存 16 并发计算
     private func updateSelectedSize() {
+        sizeCalculationTask?.cancel()
+
         let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
         guard !selected.isEmpty else {
             selectedSizeText = ByteFormatter.format(0)
             return
         }
+
         let selectedAssets = selected.map(\.asset)
-        Task {
+        sizeCalculationTask = Task {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
+
             let total = await Task.detached(priority: .userInitiated) {
+                var uncachedAssets: [PHAsset] = []
                 var sum: Int64 = 0
+
                 for asset in selectedAssets {
-                    sum += PHAssetSizeHelper.getFileSize(asset)
+                    if let cached = PHAssetSizeHelper.getCachedSize(for: asset) {
+                        sum += cached
+                    } else {
+                        uncachedAssets.append(asset)
+                    }
                 }
-                return sum
+
+                guard !uncachedAssets.isEmpty else { return sum }
+
+                let uncachedSum = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
+                    let maxConcurrent = 16
+                    var running = 0
+                    var groupTotal: Int64 = 0
+
+                    for asset in uncachedAssets {
+                        if running >= maxConcurrent {
+                            if let s = await group.next() {
+                                groupTotal += s
+                                running -= 1
+                            }
+                        }
+                        group.addTask {
+                            PHAssetSizeHelper.getFileSize(asset)
+                        }
+                        running += 1
+                    }
+
+                    for await s in group {
+                        groupTotal += s
+                    }
+                    return groupTotal
+                }
+
+                return sum + uncachedSum
             }.value
+
+            guard !Task.isCancelled else { return }
             selectedSizeText = ByteFormatter.format(total)
         }
     }
@@ -781,6 +888,7 @@ struct OrganizeResultsView: View {
                 initialPhotoID: photoID,
                 onDelete: { photo in
                     photoManager.addToTrash(photo)
+                    showDeleteToast(count: 1)
                 },
                 onFavoriteToggled: { photo, isFavorite in
                     organizeManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
@@ -839,3 +947,4 @@ private struct FileSizeBadge: View {
         }
     }
 }
+

@@ -135,11 +135,7 @@ struct MainTabView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        photoManager.showTrash = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
+                    PendingPhotosEntryButton()
                 }
             }
             .task {
@@ -200,11 +196,7 @@ struct MainTabView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        photoManager.showTrash = true
-                    } label: {
-                        Image(systemName: "trash")
-                    }
+                    PendingPhotosEntryButton()
                 }
             }
             .navigationDestination(for: OrganizeDestination.self) { destination in

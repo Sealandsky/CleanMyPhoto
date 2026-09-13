@@ -229,9 +229,7 @@ struct SystemMonthPhotosView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         let selected = photos.filter { selectionManager.isSelected($0.id) }
-                        for photo in selected {
-                            photoManager.addToTrash(photo)
-                        }
+                        photoManager.addToTrash(selected)
                         selectionManager.clearSelection()
                     } label: {
                         HStack(spacing: 4) {
