@@ -71,13 +71,16 @@ struct OrganizeScanGroup: Identifiable, Sendable {
     let title: String
     let localIdentifiers: [String]
     let potentialSpaceSaved: Int64
+    let sampleDate: Date?
 
-    init(category: OrganizeCategory, title: String, localIdentifiers: [String], potentialSpaceSaved: Int64 = 0) {
+    /// nonisolated：扫描分组在后台任务（相似/重复聚类）中构造，纯值类型可安全跨隔离域
+    nonisolated init(category: OrganizeCategory, title: String, localIdentifiers: [String], potentialSpaceSaved: Int64 = 0, sampleDate: Date? = nil) {
         self.id = UUID().uuidString
         self.category = category
         self.title = title
         self.localIdentifiers = localIdentifiers
         self.potentialSpaceSaved = potentialSpaceSaved
+        self.sampleDate = sampleDate
     }
 }
 
@@ -90,6 +93,7 @@ struct OrganizeGroupDisplay: Identifiable {
     var loadedPhotos: [PhotoAsset] = []
     var bestPhotoId: String? = nil
     var totalSize: Int64 = 0
+    var sampleDate: Date? = nil
 }
 
 // MARK: - Category Page State (pagination)
@@ -115,6 +119,11 @@ enum OrganizeDestination: Hashable {
 
 // MARK: - Cache Summary (JSON file for instant load)
 
+struct OrganizeCacheGroupItem: Codable, Sendable {
+    let localIdentifiers: [String]
+    let sampleDate: Date?
+}
+
 struct OrganizeCacheSummary: Codable {
     let version: Int
     let timestamp: Date
@@ -125,12 +134,12 @@ struct OrganizeCacheSummary: Codable {
     let largeFileIds: [String]
     let largeFileTotalSize: Int64
     let lowQualityIds: [String]
-    let similarGroups: [[String]]
-    let duplicateGroups: [[String]]
+    let similarGroups: [OrganizeCacheGroupItem]
+    let duplicateGroups: [OrganizeCacheGroupItem]
     let blurryIds: [String]
     let poorFaceIds: [String]
 
-    static let currentVersion = 5
+    static let currentVersion = 8
     static let fileName = "OrganizeCache.json"
 }
 

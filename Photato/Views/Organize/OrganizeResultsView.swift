@@ -10,6 +10,10 @@ struct OrganizeResultsView: View {
     @State private var selectedSizeText = ByteFormatter.format(0)
     @State private var categorySizeText = ""
 
+    // 删除反馈轻提示（显示约 2 秒后自动淡出）
+    @State private var deleteToastText: String?
+    @State private var deleteToastDismissTask: Task<Void, Never>?
+
     // 日期分节：相似/重复按拍摄日聚合分节；其他分类按拍摄年月归类
     @State private var dateSections: [DateSection] = []
     @State private var sectionSizes: [String: Int64] = [:]
@@ -48,23 +52,6 @@ struct OrganizeResultsView: View {
                 .foregroundColor(.secondary)
 
             Spacer()
-
-            if isGroupedMode {
-                Button {
-                    aiAutoSelect()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(String(localized: "AI Select"))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    }
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .tint(.primary)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -120,9 +107,36 @@ struct OrganizeResultsView: View {
                 .allowsHitTesting(isDeleteButtonVisible)
                 .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
         }
+        .overlay(alignment: .top) { deleteToast }
         .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
-            toolbarContent
+            if isGroupedMode {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        aiAutoSelect()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(String(localized: "AI Select"))
+                                .font(.system(size: 15))
+                        }
+                    }
+                    .disabled(allPhotos.isEmpty)
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectionManager.count == allPhotos.count && !allPhotos.isEmpty
+                         ? String(localized: "Deselect All")
+                         : String(localized: "Select All"))
+                        .font(.system(size: 15))
+                }
+                .disabled(allPhotos.isEmpty)
+            }
         }
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.large)
@@ -132,16 +146,16 @@ struct OrganizeResultsView: View {
             fullscreenBrowserDestination
         }
         .confirmationDialog(
-            String(localized: "Delete \(selectionManager.count) photos?"),
+            String(localized: "Add \(selectionManager.count) photos to Pending Photos?"),
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Delete \(selectionManager.count) Photos"), role: .destructive) {
+            Button(String(localized: "Add to Pending Photos"), role: .destructive) {
                 deleteSelected()
             }
             Button(String(localized: "Cancel"), role: .cancel) { }
         } message: {
-            Text(String(localized: "\(selectionManager.count) photos will be permanently deleted and cannot be recovered. Total \(selectedSizeText)"))
+            Text(String(localized: "\(selectionManager.count) photos will be moved to the Trash and can be restored there. Total \(selectedSizeText)"))
         }
         .onAppear {
             if dateSections.isEmpty {
@@ -489,45 +503,52 @@ struct OrganizeResultsView: View {
         pendingDeletionIDs: Set<String>
     ) -> [DateSection] {
         if category == .similar || category == .duplicates {
-            // 按日期归类分组：同日的多组聚合成同一个日期分节，不再标注「组 1」、「组 2」
-            var dateMap: [String: (date: Date, photos: [PhotoAsset], size: Int64)] = [:]
-            var dateOrder: [String] = []
+            // 每个分组保持完全独立，绝不把不同分组的照片合并在同一个九宫格内
+            // 统计每个单日内出现的分组数量，若同日仅有 1 组显示单日期，若有多组则自然显示日期与时间
+            var dayCountMap: [String: Int] = [:]
+
+            var validGroups: [(group: OrganizeGroupDisplay, photos: [PhotoAsset], sampleDate: Date, dayKey: String)] = []
 
             for group in groups {
                 let validPhotos = group.loadedPhotos.filter { !pendingDeletionIDs.contains($0.id) }
                 // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
                 guard validPhotos.count >= 2 else { continue }
 
-                let dateKey = primaryDateString(for: validPhotos)
-                let sampleDate = validPhotos.compactMap { $0.asset.creationDate }.first ?? .distantPast
+                let sampleDate = validPhotos.compactMap { $0.asset.creationDate }.max()
+                    ?? group.sampleDate
+                    ?? .distantPast
+                let dayKey = sampleDate == .distantPast ? "unknown" : sampleDate.formatted(date: .long, time: .omitted)
+                dayCountMap[dayKey, default: 0] += 1
 
-                if var existing = dateMap[dateKey] {
-                    existing.photos.append(contentsOf: validPhotos)
-                    existing.size += group.totalSize
-                    if sampleDate > existing.date {
-                        existing.date = sampleDate
-                    }
-                    dateMap[dateKey] = existing
-                } else {
-                    dateMap[dateKey] = (date: sampleDate, photos: validPhotos, size: group.totalSize)
-                    dateOrder.append(dateKey)
-                }
+                validGroups.append((group: group, photos: validPhotos, sampleDate: sampleDate, dayKey: dayKey))
             }
 
-            // 按日期倒序排列各分节（最新日期在前）
-            let sortedKeys = dateOrder.sorted {
-                (dateMap[$0]?.date ?? .distantPast) > (dateMap[$1]?.date ?? .distantPast)
+            // 按拍摄时间倒序排列各分组（最新在前）
+            let sortedGroups = validGroups.sorted { $0.sampleDate > $1.sampleDate }
+
+            // 预统计同日多组的时间标题重名情况（如果在同一分钟内，则精确到秒）
+            var titleCountMap: [String: Int] = [:]
+            for item in sortedGroups {
+                let isMultiOnSameDay = (dayCountMap[item.dayKey] ?? 0) > 1
+                let title = primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: false)
+                titleCountMap[title, default: 0] += 1
             }
 
             var sections: [DateSection] = []
-            for dateKey in sortedKeys {
-                guard let item = dateMap[dateKey], !item.photos.isEmpty else { continue }
+            for item in sortedGroups {
+                let isMultiOnSameDay = (dayCountMap[item.dayKey] ?? 0) > 1
+                let baseTitle = primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: false)
+                let hasCollision = (titleCountMap[baseTitle] ?? 0) > 1
+                let finalTitle = hasCollision
+                    ? primaryDateString(for: item.photos, showTimeIfSameDay: isMultiOnSameDay, includeSeconds: true)
+                    : baseTitle
+
                 sections.append(DateSection(
-                    id: "date-\(category.rawValue)-\(dateKey)",
-                    groupID: "date-\(category.rawValue)-\(dateKey)",
-                    title: dateKey,
+                    id: "group-\(category.rawValue)-\(item.group.id)",
+                    groupID: item.group.id,
+                    title: finalTitle,
                     photos: item.photos,
-                    totalSize: item.size
+                    totalSize: item.group.totalSize
                 ))
             }
             return sections
@@ -540,18 +561,28 @@ struct OrganizeResultsView: View {
         }
     }
 
-    /// 提取一组照片的主日期文案（同日显示单日期，跨天显示区间）
-    private static func primaryDateString(for photos: [PhotoAsset]) -> String {
+    /// 提取一组照片的主日期文案：同日单组显示日期，同日多组自然显示日期+时间，跨天显示区间
+    private static func primaryDateString(
+        for photos: [PhotoAsset],
+        showTimeIfSameDay: Bool = false,
+        includeSeconds: Bool = false
+    ) -> String {
         let dates = photos.compactMap { $0.asset.creationDate }.sorted()
         guard let first = dates.first else {
             return String(localized: "Unknown Date")
         }
         guard let last = dates.last else {
-            return first.formatted(date: .long, time: .omitted)
+            let timeStyle: Date.FormatStyle.TimeStyle = includeSeconds ? .standard : .shortened
+            return first.formatted(date: .long, time: showTimeIfSameDay ? timeStyle : .omitted)
         }
         let cal = Calendar.current
         if cal.isDate(first, inSameDayAs: last) {
-            return first.formatted(date: .long, time: .omitted)
+            if showTimeIfSameDay {
+                let timeStyle: Date.FormatStyle.TimeStyle = includeSeconds ? .standard : .shortened
+                return first.formatted(date: .long, time: timeStyle)
+            } else {
+                return first.formatted(date: .long, time: .omitted)
+            }
         } else {
             let fStr = first.formatted(date: .long, time: .omitted)
             let lStr = last.formatted(date: .long, time: .omitted)
@@ -615,22 +646,7 @@ struct OrganizeResultsView: View {
         }
     }
 
-    // MARK: - Toolbar（右上角：全选 / 取消全选）
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                toggleSelectAll()
-            } label: {
-                Text(selectionManager.count == allPhotos.count && !allPhotos.isEmpty
-                     ? String(localized: "Deselect All")
-                     : String(localized: "Select All"))
-                    .font(.system(size: 15))
-            }
-            .disabled(allPhotos.isEmpty)
-        }
-    }
 
     private func toggleSelectAll() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -646,9 +662,9 @@ struct OrganizeResultsView: View {
 
     private var deleteButtonTitle: String {
         if !selectedSizeText.isEmpty && selectedSizeText != ByteFormatter.format(0) {
-            return String(localized: "Delete \(selectionManager.count) Photos (\(selectedSizeText))")
+            return String(localized: "Add \(selectionManager.count) Photos to Pending Photos (\(selectedSizeText))")
         } else {
-            return String(localized: "Delete \(selectionManager.count) Photos")
+            return String(localized: "Add \(selectionManager.count) Photos to Pending Photos")
         }
     }
 
@@ -693,13 +709,51 @@ struct OrganizeResultsView: View {
 
     // MARK: - Helpers
 
-    /// 执行删除：所选照片全部移入回收站，并清空选中状态
+    /// 执行删除：所选照片全部移入待处理照片，并清空选中状态
+    /// （震动反馈由 addToTrash 统一触发；toast 在全屏浏览时不可见，返回后仍短暂可见）
     private func deleteSelected() {
         let selected = allPhotos.filter { selectionManager.isSelected($0.id) }
-        for photo in selected {
-            photoManager.addToTrash(photo)
-        }
+        guard !selected.isEmpty else { return }
+        photoManager.addToTrash(selected)
         selectionManager.clearSelection()
+        showDeleteToast(count: selected.count)
+    }
+
+    // MARK: - Delete Toast（删除后「已移入待处理照片」轻提示）
+
+    private func showDeleteToast(count: Int) {
+        deleteToastText = String(localized: "Moved \(count) photos to Pending Photos")
+        deleteToastDismissTask?.cancel()
+        deleteToastDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                deleteToastText = nil
+            }
+        }
+    }
+
+    private var deleteToast: some View {
+        VStack {
+            if let text = deleteToastText {
+                HStack(spacing: 6) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(text)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            Spacer()
+        }
+        .padding(.top, 8)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: deleteToastText)
+        .allowsHitTesting(false)
     }
 
     /// 选中合计大小：带 0.1s 防抖、内存缓存优先、未缓存 16 并发计算
@@ -834,6 +888,7 @@ struct OrganizeResultsView: View {
                 initialPhotoID: photoID,
                 onDelete: { photo in
                     photoManager.addToTrash(photo)
+                    showDeleteToast(count: 1)
                 },
                 onFavoriteToggled: { photo, isFavorite in
                     organizeManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
@@ -892,3 +947,4 @@ private struct FileSizeBadge: View {
         }
     }
 }
+

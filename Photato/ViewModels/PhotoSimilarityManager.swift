@@ -30,8 +30,21 @@ final class PhotoSimilarityManager {
     var isComputing = false
     var computingProgress: Double = 0
     var currentStep = ""
-
     @ObservationIgnored private var _persistentContainer: NSPersistentContainer?
+    private static let currentEngineVersion = 7
+    private static let engineVersionKey = "PhotoSimilarityManager.engineVersion"
+
+    init() {
+        checkEngineVersion()
+    }
+
+    private func checkEngineVersion() {
+        let savedVersion = UserDefaults.standard.integer(forKey: Self.engineVersionKey)
+        if savedVersion < Self.currentEngineVersion {
+            clearCache()
+            UserDefaults.standard.set(Self.currentEngineVersion, forKey: Self.engineVersionKey)
+        }
+    }
 
     @ObservationIgnored
     private var persistentContainer: NSPersistentContainer {
@@ -195,22 +208,30 @@ final class PhotoSimilarityManager {
     // MARK: - Private: Group Computation
 
     nonisolated private static func computeSimilarGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
-        // 过滤无指纹的脏数据并按拍摄时间升序排布
+        // 过滤无指纹、无拍摄时间或无有效尺寸的脏数据，并按拍摄时间升序排布
         let sorted = fingerprints
-            .filter { $0.dhashBits != 0 }
-            .sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+            .filter {
+                $0.dhashBits != 0 &&
+                $0.creationDate != nil &&
+                $0.pixelWidth > 0 &&
+                $0.pixelHeight > 0
+            }
+            .sorted { ($0.creationDate!) < ($1.creationDate!) }
 
         guard sorted.count > 1 else { return [] }
 
         var usedIndices = Set<Int>()
-        var clusterGroups: [[String]] = []
+        var clusterGroups: [(ids: [String], sampleDate: Date)] = []
 
-        // 锚点贪心聚类 + 簇直径硬约束：杜绝并查集无限制传递（雪球效应）
+        // 锚点贪心聚类 + 多维硬约束（宽高比、分辨率比例、单簇最大时间跨度、整簇直径硬约束）
         for i in 0..<sorted.count {
             if usedIndices.contains(i) { continue }
 
             let anchor = sorted[i]
-            let anchorDate = anchor.creationDate ?? .distantPast
+            let anchorDate = anchor.creationDate!
+            let anchorAspectRatio = Double(anchor.pixelWidth) / Double(anchor.pixelHeight)
+            let anchorPixels = Double(anchor.pixelWidth * anchor.pixelHeight)
+
             var clusterMembers = [anchor]
             var clusterIndices = [i]
 
@@ -218,25 +239,45 @@ final class PhotoSimilarityManager {
                 if usedIndices.contains(j) { continue }
 
                 let candidate = sorted[j]
-                let candDate = candidate.creationDate ?? .distantPast
+                let candDate = candidate.creationDate!
                 let dtAnchor = candDate.timeIntervalSince(anchorDate)
 
-                // 跨场景阻断：时间差超过 3 分钟绝对不作为同场景相似组
+                // 跨场景阻断：单簇时间跨度严格限制在 60 秒内（连拍或同场景拍摄）
                 guard dtAnchor >= 0 else { continue }
-                guard dtAnchor <= 180 else { break }
+                guard dtAnchor <= 60 else { break }
 
-                let lastDate = clusterMembers.last!.creationDate ?? .distantPast
+                let lastDate = clusterMembers.last!.creationDate!
                 let dtLast = candDate.timeIntervalSince(lastDate)
+                // 相邻照片时间间隔超过 20 秒，视为动作中断，终止向后串联
+                guard dtLast <= 20 else { break }
 
-                // 分级时间阈值：超短时抓拍 (<=15s) 放宽至 11，同场景摆拍 (<=3min) 收紧至 7
-                let tau: Int = (dtLast <= 15 || dtAnchor <= 15) ? 11 : 7
+                // 1. 宽高比硬约束：差异必须 < 0.15（彻底剔除长截屏与相机 4:3 混杂、横图与竖图混杂）
+                let candAspectRatio = Double(candidate.pixelWidth) / Double(candidate.pixelHeight)
+                guard abs(anchorAspectRatio - candAspectRatio) < 0.15 else { continue }
+
+                // 2. 分辨率比例硬约束：像素总量倍数必须 < 1.5（剔除缩略图/预览图与全高清大图混杂）
+                let candPixels = Double(candidate.pixelWidth * candidate.pixelHeight)
+                let pixelRatio = max(anchorPixels, candPixels) / max(1.0, min(anchorPixels, candPixels))
+                guard pixelRatio < 1.5 else { continue }
+
+                // 3. 分级严格汉明距离阈值：
+                // 超短时抓拍 (<=3s) 允许差异 <= 6；同场景连续拍摄 (<=15s) <= 5；微调构图 (<=60s) <= 3
+                let tau: Int
+                if dtLast <= 3 || dtAnchor <= 3 {
+                    tau = 6
+                } else if dtLast <= 15 || dtAnchor <= 15 {
+                    tau = 5
+                } else {
+                    tau = 3
+                }
+
                 let distToAnchor = Self.hammingDistance(candidate.dhashBits, anchor.dhashBits)
                 guard distToAnchor <= tau else { continue }
 
-                // 簇直径硬约束：新照片与簇内所有已有照片的最大汉明距离必须 <= 12，防止连环串联
+                // 4. 簇直径硬约束：新照片与簇内所有已有照片的最大汉明距离必须 <= 6，彻底杜绝长链漂移
                 var isConsistentWithAll = true
                 for member in clusterMembers {
-                    if Self.hammingDistance(candidate.dhashBits, member.dhashBits) > 12 {
+                    if Self.hammingDistance(candidate.dhashBits, member.dhashBits) > 6 {
                         isConsistentWithAll = false
                         break
                     }
@@ -245,51 +286,67 @@ final class PhotoSimilarityManager {
                 if isConsistentWithAll {
                     clusterMembers.append(candidate)
                     clusterIndices.append(j)
+                    // 单簇上限 30 张，防止异常暴增
+                    if clusterMembers.count >= 30 {
+                        break
+                    }
                 }
             }
 
             if clusterMembers.count >= 2 {
-                clusterGroups.append(clusterMembers.map(\.localIdentifier))
+                let ids = clusterMembers.map(\.localIdentifier)
+                let latestDate = clusterMembers.compactMap(\.creationDate).max() ?? anchorDate
+                clusterGroups.append((ids: ids, sampleDate: latestDate))
                 usedIndices.formUnion(clusterIndices)
             }
         }
 
+        // 按最新拍摄时间倒序排列分组（时间最新在前），确保首屏加载即为最新分组
         return clusterGroups
-            .sorted { $0.count > $1.count }
-            .map { ids in
+            .sorted { $0.sampleDate > $1.sampleDate }
+            .map { cluster in
                 OrganizeScanGroup(
                     category: .similar,
-                    title: String(localized: "\(ids.count) similar"),
-                    localIdentifiers: ids
+                    title: String(localized: "\(cluster.ids.count) similar"),
+                    localIdentifiers: cluster.ids,
+                    sampleDate: cluster.sampleDate
                 )
             }
     }
 
     nonisolated private static func computeDuplicateGroups(from fingerprints: [FingerprintData]) -> [OrganizeScanGroup] {
-        var groups: [String: [String]] = [:]
+        var groups: [String: [FingerprintData]] = [:]
         for fp in fingerprints {
             guard fp.dhashBits != 0 else {
                 // 指纹为 0 时（如纯黑/白图）仅同日两秒内归并，防止跨月纯色图误伤
                 let dateKey = fp.creationDate.map { "\(Int($0.timeIntervalSince1970 / 2) * 2)" } ?? "none"
                 let key = "zero_\(fp.pixelWidth)x\(fp.pixelHeight)_\(dateKey)"
-                groups[key, default: []].append(fp.localIdentifier)
+                groups[key, default: []].append(fp)
                 continue
             }
             // 真实有效指纹且尺寸完全一致：判定为确定性重复照片（支持跨时间保存的相同文件）
             let key = "\(fp.dhashBits)_\(fp.pixelWidth)x\(fp.pixelHeight)"
-            groups[key, default: []].append(fp.localIdentifier)
+            groups[key, default: []].append(fp)
         }
 
-        return groups.values
-            .filter { $0.count > 1 }
-            .sorted { $0.count > $1.count }
-            .map { ids in
-                OrganizeScanGroup(
-                    category: .duplicates,
-                    title: String(localized: "\(ids.count) duplicates"),
-                    localIdentifiers: ids
-                )
-            }
+        let validGroups = groups.values.filter { $0.count > 1 }
+        // 按最新拍摄时间倒序排列（最新在前）
+        let sorted = validGroups.sorted { group1, group2 in
+            let date1 = group1.compactMap(\.creationDate).max() ?? .distantPast
+            let date2 = group2.compactMap(\.creationDate).max() ?? .distantPast
+            return date1 > date2
+        }
+
+        return sorted.map { members in
+            let ids = members.map(\.localIdentifier)
+            let latestDate = members.compactMap(\.creationDate).max()
+            return OrganizeScanGroup(
+                category: .duplicates,
+                title: String(localized: "\(ids.count) duplicates"),
+                localIdentifiers: ids,
+                sampleDate: latestDate
+            )
+        }
     }
 
     // MARK: - File Size Cache
@@ -387,6 +444,7 @@ final class PhotoSimilarityManager {
 
     private func loadCachedIdentifiers() -> Set<String> {
         let request = PhotoFingerprint.fetchRequest()
+        request.predicate = NSPredicate(format: "dhash != nil AND dhash != ''")
         request.propertiesToFetch = ["localIdentifier"]
 
         let results = (try? context.fetch(request)) ?? []
@@ -394,15 +452,24 @@ final class PhotoSimilarityManager {
     }
 
     private func saveFingerprints(_ data: [FingerprintData]) {
+        guard !data.isEmpty else { return }
+        let ids = data.map(\.localIdentifier)
+        let request = PhotoFingerprint.fetchRequest()
+        request.predicate = NSPredicate(format: "localIdentifier IN %@", ids)
+        let existingFPs = (try? context.fetch(request)) ?? []
+        let existingMap = Dictionary(existingFPs.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+
         for item in data {
             guard !item.dhash.isEmpty else { continue }
-            let fp = PhotoFingerprint(context: context)
+            let fp = existingMap[item.localIdentifier] ?? PhotoFingerprint(context: context)
             fp.localIdentifier = item.localIdentifier
             fp.dhash = item.dhash
             fp.creationDate = item.creationDate
             fp.pixelWidth = item.pixelWidth
             fp.pixelHeight = item.pixelHeight
-            fp.fileSize = item.fileSize
+            if item.fileSize > 0 {
+                fp.fileSize = item.fileSize
+            }
             fp.computedAt = Date()
         }
         try? context.save()
@@ -431,20 +498,26 @@ final class PhotoSimilarityManager {
 
     private func loadAllFingerprints() -> [FingerprintData] {
         let request = PhotoFingerprint.fetchRequest()
+        request.predicate = NSPredicate(format: "dhash != nil AND dhash != ''")
         request.fetchBatchSize = 500
 
         let results = (try? context.fetch(request)) ?? []
-        return results.map { fp in
-            FingerprintData(
+        var unique: [String: FingerprintData] = [:]
+        for fp in results {
+            guard !fp.dhash.isEmpty else { continue }
+            let bits = Self.parseDHashBits(fp.dhash)
+            guard bits != 0 else { continue }
+            unique[fp.localIdentifier] = FingerprintData(
                 localIdentifier: fp.localIdentifier,
                 dhash: fp.dhash,
-                dhashBits: Self.parseDHashBits(fp.dhash),
+                dhashBits: bits,
                 creationDate: fp.creationDate,
                 pixelWidth: fp.pixelWidth,
                 pixelHeight: fp.pixelHeight,
                 fileSize: fp.fileSize
             )
         }
+        return Array(unique.values)
     }
 
     private func validateAndClean(_ fingerprints: [FingerprintData]) -> [FingerprintData] {
@@ -479,11 +552,11 @@ final class PhotoSimilarityManager {
         var hash = ""
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: CGSize(width: 9, height: 8),
+            targetSize: CGSize(width: 64, height: 64),
             contentMode: .aspectFill,
             options: options
         ) { image, _ in
-            guard let image = image, let cgImage = image.cgImage else { return }
+            guard let image = image else { return }
 
             let width = 9
             let height = 8
@@ -495,10 +568,24 @@ final class PhotoSimilarityManager {
                 bitmapInfo: CGImageAlphaInfo.none.rawValue
             ) else { return }
 
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            UIGraphicsPushContext(context)
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1.0, y: -1.0)
+            image.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+            UIGraphicsPopContext()
 
             guard let pixelData = context.data else { return }
             let pixels = pixelData.bindMemory(to: UInt8.self, capacity: width * height)
+
+            var minVal = 255
+            var maxVal = 0
+            for i in 0..<(width * height) {
+                let v = Int(pixels[i])
+                if v < minVal { minVal = v }
+                if v > maxVal { maxVal = v }
+            }
+            // 过滤无动态对比度的图像（纯黑、深灰锁屏、纯白界面等），防止噪点产生伪指纹
+            guard maxVal - minVal >= 12 else { return }
 
             for row in 0..<height {
                 for col in 0..<(width - 1) {

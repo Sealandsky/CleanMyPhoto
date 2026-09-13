@@ -22,57 +22,27 @@ struct TrashView: View {
                     trashContent
                 }
             }
-            .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Trash Bin"))
+            .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if selectionManager.isSelectMode {
-                        Button(String(localized: "Cancel")) {
+                    // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
+                    Button {
+                        if selectionManager.isSelectMode {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectionManager.clearSelection()
                             }
-                        }
-                    } else {
-                        Button(String(localized: "Close")) {
+                        } else {
                             dismiss()
                         }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
                     }
                 }
-
-                if selectionManager.isSelectMode {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            for id in selectionManager.selectedIDs {
-                                photoManager.restoreFromTrash(id)
-                            }
-                            selectionManager.clearSelection()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.uturn.backward")
-                                Text(String(localized: "Restore"))
-                            }
-                        }
-                        .tint(.green)
-                        .disabled(selectionManager.isEmpty)
-                    }
-                } else if photoManager.trashCount > 0 {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(String(localized: "Restore All")) {
-                            showingRestoreConfirmation = true
-                        }
-                    }
-
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(String(localized: "Empty Trash")) {
-                            guard membershipManager.isPremiumMember || !membershipManager.isTrialExpired else {
-                                showMembershipPaywall = true
-                                return
-                            }
-                            showingDeleteConfirmation = true
-                        }
-                        .foregroundColor(.red)
-                    }
-                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                bottomFloatingBar
             }
             .confirmationDialog(String(localized: "Restore All Photos"), isPresented: $showingRestoreConfirmation) {
                 Button(String(localized: "Cancel"), role: .cancel) { }
@@ -103,6 +73,80 @@ struct TrashView: View {
         }
     }
 
+    // MARK: - 底部悬浮操作栏（固定于底部，不随内容滚动）
+    /// 常规模式：全部恢复 + 全部删除 等宽横向铺满；多选模式：恢复所选。
+    /// 按钮为系统 Liquid Glass 原生风格（iOS 26+），旧系统回退实色胶囊
+    @ViewBuilder
+    private var bottomFloatingBar: some View {
+        if photoManager.trashCount > 0 {
+            HStack(spacing: 12) {
+                if selectionManager.isSelectMode {
+                    liquidGlassCapsule(tint: .green, prominent: false) {
+                        for id in selectionManager.selectedIDs {
+                            photoManager.restoreFromTrash(id)
+                        }
+                        selectionManager.clearSelection()
+                    } label: {
+                        Label(String(localized: "Restore \(selectionManager.count) Photos"),
+                              systemImage: "arrow.uturn.backward")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                    .disabled(selectionManager.isEmpty)
+                } else {
+                    liquidGlassCapsule(tint: .green, prominent: false) {
+                        showingRestoreConfirmation = true
+                    } label: {
+                        Text(String(localized: "Restore All"))
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+
+                    liquidGlassCapsule(tint: .red, prominent: true) {
+                        guard membershipManager.isPremiumMember || !membershipManager.isTrialExpired else {
+                            showMembershipPaywall = true
+                            return
+                        }
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Text(String(localized: "Empty Trash"))
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+            .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
+        }
+    }
+
+    /// 系统 Liquid Glass 胶囊按钮：iOS 26+ 走原生 glass 风格
+    /// （prominent 为着色玻璃，用于删除等强调操作），iOS 18 回退实色胶囊。
+    /// frame 加在 label 内部使胶囊本体撑满可用宽度（加在外部只会居中）
+    @ViewBuilder
+    private func liquidGlassCapsule(tint: Color,
+                                    prominent: Bool = false,
+                                    action: @escaping () -> Void,
+                                    @ViewBuilder label: @escaping () -> some View) -> some View {
+        let button = Button {
+            action()
+        } label: {
+            label()
+                .frame(maxWidth: .infinity)
+        }
+        .controlSize(.large)
+        if #available(iOS 26.0, *) {
+            if prominent {
+                button.buttonStyle(.glassProminent)
+                    .tint(tint)
+            } else {
+                button.buttonStyle(.glass)
+            }
+        } else {
+            button.buttonStyle(.borderedProminent)
+                .tint(tint)
+        }
+    }
+
     // MARK: - Empty State
     private var emptyTrashView: some View {
         VStack(spacing: 20) {
@@ -110,7 +154,7 @@ struct TrashView: View {
                 .font(.system(size: 60, design: .rounded))
                 .foregroundColor(.gray)
 
-            Text(String(localized: "Trash is Empty"))
+            Text(String(localized: "No Pending Photos"))
                 .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
 
@@ -123,41 +167,44 @@ struct TrashView: View {
     }
 
     // MARK: - Trash Content
+    /// 排列方式与图片列表保持一致：跟随设置页的网格设置
+    /// （原比例 → 瀑布流；1:1 / 3:4 → 固定列网格），由 AdaptivePhotoGrid + PhotoCell 统一处理
     private var trashContent: some View {
         ScrollView {
-            LazyVGrid(columns: GridColumnHelper.columns(count: gridSettings.columnCount), spacing: GridColumnHelper.spacing) {
-                ForEach(trashedPhotos) { photo in
-                    PhotoCell(
-                        photo: photo,
-                        isSelected: selectionManager.isSelected(photo.id),
-                        isSelectMode: selectionManager.isSelectMode
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if selectionManager.isSelectMode {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                selectionManager.toggle(photo.id)
-                            }
-                        }
-                    }
-                    .onLongPressGesture(minimumDuration: 0.3) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+            AdaptivePhotoGrid(photos: trashedPhotos) { photo in
+                PhotoCell(
+                    photo: photo,
+                    isSelected: selectionManager.isSelected(photo.id),
+                    isSelectMode: selectionManager.isSelectMode
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if selectionManager.isSelectMode {
+                        withAnimation(.easeInOut(duration: 0.15)) {
                             selectionManager.toggle(photo.id)
                         }
                     }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                photoManager.restoreFromTrash(photo.id)
-                            }
-                        } label: {
-                            Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
+                }
+                .onLongPressGesture(minimumDuration: 0.3) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectionManager.toggle(photo.id)
+                    }
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        withAnimation {
+                            photoManager.restoreFromTrash(photo.id)
                         }
+                    } label: {
+                        Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollIndicators(.hidden)
     }
 }
 

@@ -9,3 +9,8 @@ extension ShapeStyle where Self == LinearGradient {
         )
     }
 }
+
+extension Color {
+    /// 统一卡片底色 #E9EAEB（相簿堆叠卡、清理功能入口卡、设置页会员卡共用）
+    static let cardBackground = Color(.sRGB, red: 233/255, green: 234/255, blue: 235/255)
+}

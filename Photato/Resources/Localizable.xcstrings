@@ -125,18 +125,18 @@
         }
       }
     },
-    "%lld photos will be permanently deleted and cannot be recovered. Total %@" : {
+    "%lld photos will be moved to the Trash and can be restored there. Total %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld photos will be permanently deleted and cannot be recovered. Total %@"
+            "value" : "%lld photos will be moved to Pending Photos and can be restored there. Total %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 张照片将从本设备彻底删除，且无法恢复，共 %@"
+            "value" : "%lld 张照片将移入待处理照片，可随时恢复，共 %@"
           }
         }
       }
@@ -326,6 +326,54 @@
         }
       }
     },
+    "Add %lld Photos to Pending Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add %lld Photos to Pending Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 %lld 张照片到待处理照片"
+          }
+        }
+      }
+    },
+    "Add %lld Photos to Pending Photos (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add %1$lld Photos to Pending Photos (%2$@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加 %1$lld 张照片到待处理照片（%2$@）"
+          }
+        }
+      }
+    },
+    "Add %lld photos to Pending Photos?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add %lld photos to Pending Photos?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 张照片添加到待处理照片？"
+          }
+        }
+      }
+    },
     "Add Photos from Library" : {
       "localizations" : {
         "en" : {
@@ -338,6 +386,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从图库挑选照片"
+          }
+        }
+      }
+    },
+    "Add to Pending Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Pending Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到待处理照片"
           }
         }
       }
@@ -481,7 +545,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批量删除与回收站"
+            "value" : "批量删除与待处理照片"
           }
         }
       }
@@ -843,6 +907,7 @@
       }
     },
     "Close" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -929,54 +994,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除 %lld 项，%@"
-          }
-        }
-      }
-    },
-    "Delete %lld Photos" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete %lld Photos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %lld 张照片"
-          }
-        }
-      }
-    },
-    "Delete %lld Photos (%@)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete %1$lld Photos (%2$@)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除 %1$lld 张照片 (%2$@)"
-          }
-        }
-      }
-    },
-    "Delete %lld photos?" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete %lld photos?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要删除 %lld 张照片吗？"
           }
         }
       }
@@ -1083,13 +1100,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Empty Trash"
+            "value" : "Delete All"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清空回收站"
+            "value" : "全部删除"
           }
         }
       }
@@ -1245,22 +1262,6 @@
         }
       }
     },
-    "In Trash" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In Trash"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回收站中"
-          }
-        }
-      }
-    },
     "Junk Items" : {
       "localizations" : {
         "en" : {
@@ -1272,7 +1273,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "废片数量"
+            "value" : "可清理照片"
           }
         }
       }
@@ -1642,13 +1643,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Move to Trash"
+            "value" : "Move to Pending Photos"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "移至回收站"
+            "value" : "移入待处理照片"
+          }
+        }
+      }
+    },
+    "Moved %lld photos to Pending Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moved %lld photos to Pending Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将 %lld 张照片移入待处理照片"
           }
         }
       }
@@ -1733,6 +1750,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无更多适合的照片"
+          }
+        }
+      }
+    },
+    "No Pending Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Pending Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无待处理照片"
           }
         }
       }
@@ -1959,6 +1992,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "原比例"
+          }
+        }
+      }
+    },
+    "Pending Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pending Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待处理照片"
           }
         }
       }
@@ -2218,6 +2267,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复"
+          }
+        }
+      }
+    },
+    "Restore %lld Photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore %lld Photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复 %lld 张照片"
           }
         }
       }
@@ -2809,38 +2874,6 @@
         }
       }
     },
-    "Trash Bin" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trash Bin"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回收站"
-          }
-        }
-      }
-    },
-    "Trash is Empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trash is Empty"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回收站为空"
-          }
-        }
-      }
-    },
     "Trial expires in %lld days" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2939,7 +2972,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁所有功能"
+            "value" : "订阅解锁所有功能"
           }
         }
       }

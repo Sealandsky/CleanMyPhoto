@@ -28,9 +28,9 @@ final class PhotoOrganizeManager {
         categoryStats[category] ?? 0
     }
 
-    /// 废片数量：给定功能分类下去重后的唯一照片数。
+    /// 可清理照片数量：给定功能分类下去重后的唯一照片数。
     /// 分类之间互相重叠（如重复组几乎必然也在相似组里，一张模糊截图同时
-    /// 计入截图与模糊），简单求和会重复计数导致废片数大于照片总数，
+    /// 计入截图与模糊），简单求和会重复计数导致可清理照片数大于照片总数，
     /// 因此按 localIdentifier 取并集口径
     func uniqueJunkCount(categories: [OrganizeCategory]) -> Int {
         var ids = Set<String>()
@@ -139,25 +139,29 @@ final class PhotoOrganizeManager {
             loadFlatCategoryFromCache(.lowQuality, ids: summary.lowQualityIds)
 
             if !summary.similarGroups.isEmpty {
-                scanResults[.similar] = summary.similarGroups.map { ids in
+                let loaded = summary.similarGroups.map { item in
                     OrganizeScanGroup(
                         category: .similar,
-                        title: String(localized: "\(ids.count) similar"),
-                        localIdentifiers: ids
+                        title: String(localized: "\(item.localIdentifiers.count) similar"),
+                        localIdentifiers: item.localIdentifiers,
+                        sampleDate: item.sampleDate
                     )
                 }
-                categoryStats[.similar] = summary.similarGroups.reduce(0) { $0 + $1.count }
+                scanResults[.similar] = loaded.sorted { ($0.sampleDate ?? .distantPast) > ($1.sampleDate ?? .distantPast) }
+                categoryStats[.similar] = loaded.reduce(0) { $0 + $1.localIdentifiers.count }
             }
 
             if !summary.duplicateGroups.isEmpty {
-                scanResults[.duplicates] = summary.duplicateGroups.map { ids in
+                let loaded = summary.duplicateGroups.map { item in
                     OrganizeScanGroup(
                         category: .duplicates,
-                        title: String(localized: "\(ids.count) duplicates"),
-                        localIdentifiers: ids
+                        title: String(localized: "\(item.localIdentifiers.count) duplicates"),
+                        localIdentifiers: item.localIdentifiers,
+                        sampleDate: item.sampleDate
                     )
                 }
-                categoryStats[.duplicates] = summary.duplicateGroups.reduce(0) { $0 + $1.count }
+                scanResults[.duplicates] = loaded.sorted { ($0.sampleDate ?? .distantPast) > ($1.sampleDate ?? .distantPast) }
+                categoryStats[.duplicates] = loaded.reduce(0) { $0 + $1.localIdentifiers.count }
             }
 
             loadFlatCategoryFromCache(.blurry, ids: summary.blurryIds)
@@ -180,8 +184,12 @@ final class PhotoOrganizeManager {
         let lowQualityIds = identifiers(for: .lowQuality)
         let blurryIds = identifiers(for: .blurry)
         let poorFaceIds = identifiers(for: .poorFace)
-        let similarGroups = scanResults[.similar]?.map { $0.localIdentifiers } ?? []
-        let duplicateGroups = scanResults[.duplicates]?.map { $0.localIdentifiers } ?? []
+        let similarGroups = scanResults[.similar]?.map {
+            OrganizeCacheGroupItem(localIdentifiers: $0.localIdentifiers, sampleDate: $0.sampleDate)
+        } ?? []
+        let duplicateGroups = scanResults[.duplicates]?.map {
+            OrganizeCacheGroupItem(localIdentifiers: $0.localIdentifiers, sampleDate: $0.sampleDate)
+        } ?? []
 
         let summary = OrganizeCacheSummary(
             version: OrganizeCacheSummary.currentVersion,
@@ -493,7 +501,8 @@ final class PhotoOrganizeManager {
             var displayGroup = OrganizeGroupDisplay(
                 id: scanGroup.id,
                 title: scanGroup.title,
-                localIdentifiers: scanGroup.localIdentifiers
+                localIdentifiers: scanGroup.localIdentifiers,
+                sampleDate: scanGroup.sampleDate
             )
 
             for identifier in scanGroup.localIdentifiers {

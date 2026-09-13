@@ -10,13 +10,13 @@ struct OrganizeView: View {
     @State private var totalLibraryCount = 0
 
     // MARK: - 分类分组定义
-    /// 媒体类型：属于格式类型筛选，不计入废片统计
+    /// 媒体类型：属于格式类型筛选，不计入可清理照片统计
     private static let mediaTypeCategories: [OrganizeCategory] = [
         .videos,
         .livePhotos
     ]
 
-    /// 功能类型：废片清理功能分类，计入废片统计
+    /// 功能类型：清理功能分类，计入可清理照片统计
     private static let functionCategories: [OrganizeCategory] = [
         .similar,
         .duplicates,
@@ -86,10 +86,10 @@ struct OrganizeView: View {
         await organizeManager.quickAnalysis()
     }
 
-    // MARK: - 废片数量与占比
-    /// 排除媒体类型（视频/实况属于格式筛选，不计入废片）；
+    // MARK: - 可清理照片数量与占比
+    /// 排除媒体类型（视频/实况属于格式筛选，不计入统计）；
     /// 跨分类去重取唯一照片数——一张照片同属多个分类只计一次，
-    /// 避免求和口径下废片数大于照片总数
+    /// 避免求和口径下可清理照片数大于照片总数
     private var junkCount: Int {
         organizeManager.uniqueJunkCount(categories: Self.functionCategories)
     }
@@ -120,10 +120,10 @@ struct OrganizeView: View {
         .frame(width: 24, height: 24)
     }
 
-    // MARK: - Scan Card（Figma 597:196：黑色大卡 + 大数字 废片数/总数）
-    /// 结构：上行为标题 + 操作胶囊按钮，中间 Spacer 撑开，下行为百分比圆环 + 「废片数 / 总数」大数字；
+    // MARK: - Scan Card（Figma 597:196：渐变大卡 + 大数字 可清理照片数/总数）
+    /// 结构：上行为标题 + 操作胶囊按钮，中间 Spacer 撑开，下行为百分比圆环 + 「可清理照片数 / 总数」大数字；
     /// 扫描中替换为进度条 + 取消按钮。卡片固定高度 128pt，数据牢固吸底。
-    /// 卡面为深色特例组件（不随浅色主题变化），文字固定白色
+    /// 卡面沿用设置页会员卡的 accentGradient 渐变，文字固定白色
     @ViewBuilder
     private var scanCard: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -141,7 +141,7 @@ struct OrganizeView: View {
 
             Spacer(minLength: 0)
 
-            // 下行：大数字（废片数 / 总数）或扫描进度（吸附于卡片底部）
+            // 下行：大数字（可清理照片数 / 总数）或扫描进度（吸附于卡片底部）
             if organizeManager.isAnalyzing {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(organizeManager.currentStep.isEmpty
@@ -152,7 +152,7 @@ struct OrganizeView: View {
                         .lineLimit(1)
 
                     ProgressView(value: organizeManager.analysisProgress)
-                        .tint(.blue)
+                        .tint(.white)
                 }
             } else {
                 HStack(alignment: .center, spacing: 10) {
@@ -178,10 +178,10 @@ struct OrganizeView: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .frame(height: 128)
-        // 黑色 80% 卡面 + 24pt 圆角；深浅模式下均为深色卡、白字
+        // 卡面沿用设置页会员卡的 accentGradient 渐变 + 24pt 圆角，深浅模式下均为白字
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(0.8))
+                .fill(.accentGradient)
                 .shadow(
                     color: Self.cardShadowColor,
                     radius: Self.cardShadowRadius,
@@ -226,22 +226,25 @@ struct OrganizeView: View {
         }
     }
 
+    /// 样式沿用设置页会员卡右侧的「升级」胶囊按钮
     private func scanPillButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 3) {
+            HStack(spacing: 2) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .overlay(
                 Capsule()
                     .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
             )
-            .background(Color.white.opacity(0.12))
+            .background(Color.white.opacity(0.1))
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -284,7 +287,7 @@ struct OrganizeView: View {
             .frame(height: 56)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(red: 237/255, green: 237/255, blue: 237/255))
+                    .fill(Color.cardBackground)
             )
         }
         .buttonStyle(.plain)

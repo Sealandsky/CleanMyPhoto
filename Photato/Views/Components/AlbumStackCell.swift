@@ -14,7 +14,7 @@ import Photos
 struct AlbumStackCell: View {
     let album: AlbumModel
 
-    static let cardBackgroundColor = Color(red: 237/255, green: 237/255, blue: 237/255)
+    static let cardBackgroundColor = Color.cardBackground
 
     var body: some View {
         VStack(spacing: 0) {

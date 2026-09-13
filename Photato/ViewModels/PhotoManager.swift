@@ -290,16 +290,26 @@ class PhotoManager: ObservableObject {
     }
 
     // MARK: - Trash Management
+    /// 单张移入待处理照片
     func addToTrash(_ photo: PhotoAsset) {
-        pendingDeletionIDs.insert(photo.id)
-        if !trashedAssets.contains(where: { $0.id == photo.id }) {
-            trashedAssets.append(photo)
-            Task {
-                let size = await getAssetSize(photo.asset)
-                statisticsManager?.recordDeletion(assetSize: size)
+        addToTrash([photo])
+    }
+
+    /// 批量移入待处理照片：仅标记隐藏并入站，不执行真实删除；统一只触发一次震动反馈
+    func addToTrash(_ photos: [PhotoAsset]) {
+        guard !photos.isEmpty else { return }
+        for photo in photos {
+            pendingDeletionIDs.insert(photo.id)
+            if !trashedAssets.contains(where: { $0.id == photo.id }) {
+                trashedAssets.append(photo)
+                Task {
+                    let size = await getAssetSize(photo.asset)
+                    statisticsManager?.recordDeletion(assetSize: size)
+                }
             }
         }
         updateDisplayedPhotos()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Favorite Management
