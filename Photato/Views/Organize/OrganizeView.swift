@@ -284,13 +284,7 @@ struct OrganizeView: View {
             .frame(height: 56)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(UIColor.secondarySystemGroupedBackground))
-                    .shadow(
-                        color: Self.cardShadowColor,
-                        radius: Self.cardShadowRadius,
-                        x: Self.cardShadowX,
-                        y: Self.cardShadowY
-                    )
+                    .fill(Color(red: 237/255, green: 237/255, blue: 237/255))
             )
         }
         .buttonStyle(.plain)
