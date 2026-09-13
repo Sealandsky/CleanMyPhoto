@@ -14,21 +14,40 @@ import Photos
 struct AlbumStackCell: View {
     let album: AlbumModel
 
+    static let cardBackgroundColor = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? .secondarySystemGroupedBackground
+            : UIColor(red: 237/255, green: 237/255, blue: 237/255, alpha: 1.0)
+    })
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 20)
             stackArea
-            VStack(spacing: 2) {
+                .frame(width: 115.3, height: 95.3)
+            Spacer(minLength: 8)
+            VStack(spacing: 4) {
                 Text(album.title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                     .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
                 // 数量展示
                 Text("\(album.assetCount)")
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
+            Spacer().frame(height: 16)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Self.cardBackgroundColor)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - 堆叠规格定义（精准对齐 Figma 686:1312 组件集）
@@ -62,9 +81,9 @@ struct AlbumStackCell: View {
     }
 
     // MARK: - 堆叠区
-    /// 设计稿精确布局（堆叠区 153.71×127，归一化百分比；堆叠区宽高比 1.21）：
-    /// - 卡片未旋转物理尺寸：宽 68.90 (44.82%)，高 103.34 (81.37%)，标准 2:3 纵向相纸
-    /// - 白色描边 2.2pt + 柔和投影
+    /// 设计稿精确布局（堆叠区 115.3×95.3，归一化百分比；堆叠区宽高比 1.21）：
+    /// - 卡片未旋转物理尺寸：宽 51.68 (44.82%)，高 77.50 (81.37%)，标准 2:3 纵向相纸
+    /// - 白色描边 1.65pt + 柔和投影（对齐 Figma 635:1318）
     private var stackArea: some View {
         GeometryReader { geo in
             let width = geo.size.width
@@ -72,7 +91,7 @@ struct AlbumStackCell: View {
             let displayed = Array(album.stackAssets.suffix(3))
             let count = displayed.count
 
-            // 卡片尺寸与圆角（对齐设计稿 68.90 × 103.34，cornerRadius 8.25）
+            // 卡片尺寸与圆角（对齐设计稿 51.68 × 77.50，cornerRadius 6.18）
             let cardW = width * 0.4482
             let cardH = height * 0.8137
             let cornerRadius = cardW * (8.25 / 68.90)
@@ -85,7 +104,7 @@ struct AlbumStackCell: View {
                         .frame(width: cardW, height: cardH)
                         .overlay(
                             Image(systemName: "photo")
-                                .font(.system(size: 24, design: .rounded))
+                                .font(.system(size: 20, design: .rounded))
                                 .foregroundColor(.secondary)
                         )
                         .position(x: width * 0.5, y: height * 0.5)
@@ -96,13 +115,13 @@ struct AlbumStackCell: View {
                         AlbumStackCoverImage(asset: displayed[index])
                             .frame(width: cardW, height: cardH)
                             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                            // 白色相纸白边 2.2pt
+                            // 白色相纸白边 1.65pt
                             .overlay(
                                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                    .strokeBorder(Color.white, lineWidth: 2.2)
+                                    .strokeBorder(Color.white, lineWidth: 1.65)
                             )
-                            // 柔和自然投影（对齐 Figma: blur 14.09, y 11.56, black 15%）
-                            .shadow(color: .black.opacity(0.18), radius: 7, x: 0, y: 5)
+                            // 柔和自然投影（对齐 Figma: blur 10.5, y 8.67, black 15%）
+                            .shadow(color: .black.opacity(0.15), radius: 10.5, x: 0, y: 8.67)
                             .rotationEffect(.degrees(s.angle))
                             .position(x: width * s.cx, y: height * s.cy)
                     }
