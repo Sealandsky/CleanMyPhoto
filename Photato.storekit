@@ -1,8 +1,6 @@
 {
   "identifier" : "B2A4B3C2D1E0F9A8B7C6D5E4F3A2B1C0",
-  "nonRenewingSubscriptions" : [
-
-  ],
+  "nonRenewingSubscriptions" : [],
   "products" : [
     {
       "displayPrice" : "2.99",
@@ -26,10 +24,13 @@
               "period" : "MONTH"
             }
           ],
-          "offerTags" : [
-
-          ],
-          "versionNumber" : 1
+          "offerTags" : [],
+          "versionNumber" : 1,
+          "introductoryOffer" : {
+            "internalID" : "9EE5693F2B424F539AB7B60F420CCF9F",
+            "paymentMode" : "freeTrial",
+            "subscriptionPeriod" : "P1W"
+          }
         }
       ]
     },
@@ -55,10 +56,13 @@
               "period" : "YEAR"
             }
           ],
-          "offerTags" : [
-
-          ],
-          "versionNumber" : 1
+          "offerTags" : [],
+          "versionNumber" : 1,
+          "introductoryOffer" : {
+            "internalID" : "014398B8C8824F4FAEB2D0D516099E8C",
+            "paymentMode" : "freeTrial",
+            "subscriptionPeriod" : "P1W"
+          }
         }
       ]
     },
@@ -78,12 +82,8 @@
       "type" : "NonConsumable",
       "versions" : [
         {
-          "features" : [
-
-          ],
-          "offerTags" : [
-
-          ],
+          "features" : [],
+          "offerTags" : [],
           "versionNumber" : 1
         }
       ]

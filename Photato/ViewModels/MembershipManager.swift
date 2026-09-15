@@ -39,6 +39,11 @@ class MembershipManager: ObservableObject {
         membershipStatus.remainingTrialText
     }
 
+    /// 任一订阅配置了免费试用（用于付费墙展示试用条款）
+    var hasFreeTrialOffer: Bool {
+        products.contains { $0.subscription?.introductoryOffer?.paymentMode == .freeTrial }
+    }
+
     #if DEBUG
     @Published var isDebugPremium = false
     #endif

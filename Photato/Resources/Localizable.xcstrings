@@ -1,12 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "·" : {
-
-    },
-    "/" : {
-
-    },
+    "·" : {},
+    "/" : {},
     "/month" : {
       "localizations" : {
         "en" : {
@@ -39,9 +35,7 @@
         }
       }
     },
-    "%lld" : {
-
-    },
+    "%lld" : {},
     "%lld days left in trial" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -279,21 +273,11 @@
         }
       }
     },
-    "1:1" : {
-
-    },
-    "2" : {
-
-    },
-    "3" : {
-
-    },
-    "3:4" : {
-
-    },
-    "4" : {
-
-    },
+    "1:1" : {},
+    "2" : {},
+    "3" : {},
+    "3:4" : {},
+    "4" : {},
     "About" : {
       "localizations" : {
         "en" : {
@@ -534,230 +518,6 @@
         }
       }
     },
-    "Benefit Batch Delete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Batch Delete & Trash"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "批量删除与待处理照片"
-          }
-        }
-      }
-    },
-    "Benefit Batch Delete Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Manage deletions with undo capability"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持批量删除与撤销管理"
-          }
-        }
-      }
-    },
-    "Benefit Duplicate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duplicate & Similar Detection"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重复与相似照片检测"
-          }
-        }
-      }
-    },
-    "Benefit Duplicate Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Find and remove identical or similar photos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发现并移除重复或相似的照片"
-          }
-        }
-      }
-    },
-    "Benefit Fullscreen" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fullscreen Photo Browser"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏手势浏览"
-          }
-        }
-      }
-    },
-    "Benefit Fullscreen Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Swipe gestures for intuitive browsing"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用手势直觉化浏览照片"
-          }
-        }
-      }
-    },
-    "Benefit Grid Layout" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Custom Grid Layout"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自定义网格布局"
-          }
-        }
-      }
-    },
-    "Benefit Grid Layout Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose your preferred photo grid size"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择喜欢的照片网格大小"
-          }
-        }
-      }
-    },
-    "Benefit Large File" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Large File Scanner"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "大体积照片扫描"
-          }
-        }
-      }
-    },
-    "Benefit Large File Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spot photos taking up too much space"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找出占用过多空间的照片"
-          }
-        }
-      }
-    },
-    "Benefit Low Quality" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Low Quality Detection"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低质量照片识别"
-          }
-        }
-      }
-    },
-    "Benefit Low Quality Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detect blurry and low-resolution photos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "识别模糊和低分辨率照片"
-          }
-        }
-      }
-    },
-    "Benefit Screenshot" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshot Cleanup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "屏幕截图一键清理"
-          }
-        }
-      }
-    },
-    "Benefit Screenshot Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quickly find and remove old screenshots"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快速找到并清理过期截图"
-          }
-        }
-      }
-    },
     "Best" : {
       "localizations" : {
         "en" : {
@@ -887,9 +647,7 @@
         }
       }
     },
-    "Cannot extract features from the base photo" : {
-
-    },
+    "Cannot extract features from the base photo" : {},
     "Categories" : {
       "localizations" : {
         "en" : {
@@ -1159,9 +917,7 @@
         }
       }
     },
-    "Filter" : {
-
-    },
+    "Filter" : {},
     "Find duplicates, similar photos, screenshots and more" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1473,9 +1229,7 @@
         }
       }
     },
-    "Matching cancelled" : {
-
-    },
+    "Matching cancelled" : {},
     "Maximize Your Photo Storage" : {
       "localizations" : {
         "en" : {
@@ -1702,9 +1456,7 @@
         }
       }
     },
-    "No duplicate photos yet" : {
-
-    },
+    "No duplicate photos yet" : {},
     "No internet connection. Please check your network and try again." : {
       "localizations" : {
         "en" : {
@@ -2092,9 +1844,7 @@
         }
       }
     },
-    "Photo library access unavailable (%lld)" : {
-
-    },
+    "Photo library access unavailable (%lld)" : {},
     "Photo Ratio" : {
       "localizations" : {
         "en" : {
@@ -2385,9 +2135,7 @@
         }
       }
     },
-    "Scan Now" : {
-
-    },
+    "Scan Now" : {},
     "Scanning for large files..." : {
       "localizations" : {
         "en" : {
@@ -2941,9 +2689,7 @@
         }
       }
     },
-    "Unknown Date" : {
-
-    },
+    "Unknown Date" : {},
     "Unknown time" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3181,6 +2927,326 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的照片"
+          }
+        }
+      }
+    },
+    "Benefit AI Similar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Similar Photo Recommendations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 相似照片推荐"
+          }
+        }
+      }
+    },
+    "Benefit AI Similar Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-group similar shots and keep the best one"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相似照片自动成组，留住最佳一张"
+          }
+        }
+      }
+    },
+    "Benefit AI Junk" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Bad Photo Detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 智能识别废片"
+          }
+        }
+      }
+    },
+    "Benefit AI Junk Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry, closed-eye & low-quality shots flagged"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动识别模糊、闭眼、低画质照片"
+          }
+        }
+      }
+    },
+    "Benefit Duplicates" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复照片检测"
+          }
+        }
+      }
+    },
+    "Benefit Duplicates Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find and remove identical photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找出并清理完全相同的照片"
+          }
+        }
+      }
+    },
+    "Benefit Smart Grouping" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Grouping by Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按时间智能分组"
+          }
+        }
+      }
+    },
+    "Benefit Smart Grouping Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Year & month albums with a review-before-delete pending list"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按年月归类，待处理清单确认后再删"
+          }
+        }
+      }
+    },
+    "Benefit Album Complete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Album Completion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 帮你补齐相簿"
+          }
+        }
+      }
+    },
+    "Benefit Album Complete Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find matching photos and add them in one tap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别散落的同类照片，一键归入"
+          }
+        }
+      }
+    },
+    "Benefit Cleanup Tools" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshots & Large Files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图清理 · 大文件扫描"
+          }
+        }
+      }
+    },
+    "Benefit Cleanup Tools Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Target the biggest space hogs, photos and videos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速定位最占空间的照片和视频"
+          }
+        }
+      }
+    },
+    "Benefit Memories" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Random Memory Rediscovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回忆随机重温"
+          }
+        }
+      }
+    },
+    "Benefit Memories Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A fresh batch of memories every refresh"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下拉刷新，换一批回忆"
+          }
+        }
+      }
+    },
+    "Benefit Browsing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fullscreen Browsing & Grid Layout"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏浏览 · 自定义网格"
+          }
+        }
+      }
+    },
+    "Benefit Browsing Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swipe gestures and your preferred grid size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手势滑动浏览，网格列数随心选"
+          }
+        }
+      }
+    },
+    "7 Days Free" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 days free"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天免费"
+          }
+        }
+      }
+    },
+    "Free Trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用"
+          }
+        }
+      }
+    },
+    "Price Unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Price unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "价格获取中"
+          }
+        }
+      }
+    },
+    "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 免费试用结束后，订阅将自动续订，除非在试用结束前至少 24 小时取消。"
           }
         }
       }
