@@ -126,27 +126,30 @@ struct MembershipView: View {
                 .foregroundColor(.primary)
                 .padding(.bottom, 2)
 
+            benefitRow(icon: "sparkles",
+                       title: String(localized: "Benefit AI Similar"),
+                       subtitle: String(localized: "Benefit AI Similar Sub"))
+            benefitRow(icon: "wand.and.stars",
+                       title: String(localized: "Benefit AI Junk"),
+                       subtitle: String(localized: "Benefit AI Junk Sub"))
             benefitRow(icon: "doc.on.doc",
-                       title: String(localized: "Benefit Duplicate"),
-                       subtitle: String(localized: "Benefit Duplicate Sub"))
-            benefitRow(icon: "photo.on.rectangle.angled",
-                       title: String(localized: "Benefit Screenshot"),
-                       subtitle: String(localized: "Benefit Screenshot Sub"))
+                       title: String(localized: "Benefit Duplicates"),
+                       subtitle: String(localized: "Benefit Duplicates Sub"))
+            benefitRow(icon: "calendar",
+                       title: String(localized: "Benefit Smart Grouping"),
+                       subtitle: String(localized: "Benefit Smart Grouping Sub"))
+            benefitRow(icon: "plus.rectangle.on.rectangle",
+                       title: String(localized: "Benefit Album Complete"),
+                       subtitle: String(localized: "Benefit Album Complete Sub"))
             benefitRow(icon: "internaldrive",
-                       title: String(localized: "Benefit Large File"),
-                       subtitle: String(localized: "Benefit Large File Sub"))
-            benefitRow(icon: "rectangle.and.text.magnifyingglass",
-                       title: String(localized: "Benefit Low Quality"),
-                       subtitle: String(localized: "Benefit Low Quality Sub"))
-            benefitRow(icon: "trash.circle",
-                       title: String(localized: "Benefit Batch Delete"),
-                       subtitle: String(localized: "Benefit Batch Delete Sub"))
-            benefitRow(icon: "hand.draw",
-                       title: String(localized: "Benefit Fullscreen"),
-                       subtitle: String(localized: "Benefit Fullscreen Sub"))
+                       title: String(localized: "Benefit Cleanup Tools"),
+                       subtitle: String(localized: "Benefit Cleanup Tools Sub"))
+            benefitRow(icon: "clock.arrow.circlepath",
+                       title: String(localized: "Benefit Memories"),
+                       subtitle: String(localized: "Benefit Memories Sub"))
             benefitRow(icon: "square.grid.2x2",
-                       title: String(localized: "Benefit Grid Layout"),
-                       subtitle: String(localized: "Benefit Grid Layout Sub"))
+                       title: String(localized: "Benefit Browsing"),
+                       subtitle: String(localized: "Benefit Browsing Sub"))
         }
     }
 
@@ -204,13 +207,32 @@ struct MembershipView: View {
                 .foregroundColor(.secondary)
 
             VStack(alignment: .leading, spacing: 6) {
+                if membershipManager.hasFreeTrialOffer {
+                    Text(String(localized: "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends."))
+                }
                 Text(String(localized: "• Subscription will auto-renew unless turned off at least 24 hours before the current period ends."))
                 Text(String(localized: "• Your account will be charged for renewal within 24 hours before the current period ends."))
                 Text(String(localized: "• You can manage your subscription and turn off auto-renewal after purchase."))
             }
             .font(.system(size: 11, design: .rounded))
             .foregroundColor(Color(.tertiaryLabel))
+
+            HStack(spacing: 24) {
+                Link(String(localized: "Terms of Use"),
+                     destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!)
+                Link(String(localized: "Privacy Policy"),
+                     destination: privacyPolicyURL)
+            }
+            .font(.system(size: 11, design: .rounded))
         }
+    }
+
+    /// 隐私政策按设备语言跳转对应版本
+    private var privacyPolicyURL: URL {
+        let isChinese = Locale.current.language.languageCode?.identifier == "zh"
+        return URL(string: isChinese
+            ? "https://sealandsky.github.io/privacy/privacy-policy-zh.html"
+            : "https://sealandsky.github.io/privacy/privacy-policy.html")!
     }
 
     // MARK: - Bottom Action Bar

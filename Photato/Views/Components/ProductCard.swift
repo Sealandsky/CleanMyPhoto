@@ -30,6 +30,13 @@ struct ProductCard: View {
                             .foregroundColor(.secondary)
                     }
 
+                    if let trial = productType.introductoryOfferText(from: products) {
+                        Text(trial)
+                            .font(.system(size: 13, design: .rounded))
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    }
+
                     if let savings = productType.savingsText {
                         Text(savings)
                             .font(.system(size: 13, design: .rounded))
@@ -40,15 +47,21 @@ struct ProductCard: View {
 
                 Spacer()
 
-                // 右侧：价格
+                // 右侧：价格（StoreKit 未加载完成时不展示，避免兜底货币错误）
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(productType.priceText(from: products))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
+                    if let price = productType.priceText(from: products) {
+                        Text(price)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
 
-                    Text(productType.durationText.isEmpty ? String(localized: "One-time") : productType.durationText)
-                        .font(.system(size: 13, design: .rounded))
-                        .foregroundColor(.secondary)
+                        Text(productType.durationText.isEmpty ? String(localized: "One-time") : productType.durationText)
+                            .font(.system(size: 13, design: .rounded))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(String(localized: "Price Unavailable"))
+                            .font(.system(size: 13, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .padding(20)
