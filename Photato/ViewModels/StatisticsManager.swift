@@ -55,14 +55,7 @@ class StatisticsManager: ObservableObject {
         trashCount = trash
     }
 
-    /// 记录删除操作
-    func recordDeletion(assetSize: Int64) {
-        totalDeletedPhotos += 1
-        storageSpaceSavedBytes += Int(assetSize)
-        saveToDefaults()
-    }
-
-    /// 批量记录删除操作
+    /// 批量记录删除操作（唯一统计口径：照片真实删除成功后调用）
     func recordDeletions(count: Int, totalSize: Int64) {
         totalDeletedPhotos += count
         storageSpaceSavedBytes += Int(totalSize)
