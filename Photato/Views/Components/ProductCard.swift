@@ -7,6 +7,8 @@ struct ProductCard: View {
     let productType: SubscriptionType
     let products: [Product]
     let isSelected: Bool
+    /// 当前 Apple ID 的试用资格：无资格时不展示试用徽章
+    var eligibleForIntroOffer: Bool = true
     let onTap: () -> Void
 
     var body: some View {
@@ -29,7 +31,10 @@ struct ProductCard: View {
                     }
 
                     HStack(spacing: 6) {
-                        if let trial = productType.trialBadgeText(from: products) {
+                        if let trial = productType.trialBadgeText(
+                            from: products,
+                            eligibleForIntroOffer: eligibleForIntroOffer
+                        ) {
                             trialBadge(trial)
                         }
 

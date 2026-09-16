@@ -18,9 +18,9 @@ struct MembershipView: View {
                 scrollView
             }
 
-            if !isMandatory {
-                closeButton
-            }
+            // 强制付费墙也保留可见的关闭按钮：唯一逃生通道是不可见的下滑手势
+            // 会同时伤害审核评价与用户信任
+            closeButton
 
             if membershipManager.isLoadingPurchase {
                 loadingOverlay
@@ -190,18 +190,55 @@ struct MembershipView: View {
 
     private var productCardsSection: some View {
         VStack(spacing: 10) {
-            ForEach(SubscriptionType.allCases, id: \.self) { productType in
-                ProductCard(
-                    productType: productType,
-                    products: membershipManager.products,
-                    isSelected: membershipManager.selectedProduct == productType,
-                    onTap: {
-                        withAnimation(.spring(response: 0.3)) {
-                            membershipManager.selectedProduct = productType
+            if membershipManager.products.isEmpty {
+                productsUnavailableView
+            } else {
+                ForEach(SubscriptionType.allCases, id: \.self) { productType in
+                    ProductCard(
+                        productType: productType,
+                        products: membershipManager.products,
+                        isSelected: membershipManager.selectedProduct == productType,
+                        eligibleForIntroOffer: membershipManager.isEligibleForIntroOffer,
+                        onTap: {
+                            withAnimation(.spring(response: 0.3)) {
+                                membershipManager.selectedProduct = productType
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
+        }
+    }
+
+    /// 商品未就绪：首次拉取显示加载态；失败后显示重试入口（不再弹全局错误）
+    @ViewBuilder
+    private var productsUnavailableView: some View {
+        if membershipManager.isLoadingProducts {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+        } else {
+            VStack(spacing: 12) {
+                Text(String(localized: "Couldn't load subscription options"))
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task { await membershipManager.reloadProducts() }
+                } label: {
+                    Text(String(localized: "Retry"))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 8)
+                }
+                .background(
+                    Capsule().fill(Color.blue.opacity(0.12))
+                )
+                .foregroundColor(.blue)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
         }
     }
 
@@ -255,14 +292,20 @@ struct MembershipView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
-                    Text(membershipManager.selectedProduct.actionButtonTitle(from: membershipManager.products))
+                    Text(membershipManager.selectedProduct.actionButtonTitle(
+                        from: membershipManager.products,
+                        eligibleForIntroOffer: membershipManager.isEligibleForIntroOffer
+                    ))
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(membershipManager.isLoadingPurchase)
+            .disabled(membershipManager.isLoadingPurchase || membershipManager.products.isEmpty)
 
             // 扣费披露：明确试用时长与试用结束后将自动收取的金额（App Store 审核 3.1.2 要求）
-            if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(from: membershipManager.products) {
+            if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(
+                from: membershipManager.products,
+                eligibleForIntroOffer: membershipManager.isEligibleForIntroOffer
+            ) {
                 Text(disclosure)
                     .font(.system(size: 11, design: .rounded))
                     .foregroundColor(.secondary)

@@ -30,17 +30,21 @@ enum SubscriptionType: String, CaseIterable {
         return String(format: String(localized: "monthly_breakdown_format"), formatted)
     }
 
-    // 精炼试用徽章文案（如：7 天免费，用于卡片内部精炼展示）
-    func trialBadgeText(from products: [Product]) -> String? {
-        guard let product = products.first(where: { $0.id == self.rawValue }),
+    // 精炼试用徽章文案（如：7 天免费，用于卡片内部精炼展示）。
+    // eligibleForIntroOffer 为 App Store 对该 Apple ID 的试用资格校验结果，
+    // 已消耗过试用的用户不再展示试用徽章（避免「显示试用实际立即扣费」）
+    func trialBadgeText(from products: [Product], eligibleForIntroOffer: Bool = true) -> String? {
+        guard eligibleForIntroOffer,
+              let product = products.first(where: { $0.id == self.rawValue }),
               let offer = product.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
         return trialDurationText(offer)
     }
 
     // 免费试用展示文本（含试用结束后的扣费金额，App Store 审核 3.1.2 要求）
-    func introductoryOfferText(from products: [Product]) -> String? {
-        guard let product = products.first(where: { $0.id == self.rawValue }),
+    func introductoryOfferText(from products: [Product], eligibleForIntroOffer: Bool = true) -> String? {
+        guard eligibleForIntroOffer,
+              let product = products.first(where: { $0.id == self.rawValue }),
               let offer = product.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
         let trialText = trialDurationText(offer)
@@ -48,9 +52,10 @@ enum SubscriptionType: String, CaseIterable {
     }
 
     // 购买按钮下方的扣费披露：明确试用时长与试用结束后将自动收取的金额
-    func purchaseDisclosureText(from products: [Product]) -> String? {
+    func purchaseDisclosureText(from products: [Product], eligibleForIntroOffer: Bool = true) -> String? {
         guard let product = products.first(where: { $0.id == self.rawValue }) else { return nil }
-        if let offer = product.subscription?.introductoryOffer, offer.paymentMode == .freeTrial {
+        if eligibleForIntroOffer,
+           let offer = product.subscription?.introductoryOffer, offer.paymentMode == .freeTrial {
             return String(
                 format: String(localized: "purchase_disclosure_trial"),
                 trialDurationText(offer), product.displayPrice, durationText
@@ -63,16 +68,17 @@ enum SubscriptionType: String, CaseIterable {
     }
 
     // 是否可用免费试用开通（用于订阅按钮文案）
-    func hasFreeTrial(from products: [Product]) -> Bool {
-        guard let product = products.first(where: { $0.id == self.rawValue }),
+    func hasFreeTrial(from products: [Product], eligibleForIntroOffer: Bool = true) -> Bool {
+        guard eligibleForIntroOffer,
+              let product = products.first(where: { $0.id == self.rawValue }),
               let offer = product.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return false }
         return true
     }
 
-    // 动作按钮文案（根据所选方案类型及是否有试用智能匹配）
-    func actionButtonTitle(from products: [Product]) -> String {
-        if hasFreeTrial(from: products) {
+    // 动作按钮文案（根据所选方案类型及是否有试用资格智能匹配）
+    func actionButtonTitle(from products: [Product], eligibleForIntroOffer: Bool = true) -> String {
+        if hasFreeTrial(from: products, eligibleForIntroOffer: eligibleForIntroOffer) {
             return String(localized: "Start Free Trial")
         }
         switch self {
