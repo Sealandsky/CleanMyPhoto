@@ -104,16 +104,9 @@ struct MembershipView: View {
                 .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
 
-            if membershipManager.remainingTrialDays > 0,
-               let text = membershipManager.remainingTrialText {
-                Text(text)
-                    .font(.system(size: 16, design: .rounded))
-                    .foregroundColor(.blue)
-            } else {
-                Text(String(localized: "Unlock All Features"))
-                    .font(.system(size: 16, design: .rounded))
-                    .foregroundColor(.secondary)
-            }
+            Text(String(localized: "Unlock All Features"))
+                .font(.system(size: 16, design: .rounded))
+                .foregroundColor(.secondary)
         }
     }
 

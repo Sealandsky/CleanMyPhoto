@@ -258,6 +258,11 @@ struct PhotoListView: View {
 
         autoScrollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
+                // 异步回调期间数据可能已被清空或收缩，先做守卫防止越界
+                guard !photos.isEmpty else {
+                    stopAutoScroll()
+                    return
+                }
                 let targetID: String?
                 if direction == .up {
                     targetID = firstVisiblePhotoID()
@@ -274,6 +279,7 @@ struct PhotoListView: View {
                 } else {
                     nextIdx = min(photos.count - 1, idx + step)
                 }
+                guard photos.indices.contains(nextIdx) else { return }
                 let nextID = photos[nextIdx].id
 
                 withTransaction(Transaction(animation: nil)) {

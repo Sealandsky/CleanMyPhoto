@@ -17,6 +17,7 @@ struct OrganizeResultsView: View {
     // 日期分节：相似/重复按拍摄日聚合分节；其他分类按拍摄年月归类
     @State private var dateSections: [DateSection] = []
     @State private var sectionSizes: [String: Int64] = [:]
+    @State private var sectionSizesTask: Task<Void, Never>? = nil
     @State private var cachedAllPhotos: [PhotoAsset] = []
     @State private var photoIndexMap: [String: Int] = [:]
     @State private var sizeCalculationTask: Task<Void, Never>? = nil
@@ -171,6 +172,9 @@ struct OrganizeResultsView: View {
             Task(priority: .utility) {
                 await calculateCategorySize()
             }
+        }
+        .onDisappear {
+            sectionSizesTask?.cancel()
         }
         .onChange(of: displayedPhotos.count) { _, _ in
             rebuildDateSections()
@@ -615,24 +619,29 @@ struct OrganizeResultsView: View {
         return sections
     }
 
-    /// 补齐各分节合计大小（后台异步计算，单次主线程批量赋值更新）
+    /// 补齐各分节合计大小（后台异步计算，单次主线程批量赋值更新；
+    /// 持有任务句柄并在视图消失时取消，避免 pop 后继续占用 IO 并回写已销毁状态）
     private func computeSectionSizes() {
         let sections = dateSections
-        Task(priority: .utility) {
+        sectionSizesTask?.cancel()
+        sectionSizesTask = Task(priority: .utility) {
             var newSizes: [String: Int64] = [:]
             for section in sections {
+                if Task.isCancelled { return }
                 let key = "\(section.id)_\(section.photos.count)"
                 guard sectionSizes[key] == nil else { continue }
                 var total: Int64 = 0
                 for photo in section.photos {
+                    if Task.isCancelled { return }
                     total += await PHAssetSizeHelper.getAssetSize(photo.asset)
                 }
                 newSizes[key] = total
             }
 
-            guard !newSizes.isEmpty else { return }
+            guard !newSizes.isEmpty, !Task.isCancelled else { return }
 
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 for (key, size) in newSizes {
                     sectionSizes[key] = size
                 }

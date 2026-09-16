@@ -175,7 +175,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    Link(destination: URL(string: "https://sealandsky.github.io/privacy/privacy.html")!) {
+                    Link(destination: privacyPolicyURL) {
                         HStack {
                             Image(systemName: "hand.raised")
                                 .foregroundColor(.blue)
@@ -235,8 +235,6 @@ struct SettingsView: View {
             case .free:
                 return String(localized: "Free")
             }
-        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
-            return text
         } else {
             return String(localized: "Free")
         }
@@ -245,8 +243,6 @@ struct SettingsView: View {
     private var membershipCardSubtitle: String {
         if membershipManager.isPremiumMember {
             return membershipStatusText
-        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
-            return text
         } else {
             return String(localized: "Subscribe or one-time purchase")
         }
@@ -254,6 +250,14 @@ struct SettingsView: View {
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    /// 隐私政策按设备语言跳转对应版本
+    private var privacyPolicyURL: URL {
+        let isChinese = Locale.current.language.languageCode?.identifier == "zh"
+        return URL(string: isChinese
+            ? "https://sealandsky.github.io/privacy/privacy-policy-zh.html"
+            : "https://sealandsky.github.io/privacy/privacy-policy.html")!
     }
 }
 

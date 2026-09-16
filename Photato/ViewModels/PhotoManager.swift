@@ -5,7 +5,7 @@ import UIKit
 
 // MARK: - Photo Manager ViewModel
 @MainActor
-class PhotoManager: ObservableObject {
+class PhotoManager: NSObject, ObservableObject {
     @Published var allPhotos: [PhotoAsset] = []
     @Published var displayedPhotos: [PhotoAsset] = []
     @Published var pendingDeletionIDs: Set<String> = []
@@ -22,6 +22,8 @@ class PhotoManager: ObservableObject {
 
     private let maxPhotoCount = 50
     private var currentFetchOffset = 0
+    /// 当前分页所基于的相册查询结果；作为 PHChange 增量比对的基准
+    private var fetchResult: PHFetchResult<PHAsset>?
     private(set) var statisticsManager: StatisticsManager?
     private(set) var totalPhotoCount: Int = 0
 
@@ -30,9 +32,12 @@ class PhotoManager: ObservableObject {
     }
 
     init(statisticsManager: StatisticsManager? = nil) {
+        super.init()
         self.statisticsManager = statisticsManager
         // 初始化时检查当前的权限状态
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        // 监听系统相册变更（外部增删改、iCloud 下载完成等），保持数据与相册一致
+        PHPhotoLibrary.shared().register(self)
     }
 
     // MARK: - Authorization
@@ -75,14 +80,19 @@ class PhotoManager: ObservableObject {
         await fetchPhotos(offset: allPhotos.count)
     }
 
-    private func fetchPhotos(offset: Int) async {
+    /// 图库查询条件（分页拉取与相册变更后的窗口重建共用同一套排序与过滤）
+    private static func makeFetchOptions() -> PHFetchOptions {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         fetchOptions.predicate = NSPredicate(format: "mediaType IN %@", [PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue])
         fetchOptions.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared]
         fetchOptions.includeAllBurstAssets = false
+        return fetchOptions
+    }
 
-        let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+    private func fetchPhotos(offset: Int) async {
+        let fetchResult = PHAsset.fetchAssets(with: Self.makeFetchOptions())
+        self.fetchResult = fetchResult
         totalPhotoCount = fetchResult.count
         print("📸 FetchResult total count: \(fetchResult.count)")
 
@@ -295,19 +305,22 @@ class PhotoManager: ObservableObject {
         addToTrash([photo])
     }
 
-    /// 批量移入待处理照片：仅标记隐藏并入站，不执行真实删除；统一只触发一次震动反馈
+    /// 批量移入待处理照片：仅标记隐藏并入站，不执行真实删除；统一只触发一次震动反馈。
+    /// 删除统计只在 emptyTrash 真实删除成功时计入，避免双重计数。
+    /// pendingDeletionIDs/trashedAssets 均为 @Published：合并为各一次赋值，
+    /// 避免逐张 mutation 触发全局观察者 N 次重渲染。
     func addToTrash(_ photos: [PhotoAsset]) {
         guard !photos.isEmpty else { return }
-        for photo in photos {
-            pendingDeletionIDs.insert(photo.id)
-            if !trashedAssets.contains(where: { $0.id == photo.id }) {
-                trashedAssets.append(photo)
-                Task {
-                    let size = await getAssetSize(photo.asset)
-                    statisticsManager?.recordDeletion(assetSize: size)
-                }
-            }
-        }
+
+        var newIDs = pendingDeletionIDs
+        newIDs.formUnion(photos.map(\.id))
+        pendingDeletionIDs = newIDs
+
+        var newTrash = trashedAssets
+        let existingIDs = Set(newTrash.map(\.id))
+        newTrash.append(contentsOf: photos.filter { !existingIDs.contains($0.id) })
+        trashedAssets = newTrash
+
         updateDisplayedPhotos()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
@@ -433,6 +446,85 @@ class PhotoManager: ObservableObject {
             options: options
         ) { image, _ in
             result(image)
+        }
+    }
+}
+
+// MARK: - PHPhotoLibrary Change Observer
+extension PhotoManager: PHPhotoLibraryChangeObserver {
+    /// 回调来自任意后台队列：仅持有 PHChange（线程安全），切回主线程与 fetchResult 比对
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor in
+            guard let result = fetchResult,
+                  let details = changeInstance.changeDetails(for: result) else { return }
+            applyLibraryChanges(details)
+        }
+    }
+}
+
+private extension PhotoManager {
+    /// 增量应用相册变更：
+    /// - 已删除资产同步清出待处理集合（对 emptyTrash 自身触发的变更幂等）；
+    /// - 结构性增删/移动按当前已加载深度重放首屏窗口，保持滚动位置语义；
+    /// - 纯内容变更（收藏、iCloud 下载完成等）原地刷新对应 PhotoAsset。
+    func applyLibraryChanges(_ details: PHFetchResultChangeDetails<PHAsset>) {
+        fetchResult = details.fetchResultAfterChanges
+        totalPhotoCount = details.fetchResultAfterChanges.count
+
+        let removedIDs = Set(details.removedObjects.map(\.localIdentifier))
+        if !removedIDs.isEmpty {
+            pendingDeletionIDs.subtract(removedIDs)
+            trashedAssets.removeAll { removedIDs.contains($0.id) }
+        }
+
+        let structural = !details.hasIncrementalChanges
+            || details.hasMoves
+            || !details.insertedObjects.isEmpty
+            || !details.removedObjects.isEmpty
+
+        if structural {
+            reloadLoadedWindow()
+        } else if !details.changedObjects.isEmpty {
+            refreshChangedAssets(details.changedObjects)
+        }
+
+        updateDisplayedPhotos()
+    }
+
+    /// 按变更后的相册顺序重建已加载窗口（条数与此前一致，新照片进入窗口、窗口尾自然延后）
+    private func reloadLoadedWindow() {
+        let result = fetchResult ?? PHAsset.fetchAssets(with: Self.makeFetchOptions())
+        fetchResult = result
+        totalPhotoCount = result.count
+
+        let loadedCount = allPhotos.count
+        let endIndex = min(loadedCount, result.count)
+        var assets: [PhotoAsset] = []
+        assets.reserveCapacity(endIndex)
+        for i in 0..<endIndex {
+            assets.append(PhotoAsset(asset: result.object(at: i)))
+        }
+        allPhotos = assets
+        hasMorePhotos = endIndex < result.count
+    }
+
+    /// changedObjects 携带的即是更新后的 PHAsset 实例，无需二次请求
+    private func refreshChangedAssets(_ objects: [PHAsset]) {
+        var freshByID: [String: PHAsset] = [:]
+        freshByID.reserveCapacity(objects.count)
+        for asset in objects {
+            freshByID[asset.localIdentifier] = asset
+        }
+
+        for index in allPhotos.indices {
+            if let fresh = freshByID[allPhotos[index].id] {
+                allPhotos[index] = PhotoAsset(asset: fresh)
+            }
+        }
+        for index in trashedAssets.indices {
+            if let fresh = freshByID[trashedAssets[index].id] {
+                trashedAssets[index] = PhotoAsset(asset: fresh)
+            }
         }
     }
 }
