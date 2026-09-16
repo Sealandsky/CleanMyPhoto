@@ -21,6 +21,23 @@ enum SubscriptionType: String, CaseIterable {
         products.first(where: { $0.id == self.rawValue })?.displayPrice
     }
 
+    // 年度订阅折算月价（如：折合 ¥4.83/月 或 $1.08/mo）
+    func monthlyEquivalentPriceText(from products: [Product]) -> String? {
+        guard self == .yearly,
+              let product = products.first(where: { $0.id == self.rawValue }) else { return nil }
+        let monthlyPrice = product.price / 12
+        let formatted = monthlyPrice.formatted(product.priceFormatStyle)
+        return String(format: String(localized: "monthly_breakdown_format"), formatted)
+    }
+
+    // 精炼试用徽章文案（如：7 天免费，用于卡片内部精炼展示）
+    func trialBadgeText(from products: [Product]) -> String? {
+        guard let product = products.first(where: { $0.id == self.rawValue }),
+              let offer = product.subscription?.introductoryOffer,
+              offer.paymentMode == .freeTrial else { return nil }
+        return trialDurationText(offer)
+    }
+
     // 免费试用展示文本（含试用结束后的扣费金额，App Store 审核 3.1.2 要求）
     func introductoryOfferText(from products: [Product]) -> String? {
         guard let product = products.first(where: { $0.id == self.rawValue }),
@@ -47,7 +64,23 @@ enum SubscriptionType: String, CaseIterable {
 
     // 是否可用免费试用开通（用于订阅按钮文案）
     func hasFreeTrial(from products: [Product]) -> Bool {
-        introductoryOfferText(from: products) != nil
+        guard let product = products.first(where: { $0.id == self.rawValue }),
+              let offer = product.subscription?.introductoryOffer,
+              offer.paymentMode == .freeTrial else { return false }
+        return true
+    }
+
+    // 动作按钮文案（根据所选方案类型及是否有试用智能匹配）
+    func actionButtonTitle(from products: [Product]) -> String {
+        if hasFreeTrial(from: products) {
+            return String(localized: "Start Free Trial")
+        }
+        switch self {
+        case .monthly, .yearly:
+            return String(localized: "Subscribe Now")
+        case .lifetime:
+            return String(localized: "Unlock Lifetime Access")
+        }
     }
 
     private func trialDurationText(_ offer: Product.SubscriptionOffer) -> String {
@@ -71,21 +104,49 @@ enum SubscriptionType: String, CaseIterable {
         self == .yearly
     }
 
-    // 折扣信息
+    // 折扣信息（已按要求移除省 64% 标签）
     var savingsText: String? {
+        nil
+    }
+
+    // 附加说明（月度与年度订阅均显示可随时取消，终身显示一次性买断）
+    var subtitleText: String? {
         switch self {
-        case .monthly: return nil
-        case .yearly: return String(localized: "Save 64%")
-        case .lifetime: return nil
+        case .monthly, .yearly: return String(localized: "Cancel anytime")
+        case .lifetime: return String(localized: "One-time Purchase · Lifetime Access")
         }
     }
 
-    // 附加说明
-    var subtitleText: String? {
-        switch self {
-        case .monthly: return nil
-        case .yearly: return String(localized: "Most Popular")
-        case .lifetime: return String(localized: "One-time Purchase")
+    // 终身会员划线参考原价（根据 StoreKit 真实价格与货币代码动态计算）
+    func lifetimeOriginalPriceText(from products: [Product]) -> String {
+        guard let product = products.first(where: { $0.id == self.rawValue }) else {
+            return "¥168.00"
         }
+
+        let currencyCode = product.priceFormatStyle.currencyCode
+
+        // 人民币区域固定锚定到 ¥168.00（带两位小数）
+        if currencyCode == "CNY" {
+            return Decimal(168).formatted(product.priceFormatStyle)
+        }
+
+        // 美元区域固定锚定到常用的 $49.99
+        if currencyCode == "USD" {
+            return "$49.99"
+        }
+
+        // 其他地区（如欧元、英镑、日元、加元等）：基于当前价格按约 1.9 倍（约 5.2 折）动态计算，并用本地货币格式化
+        let originalPriceDecimal: Decimal
+        if currencyCode == "JPY" || currencyCode == "KRW" {
+            let rough = NSDecimalNumber(decimal: product.price * 1.9).doubleValue
+            let rounded = (rough / 100.0).rounded() * 100.0
+            originalPriceDecimal = Decimal(rounded)
+        } else {
+            let rough = NSDecimalNumber(decimal: product.price * 1.9).doubleValue
+            let rounded = floor(rough) + 0.99
+            originalPriceDecimal = Decimal(rounded)
+        }
+
+        return originalPriceDecimal.formatted(product.priceFormatStyle)
     }
 }

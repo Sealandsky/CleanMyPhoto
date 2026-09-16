@@ -50,21 +50,20 @@ struct MembershipView: View {
 
     private var scrollView: some View {
         ScrollView {
-            VStack(spacing: 28) {
+            VStack(spacing: 22) {
                 headerSection
                 productCardsSection
                 benefitsSection
                 termsSection
             }
-            .padding(.top, isMandatory ? 40 : 60)
-            .padding(.bottom, 24)
-            .padding(.horizontal, 24)
+            .padding(.top, isMandatory ? 24 : 40)
+            .padding(.bottom, 20)
+            .padding(.horizontal, 20)
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
         }
-        .scrollIndicators(.hidden)  // 隐藏滚动条
     }
 
     // MARK: - Close Button
@@ -73,20 +72,32 @@ struct MembershipView: View {
         VStack {
             HStack {
                 Spacer()
-                Button {
-                    hasShownMembership = true
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                        .foregroundColor(.secondary)
-                        .frame(width: 36, height: 36)
-                        .background(Color.primary.opacity(0.06))
-                        .clipShape(Circle())
+                if #available(iOS 26.0, *) {
+                    Button {
+                        hasShownMembership = true
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(width: 40, height: 40)
+                            .glassEffect(.regular.interactive(), in: Circle())
+                    }
+                } else {
+                    Button {
+                        hasShownMembership = true
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
                 }
-                .padding(.trailing, 20)
-                .padding(.top, 10)
             }
+            .padding(.trailing, 16)
+            .padding(.top, 10)
             Spacer()
         }
     }
@@ -94,28 +105,31 @@ struct MembershipView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Image("WelcomeIcon")
                 .resizable()
-                .frame(width: 72, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
 
-            Text(String(localized: "Upgrade to Pro"))
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
+            VStack(spacing: 4) {
+                Text(String(localized: "Upgrade to Pro"))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
 
-            Text(String(localized: "Unlock All Features"))
-                .font(.system(size: 16, design: .rounded))
-                .foregroundColor(.secondary)
+                Text(String(localized: "Unlock All Features"))
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
     // MARK: - Benefits
 
     private var benefitsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(String(localized: "Membership Benefits"))
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
                 .padding(.bottom, 2)
 
@@ -147,13 +161,13 @@ struct MembershipView: View {
     }
 
     private func benefitRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundColor(.blue)
-                .frame(width: 40, height: 40)
-                .background(Color.blue.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .frame(width: 36, height: 36)
+                .background(Color.blue.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -167,15 +181,15 @@ struct MembershipView: View {
             Spacer()
 
             Image(systemName: "checkmark")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundColor(.blue)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(Color.blue.opacity(0.85))
         }
     }
 
     // MARK: - Product Cards
 
     private var productCardsSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             ForEach(SubscriptionType.allCases, id: \.self) { productType in
                 ProductCard(
                     productType: productType,
@@ -231,66 +245,66 @@ struct MembershipView: View {
     // MARK: - Bottom Action Bar
 
     private var bottomActionBar: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 0.5)
+        VStack(spacing: 10) {
+            Button {
+                Task {
+                    await membershipManager.purchase(membershipManager.selectedProduct)
+                }
+            } label: {
+                if membershipManager.isLoadingPurchase {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text(membershipManager.selectedProduct.actionButtonTitle(from: membershipManager.products))
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(membershipManager.isLoadingPurchase)
 
-            VStack(spacing: 10) {
+            // 扣费披露：明确试用时长与试用结束后将自动收取的金额（App Store 审核 3.1.2 要求）
+            if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(from: membershipManager.products) {
+                Text(disclosure)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
+
+            HStack(spacing: 8) {
                 Button {
                     Task {
-                        await membershipManager.purchase(membershipManager.selectedProduct)
+                        await membershipManager.restorePurchases()
                     }
                 } label: {
-                    if membershipManager.isLoadingPurchase {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else if membershipManager.selectedProduct.hasFreeTrial(from: membershipManager.products) {
-                        Text(String(localized: "Start Free Trial"))
-                    } else {
-                        Text(String(localized: "Subscribe"))
-                    }
+                    Text(String(localized: "Restore Purchases"))
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(membershipManager.isLoadingPurchase)
 
-                // 扣费披露：明确试用时长与试用结束后将自动收取的金额（App Store 审核 3.1.2 要求）
-                if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(from: membershipManager.products) {
-                    Text(disclosure)
-                        .font(.system(size: 11, design: .rounded))
+                if !isMandatory {
+                    Text("·")
                         .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 8)
-                }
 
-                HStack(spacing: 8) {
                     Button {
-                        Task {
-                            await membershipManager.restorePurchases()
-                        }
+                        hasShownMembership = true
+                        dismiss()
                     } label: {
-                        Text(String(localized: "Restore Purchases"))
-                    }
-
-                    if !isMandatory {
-                        Text("·")
-                            .foregroundColor(.secondary)
-
-                        Button {
-                            hasShownMembership = true
-                            dismiss()
-                        } label: {
-                            Text(String(localized: "Later"))
-                        }
+                        Text(String(localized: "Later"))
                     }
                 }
-                .font(.system(size: 13, design: .rounded))
-                .foregroundColor(.blue)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            .font(.system(size: 13, design: .rounded))
+            .foregroundColor(.blue)
         }
-        .background(Color(UIColor.systemBackground))
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(alignment: .top) {
+                    Divider().opacity(0.4)
+                }
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 
     // MARK: - Loading Overlay
