@@ -67,9 +67,10 @@ class MembershipManager: ObservableObject {
         // 监听 StoreKit 更新
         updateListenerTask = listenForTransactions()
 
-        // 加载产品
+        // 加载产品并校验当前权益（订阅到期/退款后自动降级）
         Task {
             await loadProducts()
+            await refreshEntitlements()
         }
     }
 
@@ -119,8 +120,10 @@ class MembershipManager: ObservableObject {
             // 检查是否是我们的产品
             let productID = transaction.productID
             if SubscriptionType.allCases.contains(where: { $0.rawValue == productID }) {
-                // 更新会员状态
-                updateMembershipStatus(from: productID)
+                // 以当前有效权益为准（退款/到期推送也会走到这里，触发自动降级）
+                Task {
+                    await refreshEntitlements()
+                }
                 print("✅ Transaction verified: \(productID)")
 
                 // 完成交易
@@ -149,7 +152,7 @@ class MembershipManager: ObservableObject {
             case .success(let verification):
                 print("✅ Purchase successful")
                 let transaction = try checkVerified(verification)
-                await updateMembershipStatus(for: productType)
+                await refreshEntitlements()
 
                 await transaction.finish()
                 showSuccessAlert = true
@@ -178,8 +181,11 @@ class MembershipManager: ObservableObject {
 
         do {
             try await AppStore.sync()
+            await refreshEntitlements()
+            if membershipStatus.currentTier == .free {
+                purchaseError = String(localized: "No purchases to restore")
+            }
             print("✅ Purchases restored")
-            purchaseError = nil
         } catch {
             print("❌ Restore failed: \(error.localizedDescription)")
             purchaseError = friendlyErrorMessage(error)
@@ -188,37 +194,47 @@ class MembershipManager: ObservableObject {
         isLoadingPurchase = false
     }
 
-    private func updateMembershipStatus(for productType: SubscriptionType) async {
-        let tier: MembershipTier
-        switch productType {
-        case .monthly:
-            tier = .monthly
-        case .yearly:
-            tier = .yearly
-        case .lifetime:
-            tier = .lifetime
+    // MARK: - Entitlements
+
+    /// 以 StoreKit 当前有效权益推导会员档位：
+    /// 订阅到期、取消或退款后 currentEntitlements 不再包含对应交易，档位自动降回 free。
+    private func refreshEntitlements() async {
+        var bestTier = MembershipTier.free
+
+        for await result in StoreKit.Transaction.currentEntitlements {
+            guard let transaction = try? checkVerified(result),
+                  let productType = SubscriptionType(rawValue: transaction.productID),
+                  transaction.revocationDate == nil,                        // 已退款/撤销
+                  transaction.expirationDate.map({ $0 > Date() }) ?? true   // 订阅未到期；一次性买断无到期日
+            else { continue }
+
+            let tier = membershipTier(for: productType)
+            if tierRank(tier) > tierRank(bestTier) {
+                bestTier = tier
+            }
         }
 
-        membershipStatus.currentTier = tier
-        membershipStatus.saveToStorage()
-        print("💳 Membership updated to: \(tier.rawValue)")
+        if membershipStatus.currentTier != bestTier {
+            membershipStatus.currentTier = bestTier
+            membershipStatus.saveToStorage()
+            print("💳 Membership tier updated: \(bestTier.rawValue)")
+        }
     }
 
-    private func updateMembershipStatus(from productID: String) {
-        if let productType = SubscriptionType.allCases.first(where: { $0.rawValue == productID }) {
-            let tier: MembershipTier
-            switch productType {
-            case .monthly:
-                tier = .monthly
-            case .yearly:
-                tier = .yearly
-            case .lifetime:
-                tier = .lifetime
-            }
+    private func membershipTier(for productType: SubscriptionType) -> MembershipTier {
+        switch productType {
+        case .monthly: return .monthly
+        case .yearly: return .yearly
+        case .lifetime: return .lifetime
+        }
+    }
 
-            membershipStatus.currentTier = tier
-            membershipStatus.saveToStorage()
-            print("💳 Membership updated from transaction: \(tier.rawValue)")
+    private func tierRank(_ tier: MembershipTier) -> Int {
+        switch tier {
+        case .free: return 0
+        case .monthly: return 1
+        case .yearly: return 2
+        case .lifetime: return 3
         }
     }
 

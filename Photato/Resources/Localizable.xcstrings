@@ -3314,6 +3314,22 @@
           }
         }
       }
+    },
+    "No purchases to restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No purchases to restore. Make sure you're signed in with the Apple ID used for the purchase."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可恢复的购买。请确认已登录购买时使用的 Apple ID。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
