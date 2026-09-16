@@ -66,18 +66,35 @@ class MembershipManager: ObservableObject {
     }
 
     // MARK: - StoreKit Integration
+
+    /// 商品自动重试间隔（1s / 3s）。StoreKit 2 冷缓存已知行为：首次请求可能
+    /// 返回空数组或失败，第二次起命中本地缓存；自动重试后仍失败才交给付费墙手动重试
+    private static let productLoadRetryDelays: [UInt64] = [1_000_000_000, 3_000_000_000]
+
     private func loadProducts() async {
         isLoadingProducts = true
         defer { isLoadingProducts = false }
-        do {
-            let storeProducts = try await Product.products(for: SubscriptionType.allCases.map { $0.rawValue })
-            self.products = storeProducts.sorted { $0.price < $1.price }
-            await refreshIntroOfferEligibility()
-            print("✅ Loaded \(products.count) products")
-        } catch {
-            // 加载失败不弹全局错误：付费墙卡片区显示重试入口，避免弱网时一开付费墙就报错
-            print("❌ Failed to load products: \(error.localizedDescription)")
+
+        for attempt in 0...Self.productLoadRetryDelays.count {
+            do {
+                let storeProducts = try await Product.products(for: SubscriptionType.allCases.map { $0.rawValue })
+                if !storeProducts.isEmpty {
+                    self.products = storeProducts.sorted { $0.price < $1.price }
+                    await refreshIntroOfferEligibility()
+                    print("✅ Loaded \(products.count) products (attempt \(attempt + 1))")
+                    return
+                }
+                // 空结果视为未就绪，进入重试（StoreKit 首次调用的已知行为）
+                print("⚠️ Products empty on attempt \(attempt + 1)")
+            } catch {
+                print("❌ Failed to load products (attempt \(attempt + 1)): \(error.localizedDescription)")
+            }
+
+            if attempt < Self.productLoadRetryDelays.count {
+                try? await Task.sleep(nanoseconds: Self.productLoadRetryDelays[attempt])
+            }
         }
+        // 全部尝试失败：products 保持为空，付费墙显示手动重试入口
     }
 
     /// 付费墙「重试」入口：重新拉取商品并刷新试用资格
