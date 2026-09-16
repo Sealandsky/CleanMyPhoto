@@ -363,25 +363,28 @@ final class PhotoOrganizeManager {
     static let highResMinSize: Int64 = 6 * 1024 * 1024          // 6MB (高像素下的体积门槛)
 
     private func scanLargeFiles(from fetchResult: PHFetchResult<PHAsset>) async {
-        // 收集所有静态图片资产
-        var candidates: [(identifier: String, asset: PHAsset, resolution: Int)] = []
-        fetchResult.enumerateObjects { asset, _, _ in
-            guard asset.mediaType == .image else { return }
-            candidates.append((asset.localIdentifier, asset, asset.pixelWidth * asset.pixelHeight))
+        // 收集所有静态图片资产（枚举移出主线程，与 scanMetadataCategories 一致）
+        let candidates: [(identifier: String, asset: PHAsset, resolution: Int)] = await Task.detached(priority: .userInitiated) {
+            var list: [(identifier: String, asset: PHAsset, resolution: Int)] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                guard asset.mediaType == .image else { return }
+                list.append((asset.localIdentifier, asset, asset.pixelWidth * asset.pixelHeight))
+            }
+            return list
+        }.value
+
+        let startProgress: Double = 1.0 / 6.0
+        let endProgress: Double = 2.0 / 6.0
+        let total = candidates.count
+
+        // 批量获取大小（缓存一次预取 + 缺失补测 + 单次写回），替代逐张 N+1 Core Data 往返
+        let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
+            self.analysisProgress = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
         }
 
         var sized: [(identifier: String, size: Int64)] = []
-        let total = candidates.count
-        let startProgress: Double = 1.0 / 6.0
-        let endProgress: Double = 2.0 / 6.0
-
-        for (index, candidate) in candidates.enumerated() {
-            guard !Task.isCancelled else { break }
-            if index % 20 == 0 || index == total - 1 {
-                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
-            }
-
-            let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
+        for candidate in candidates {
+            guard let size = sizes[candidate.identifier] else { continue }
             // 判定条件：真实大小 >= 10MB，或者超高分辨率(>=24MP)且大小 >= 6MB
             if size >= Self.minLargeFileSize || (candidate.resolution >= Self.highResThreshold && size >= Self.highResMinSize) {
                 sized.append((candidate.identifier, size))
@@ -399,28 +402,30 @@ final class PhotoOrganizeManager {
         let minResolution = 1920 * 1080
         let maxFileSize: Int64 = 50 * 1024
 
-        // Pass 1: low-res candidates
-        var candidates: [(identifier: String, asset: PHAsset, resolution: Int)] = []
-        fetchResult.enumerateObjects { asset, _, _ in
-            guard asset.mediaType == .image else { return }
-            let resolution = asset.pixelWidth * asset.pixelHeight
-            if resolution < minResolution {
-                candidates.append((asset.localIdentifier, asset, resolution))
+        // Pass 1: low-res candidates（枚举移出主线程）
+        let candidates: [(identifier: String, asset: PHAsset, resolution: Int)] = await Task.detached(priority: .userInitiated) {
+            var list: [(identifier: String, asset: PHAsset, resolution: Int)] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                guard asset.mediaType == .image else { return }
+                let resolution = asset.pixelWidth * asset.pixelHeight
+                if resolution < minResolution {
+                    list.append((asset.localIdentifier, asset, resolution))
+                }
             }
-        }
+            return list
+        }.value
 
-        // Pass 2: filter by file size
-        var lowQuality: [(identifier: String, resolution: Int)] = []
-        let total = candidates.count
+        // Pass 2: 批量获取大小后过滤（替代逐张 N+1）
         let startProgress: Double = 2.0 / 6.0
         let endProgress: Double = 3.0 / 6.0
 
-        for (index, candidate) in candidates.enumerated() {
-            guard !Task.isCancelled else { break }
-            if index % 20 == 0 || index == total - 1 {
-                analysisProgress = startProgress + (endProgress - startProgress) * Double(index) / Double(max(total, 1))
-            }
-            let size = await similarityManager.getOrFetchFileSize(for: candidate.asset)
+        let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
+            self.analysisProgress = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
+        }
+
+        var lowQuality: [(identifier: String, resolution: Int)] = []
+        for candidate in candidates {
+            guard let size = sizes[candidate.identifier] else { continue }
             if size <= maxFileSize {
                 lowQuality.append((candidate.identifier, candidate.resolution))
             }
@@ -536,19 +541,25 @@ final class PhotoOrganizeManager {
         }
     }
 
-    /// 后台补齐各组合计大小：异步低优先级逐张读缓存尺寸，平滑更新
+    /// 后台补齐各组合计大小：按组批量读取缓存尺寸，平滑更新。
+    /// 回写时以最新 state 定位目标组，避免跨 await 整份覆盖吞掉并发追加的新分组。
     private func fillGroupSizes(for category: OrganizeCategory, targetGroupIds: [String]) async {
-        guard var state = categoryPageStates[category] else { return }
+        guard let state = categoryPageStates[category] else { return }
         let targetSet = Set(targetGroupIds)
 
-        for i in 0..<state.groups.count {
-            if targetSet.contains(state.groups[i].id) && state.groups[i].totalSize == 0 {
-                var total: Int64 = 0
-                for photo in state.groups[i].loadedPhotos {
-                    total += await similarityManager.getOrFetchFileSize(for: photo.asset)
-                }
-                state.groups[i].totalSize = total
-                categoryPageStates[category] = state
+        for group in state.groups where targetSet.contains(group.id) && group.totalSize == 0 {
+            if Task.isCancelled { break }
+
+            let assets = group.loadedPhotos.map(\.asset)
+            let sizes = await similarityManager.getOrFetchFileSizes(for: assets)
+            let total = assets.reduce(Int64(0)) { $0 + (sizes[$1.localIdentifier] ?? 0) }
+
+            // 期间 loadMoreGroups 可能向同一 key 追加了新分组：重读最新 state 定位回写
+            if var latest = categoryPageStates[category],
+               let index = latest.groups.firstIndex(where: { $0.id == group.id }),
+               latest.groups[index].totalSize == 0 {
+                latest.groups[index].totalSize = total
+                categoryPageStates[category] = latest
             }
         }
     }

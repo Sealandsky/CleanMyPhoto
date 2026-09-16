@@ -157,6 +157,8 @@ final class PhotoSimilarityManager {
         let total = newAssets.count
 
         for batchStart in stride(from: 0, to: total, by: batchSize) {
+            // 用户取消分析（cancelAnalysis）后立即停止后续批次，已完成批次已落盘可复用
+            if Task.isCancelled { break }
             let batchEnd = min(batchStart + batchSize, total)
             let batch = Array(newAssets[batchStart..<batchEnd])
 
@@ -368,6 +370,88 @@ final class PhotoSimilarityManager {
                            pixelHeight: Int32(asset.pixelHeight))
         }
         return size
+    }
+
+    /// 批量获取文件大小：一次分块预取 Core Data 缓存 → 仅对未命中的逐张请求系统
+    /// （PhotoKit 无批量接口）→ 批量写回 + 单次 save。
+    /// 替代逐张 getOrFetchFileSize 的 N+1 模式（每张 1~3 次主线程 fetch/save）。
+    /// progress 在主线程回调（已处理数 / 总数），内部每 20 张节流一次。
+    func getOrFetchFileSizes(
+        for assets: [PHAsset],
+        progress: ((_ processed: Int, _ total: Int) -> Void)? = nil
+    ) async -> [String: Int64] {
+        guard !assets.isEmpty else { return [:] }
+
+        // 1. 分块预取已缓存的大小（IN 谓词按块查询，避免超长参数）
+        var cached: [String: Int64] = [:]
+        cached.reserveCapacity(assets.count)
+        let identifiers = assets.map(\.localIdentifier)
+        for chunkStart in stride(from: 0, to: identifiers.count, by: 1000) {
+            let chunk = Array(identifiers[chunkStart..<min(chunkStart + 1000, identifiers.count)])
+            let request = PhotoFingerprint.fetchRequest()
+            request.predicate = NSPredicate(format: "localIdentifier IN %@", chunk)
+            request.propertiesToFetch = ["localIdentifier", "fileSize"]
+            for fp in (try? context.fetch(request)) ?? [] where fp.fileSize > 0 {
+                cached[fp.localIdentifier] = fp.fileSize
+            }
+        }
+
+        // 2. 未命中的逐张请求系统大小，收集为批量写回行
+        var results = cached
+        var pending: [(identifier: String, size: Int64, creationDate: Date?, pixelWidth: Int32, pixelHeight: Int32)] = []
+        let total = assets.count
+        for (index, asset) in assets.enumerated() {
+            if Task.isCancelled { break }
+            if cached[asset.localIdentifier] == nil {
+                let size = await PHAssetSizeHelper.getAssetSize(asset)
+                if size > 0 {
+                    results[asset.localIdentifier] = size
+                    pending.append((asset.localIdentifier, size, asset.creationDate,
+                                    Int32(asset.pixelWidth), Int32(asset.pixelHeight)))
+                }
+            }
+            if index % 20 == 0 || index == total - 1 {
+                progress?(index + 1, total)
+            }
+        }
+
+        batchUpsertFileSizes(pending)
+        return results
+    }
+
+    /// 批量写回文件大小：分块取已存在行后统一赋值，单次 save
+    private func batchUpsertFileSizes(
+        _ items: [(identifier: String, size: Int64, creationDate: Date?, pixelWidth: Int32, pixelHeight: Int32)]
+    ) {
+        guard !items.isEmpty else { return }
+
+        var existingMap: [String: PhotoFingerprint] = [:]
+        let identifiers = items.map(\.identifier)
+        for chunkStart in stride(from: 0, to: identifiers.count, by: 1000) {
+            let chunk = Array(identifiers[chunkStart..<min(chunkStart + 1000, identifiers.count)])
+            let request = PhotoFingerprint.fetchRequest()
+            request.predicate = NSPredicate(format: "localIdentifier IN %@", chunk)
+            for fp in (try? context.fetch(request)) ?? [] {
+                existingMap[fp.localIdentifier] = fp
+            }
+        }
+
+        for item in items {
+            let fp: PhotoFingerprint
+            if let existing = existingMap[item.identifier] {
+                fp = existing
+            } else {
+                fp = PhotoFingerprint(context: context)
+                fp.localIdentifier = item.identifier
+                fp.dhash = ""
+                fp.creationDate = item.creationDate
+                fp.pixelWidth = item.pixelWidth
+                fp.pixelHeight = item.pixelHeight
+            }
+            fp.fileSize = item.size
+            fp.computedAt = Date()
+        }
+        try? context.save()
     }
 
     func largeFileGroup() -> OrganizeScanGroup? {
