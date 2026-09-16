@@ -68,6 +68,10 @@ final class PhotoSimilarityMatcher {
     private static let fallbackPixelSize: CGFloat = 160
     /// 进度回报节流步长：每处理 N 张向主线程回报一次（大相册防主线程刷屏）
     private static let progressStride = 10
+    /// 会话级特征库容量上限：每条 VNFeaturePrintObservation 约 8~9KB，
+    /// 超大相册（5 万张）全量驻留约 300MB+。超出上限后淘汰任意条目，
+    /// 磁盘缓存仍保留全量，跨会话可复用
+    private static let maxSessionFeatureCount = 12_000
 
     // MARK: - Threading
 
@@ -505,10 +509,15 @@ final class PhotoSimilarityMatcher {
         return feature.observation
     }
 
-    /// 写入会话特征库并持久化到磁盘（写通：扫描中断不丢已完成部分）
+    /// 写入会话特征库并持久化到磁盘（写通：扫描中断不丢已完成部分）。
+    /// 内存库超过容量上限时先淘汰任意条目再写入，防超大相册全量常驻内存
     private func remember(_ observation: VNFeaturePrintObservation, for asset: PHAsset) {
         ensureFeatureStoreLoaded()
         storeLock.lock()
+        if featureStore?.count ?? 0 >= Self.maxSessionFeatureCount,
+           let evicted = featureStore?.keys.first {
+            featureStore?.removeValue(forKey: evicted)
+        }
         featureStore?[asset.localIdentifier] = CachedFeature(
             observation: observation,
             modificationDate: asset.modificationDate
@@ -529,6 +538,8 @@ final class PhotoSimilarityMatcher {
 
         var store: [String: CachedFeature] = [:]
         for (identifier, modificationDate, data) in cache.loadAll(pipelineVersion: Self.pipelineVersion) {
+            // 超出会话库容量即停止装载（磁盘缓存保留全量，仅限制内存驻留）
+            if store.count >= Self.maxSessionFeatureCount { break }
             if let observation = try? NSKeyedUnarchiver.unarchivedObject(
                 ofClass: VNFeaturePrintObservation.self, from: data
             ) {
