@@ -243,7 +243,7 @@ struct MembershipView: View {
                 .fill(Color.primary.opacity(0.08))
                 .frame(height: 0.5)
 
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 Button {
                     Task {
                         await membershipManager.purchase(membershipManager.selectedProduct)
@@ -252,12 +252,23 @@ struct MembershipView: View {
                     if membershipManager.isLoadingPurchase {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else if membershipManager.selectedProduct.hasFreeTrial(from: membershipManager.products) {
+                        Text(String(localized: "Start Free Trial"))
                     } else {
                         Text(String(localized: "Subscribe"))
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(membershipManager.isLoadingPurchase)
+
+                // 扣费披露：明确试用时长与试用结束后将自动收取的金额（App Store 审核 3.1.2 要求）
+                if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(from: membershipManager.products) {
+                    Text(disclosure)
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                }
 
                 HStack(spacing: 8) {
                     Button {

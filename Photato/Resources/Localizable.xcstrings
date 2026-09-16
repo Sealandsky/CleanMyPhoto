@@ -3250,6 +3250,70 @@
           }
         }
       }
+    },
+    "trial_then_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, then %2$@%3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@；试用结束后收取 %2$@%3$@"
+          }
+        }
+      }
+    },
+    "purchase_disclosure_trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@; after the trial ends, %2$@%3$@ is charged automatically. Cancel anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@；试用结束后将自动收取 %2$@%3$@，可随时取消。"
+          }
+        }
+      }
+    },
+    "purchase_disclosure_no_trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@ will be charged on confirmation. Renews automatically. Cancel anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认后即收取 %1$@%2$@；自动续订，可随时取消。"
+          }
+        }
+      }
+    },
+    "Start Free Trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Free Trial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始免费试用"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
