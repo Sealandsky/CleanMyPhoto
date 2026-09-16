@@ -235,8 +235,6 @@ struct SettingsView: View {
             case .free:
                 return String(localized: "Free")
             }
-        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
-            return text
         } else {
             return String(localized: "Free")
         }
@@ -245,8 +243,6 @@ struct SettingsView: View {
     private var membershipCardSubtitle: String {
         if membershipManager.isPremiumMember {
             return membershipStatusText
-        } else if membershipManager.remainingTrialDays > 0, let text = membershipManager.remainingTrialText {
-            return text
         } else {
             return String(localized: "Subscribe or one-time purchase")
         }

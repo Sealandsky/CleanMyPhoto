@@ -101,7 +101,7 @@ struct TrashView: View {
                     }
 
                     liquidGlassCapsule(tint: .red, prominent: true) {
-                        guard membershipManager.isPremiumMember || !membershipManager.isTrialExpired else {
+                        guard membershipManager.isPremiumMember else {
                             showMembershipPaywall = true
                             return
                         }

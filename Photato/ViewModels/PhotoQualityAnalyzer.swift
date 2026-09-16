@@ -155,6 +155,8 @@ final class PhotoQualityAnalyzer {
         let batchSize = 50
 
         for batchStart in stride(from: 0, to: total, by: batchSize) {
+            // 用户取消分析后立即停止后续批次，已完成批次已落盘可复用
+            if Task.isCancelled { break }
             let batchEnd = min(batchStart + batchSize, total)
             let batch = Array(newAssets[batchStart..<batchEnd])
 

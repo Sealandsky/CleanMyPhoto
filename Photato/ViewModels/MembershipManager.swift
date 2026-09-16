@@ -24,21 +24,6 @@ class MembershipManager: ObservableObject {
     private var updateListenerTask: Task<Void, Error>?
 
     // MARK: - Computed Properties
-    var isTrialExpired: Bool {
-        guard let expirationDate = membershipStatus.trialExpirationDate else {
-            return false
-        }
-        return Date() > expirationDate && membershipStatus.currentTier == .free
-    }
-
-    var remainingTrialDays: Int {
-        membershipStatus.remainingTrialDays ?? 0
-    }
-
-    var remainingTrialText: String? {
-        membershipStatus.remainingTrialText
-    }
-
     /// 任一订阅配置了免费试用（用于付费墙展示试用条款）
     var hasFreeTrialOffer: Bool {
         products.contains { $0.subscription?.introductoryOffer?.paymentMode == .freeTrial }
@@ -61,9 +46,6 @@ class MembershipManager: ObservableObject {
         // 从 UserDefaults 加载状态
         self.membershipStatus = MembershipStatus.loadFromStorage()
 
-        // 启动首次试用计时
-        startTrialIfNeeded()
-
         // 监听 StoreKit 更新
         updateListenerTask = listenForTransactions()
 
@@ -76,19 +58,6 @@ class MembershipManager: ObservableObject {
 
     deinit {
         updateListenerTask?.cancel()
-    }
-
-    // MARK: - Trial Management
-    private func startTrialIfNeeded() {
-        if membershipStatus.trialStartDate == nil {
-            membershipStatus.trialStartDate = Date()
-            membershipStatus.saveToStorage()
-            print("🎉 Trial started at: \(membershipStatus.trialStartDate!)")
-        }
-    }
-
-    func checkTrialStatus() -> Bool {
-        return membershipStatus.isTrialActive
     }
 
     // MARK: - StoreKit Integration

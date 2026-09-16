@@ -44,11 +44,11 @@ struct WelcomePage: View {
 
             Spacer()
 
-            // 底部按钮区域
+            // 底部按钮区域：点击后进入付费墙，用户可自行开始 App Store 免费试用或跳过
             Button(action: {
                 hasShownWelcome = true
             }) {
-                Text(String(localized: "Try 7 Days Free"))
+                Text(String(localized: "Continue"))
             }
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, 24)
