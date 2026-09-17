@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		D858B8CF305B5B660016F27E /* Photato.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Photato.storekit; sourceTree = "<group>"; };
+		D858B8D0305B78B20016F27E /* Photato.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Photato.storekit; sourceTree = "<group>"; };
 		D8E4F3DD2F3785780010E310 /* Photato.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photato.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -45,6 +47,8 @@
 		D8E4F3D42F3785780010E310 = {
 			isa = PBXGroup;
 			children = (
+				D858B8CF305B5B660016F27E /* Photato.storekit */,
+				D858B8D0305B78B20016F27E /* Photato.storekit */,
 				D8E4F3DF2F3785780010E310 /* Photato */,
 				D8E4F3DE2F3785780010E310 /* Products */,
 			);
@@ -104,6 +108,12 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				"zh-Hant",
+				ja,
+				ko,
+				es,
+				"pt-BR",
 			);
 			mainGroup = D8E4F3D42F3785780010E310;
 			minimizedProjectReferenceProxies = 1;
@@ -282,7 +292,6 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to help you organize and delete unwanted photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
 				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
@@ -326,7 +335,6 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to help you organize and delete unwanted photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
 				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
