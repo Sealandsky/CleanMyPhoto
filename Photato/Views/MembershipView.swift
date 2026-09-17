@@ -117,7 +117,7 @@ struct MembershipView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
 
-                Text(String(localized: "Unlock All Features"))
+                Text(String(localized: "Unlock permanent deletion & all AI cleanup"))
                     .font(.system(size: 15, design: .rounded))
                     .foregroundColor(.secondary)
             }
@@ -133,6 +133,9 @@ struct MembershipView: View {
                 .foregroundColor(.primary)
                 .padding(.bottom, 2)
 
+            benefitRow(icon: "lock.open.fill",
+                       title: String(localized: "Benefit Permanent Delete"),
+                       subtitle: String(localized: "Benefit Permanent Delete Sub"))
             benefitRow(icon: "sparkles",
                        title: String(localized: "Benefit AI Similar"),
                        subtitle: String(localized: "Benefit AI Similar Sub"))

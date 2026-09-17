@@ -940,6 +940,7 @@
       }
     },
     "Cannot connect to the App Store. Please check your network connection and try again." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1075,6 +1076,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "继续"
+          }
+        }
+      }
+    },
+    "Couldn't load subscription options" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load subscription options. Please check your network and retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载订阅方案，请检查网络后重试。"
           }
         }
       }
@@ -2203,6 +2220,22 @@
         }
       }
     },
+    "Original Price:" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was: "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原价："
+          }
+        }
+      }
+    },
     "Pending Photos" : {
       "localizations" : {
         "en" : {
@@ -2428,6 +2461,22 @@
         }
       }
     },
+    "Purchase could not be completed. Please try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase could not be completed. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购买未能完成，请稍后再试。"
+          }
+        }
+      }
+    },
     "Purchase pending confirmation" : {
       "localizations" : {
         "en" : {
@@ -2600,6 +2649,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复购买"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
           }
         }
       }
@@ -3500,66 +3565,98 @@
         }
       }
     },
-    "Original Price:" : {
+    "Pending Hint Bar" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Was: "
+            "value" : "Organizing and moving photos here is free. Permanently deleting requires Photato Pro."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "原价："
+            "value" : "整理与移入待处理免费；永久删除需要图豆专业版"
           }
         }
       }
     },
-    "Couldn't load subscription options" : {
+    "Unlock permanent deletion & all AI cleanup" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't load subscription options. Please check your network and retry."
+            "value" : "Unlock permanent deletion & all AI cleanup"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法加载订阅方案，请检查网络后重试。"
+            "value" : "解锁永久删除与全部 AI 清理能力"
           }
         }
       }
     },
-    "Retry" : {
+    "Benefit Permanent Delete" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Retry"
+            "value" : "One-Tap Permanent Deletion"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重试"
+            "value" : "一键永久删除待处理照片"
           }
         }
       }
     },
-    "Purchase could not be completed. Please try again." : {
+    "Benefit Permanent Delete Sub" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Purchase could not be completed. Please try again."
+            "value" : "Organizing & moving to Pending is always free"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "购买未能完成，请稍后再试。"
+            "value" : "整理与移入待处理永久免费"
+          }
+        }
+      }
+    },
+    "First Pending Hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permanently deleting requires Photato Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久删除需要图豆专业版"
+          }
+        }
+      }
+    },
+    "Unlock Permanent Deletion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock Permanent Deletion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁永久删除"
           }
         }
       }

@@ -244,7 +244,7 @@ struct SettingsView: View {
         if membershipManager.isPremiumMember {
             return membershipStatusText
         } else {
-            return String(localized: "Subscribe or one-time purchase")
+            return String(localized: "Unlock Permanent Deletion")
         }
     }
 
