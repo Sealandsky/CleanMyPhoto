@@ -45,6 +45,8 @@ struct AlbumDetailView: View {
 
     @State private var recommendedPhotos: [PhotoAsset]
     @State private var isLoadingRecommendations: Bool
+    @State private var showScanSheet: Bool = false
+    @State private var hasScannedCurrentAlbum: Bool
     @State private var addingPhotoIDs = Set<String>()
     @State private var addedPhotoIDs = Set<String>()
     @State private var isFullscreenMode = false
@@ -65,12 +67,21 @@ struct AlbumDetailView: View {
         self.onViewAllTapped = onViewAllTapped
 
         let currentPhotos = albumManager.displayedAlbumPhotos
+        let isIndexed = PhotoSimilarityMatcher.shared.isLibraryIndexed
         if let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: currentPhotos) {
             _recommendedPhotos = State(initialValue: cached)
             _isLoadingRecommendations = State(initialValue: false)
-        } else {
+            _hasScannedCurrentAlbum = State(initialValue: true)
+        } else if isIndexed {
+            // 全局已建立索引：首次进入本相簿秒级纯内存匹配，绝不展示引导卡
             _recommendedPhotos = State(initialValue: [])
             _isLoadingRecommendations = State(initialValue: true)
+            _hasScannedCurrentAlbum = State(initialValue: true)
+        } else {
+            // 全局尚未建立索引：首帧呈现智能分析引导卡
+            _recommendedPhotos = State(initialValue: [])
+            _isLoadingRecommendations = State(initialValue: false)
+            _hasScannedCurrentAlbum = State(initialValue: false)
         }
     }
 
@@ -126,6 +137,29 @@ struct AlbumDetailView: View {
         }
         .task {
             await loadRecommendations()
+        }
+        .sheet(isPresented: $showScanSheet) {
+            AlbumScanProgressSheet(
+                album: album,
+                albumAssets: albumPhotos.map(\.asset),
+                excludingIDs: Set(albumPhotos.map(\.id)).union(photoManager.pendingDeletionIDs),
+                onConfirm: { foundPhotos in
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        self.recommendedPhotos = foundPhotos
+                        self.hasScannedCurrentAlbum = true
+                    }
+                    albumManager.cacheRecommendations(foundPhotos, for: album.id, currentPhotos: albumPhotos)
+                },
+                onCancel: {}
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PhotoSimilarityMatcher.libraryIndexDidFinishNotification)) { _ in
+            // 后台静默建库完成：若当前相簿尚未展示推荐，自动触发秒级比对并平滑上屏
+            if recommendedPhotos.isEmpty {
+                Task {
+                    await loadRecommendations(force: true)
+                }
+            }
         }
         .onChange(of: selectedPickerItems) { _, items in
             guard !items.isEmpty else { return }
@@ -255,7 +289,7 @@ struct AlbumDetailView: View {
     // MARK: - Module 2: More Photos for This Album
     private var morePhotosSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // 保留原有更多图片的标题（在任何状态下始终保留）
+            // 标题栏：在任何状态下始终保留
             HStack(spacing: 6) {
                 Text(String(localized: "More Photos for This Album"))
                     .font(.system(size: 19, weight: .bold, design: .rounded))
@@ -272,12 +306,14 @@ struct AlbumDetailView: View {
             .padding(.horizontal, 16)
 
             if isLoadingRecommendations && recommendedPhotos.isEmpty {
-                // 仅首次进入且无缓存时显示骨架屏，避免每次都加载
+                // 仅强制刷新且无数据时显示骨架屏
                 skeletonGrid
             } else if !recommendedPhotos.isEmpty {
                 MasonryGridContent(photos: recommendedPhotos, columnCount: 2) { photo in
-                    RecommendedPhotoCell(
+                    PhotoCell(
                         photo: photo,
+                        forceOriginalRatio: true,
+                        cornerRadius: 14,
                         isAdding: addingPhotoIDs.contains(photo.id),
                         isAdded: addedPhotoIDs.contains(photo.id),
                         onAdd: {
@@ -292,12 +328,111 @@ struct AlbumDetailView: View {
                     .id(photo.id)
                 }
                 .padding(.horizontal, 16)
+            } else if !PhotoSimilarityMatcher.shared.isLibraryIndexed {
+                // 引导卡：全局尚未建立索引时展示（一次扫描，所有相簿共同解锁）
+                aiScanPromptCard
+                    .padding(.horizontal, 16)
             } else {
-                // 空卡状态：相簿已整理完毕
+                // 空卡状态：相簿已整理完毕（全库已索引，但确实无当前相簿相似素材）
                 albumCompleteCard
                     .padding(.horizontal, 16)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.35)))
             }
         }
+    }
+
+    // MARK: - AI Scan Prompt Card
+    private var aiScanPromptCard: some View {
+        VStack(spacing: 20) {
+            // 顶部 AI 动效图标徽章
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.16), Color.teal.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.teal],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .padding(.top, 4)
+
+            // 文案说明
+            VStack(spacing: 6) {
+                Text(String(localized: "Start Library AI Analysis"))
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+
+                Text(String(localized: "Build an on-device AI index once to unlock personalized recommendations and similar photo matching for all your albums."))
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 16)
+            }
+
+            // 特性提示标签
+            HStack(spacing: 14) {
+                HStack(spacing: 4) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text(String(localized: "On-Device & Private"))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+
+                Circle()
+                    .fill(Color.secondary.opacity(0.4))
+                    .frame(width: 3, height: 3)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text(String(localized: "One-Time Analysis · All Albums Unlocked"))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            // 行动按钮：开启 AI 推荐（触发半屏面板）
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                showScanSheet = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(String(localized: "Start Library Analysis"))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
     }
 
     // MARK: - Skeleton Loading (Waterfall placeholder)
@@ -305,23 +440,23 @@ struct AlbumDetailView: View {
         HStack(alignment: .top, spacing: 10) {
             VStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(UIColor.secondarySystemFill))
                     .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                    .shimmering()
+                    .shimmering(cornerRadius: 14)
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(UIColor.secondarySystemFill))
                     .aspectRatio(1.0, contentMode: .fit)
-                    .shimmering()
+                    .shimmering(cornerRadius: 14)
             }
             VStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(UIColor.secondarySystemFill))
                     .aspectRatio(1.0, contentMode: .fit)
-                    .shimmering()
+                    .shimmering(cornerRadius: 14)
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(UIColor.secondarySystemFill))
                     .aspectRatio(4.0 / 5.0, contentMode: .fit)
-                    .shimmering()
+                    .shimmering(cornerRadius: 14)
             }
         }
         .padding(.horizontal, 16)
@@ -498,6 +633,7 @@ struct AlbumDetailView: View {
         if !force, let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: albumPhotos) {
             self.recommendedPhotos = cached
             self.isLoadingRecommendations = false
+            self.hasScannedCurrentAlbum = true
 
             // 找时机刷新替换：若缓存超过 15 分钟，后台静默刷新更新，不阻塞 UI
             if albumManager.isRecommendationCacheStale(for: album.id) {
@@ -508,7 +644,15 @@ struct AlbumDetailView: View {
             return
         }
 
-        // 首次或强制刷新：仅在无推荐图时展示骨架
+        // 全局尚未建立索引且非强制刷新：保持引导状态，等待用户在引导卡中主动触发全库索引
+        if !force && !PhotoSimilarityMatcher.shared.isLibraryIndexed {
+            self.recommendedPhotos = []
+            self.isLoadingRecommendations = false
+            self.hasScannedCurrentAlbum = false
+            return
+        }
+
+        // 强制刷新：展示骨架屏并重新检索
         if recommendedPhotos.isEmpty {
             isLoadingRecommendations = true
         }
@@ -539,6 +683,7 @@ struct AlbumDetailView: View {
             let newPhotos = matchedAssets.map { PhotoAsset(asset: $0) }
             withAnimation(.easeInOut(duration: 0.25)) {
                 self.recommendedPhotos = newPhotos
+                self.hasScannedCurrentAlbum = true
             }
             albumManager.cacheRecommendations(newPhotos, for: album.id, currentPhotos: albumPhotos)
         } catch {

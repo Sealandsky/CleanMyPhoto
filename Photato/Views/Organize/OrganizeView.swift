@@ -12,6 +12,7 @@ struct OrganizeView: View {
     // MARK: - 分类分组定义
     /// 媒体类型：属于格式类型筛选，不计入可清理照片统计
     private static let mediaTypeCategories: [OrganizeCategory] = [
+        .screenshots,
         .videos,
         .livePhotos
     ]
@@ -20,7 +21,6 @@ struct OrganizeView: View {
     private static let functionCategories: [OrganizeCategory] = [
         .similar,
         .duplicates,
-        .screenshots,
         .largeFiles,
         .lowQuality,
         .blurry,
@@ -124,106 +124,209 @@ struct OrganizeView: View {
     /// 结构：上行为标题 + 操作胶囊按钮，中间 Spacer 撑开，下行为百分比圆环 + 「可清理照片数 / 总数」大数字；
     /// 扫描中替换为进度条 + 取消按钮。卡片固定高度 128pt，数据牢固吸底。
     /// 卡面沿用设置页会员卡的 accentGradient 渐变，文字固定白色
+    // MARK: - Scan Card（Figma 597:196：渐变大卡）
     @ViewBuilder
     private var scanCard: some View {
+        if organizeManager.isAnalyzing {
+            analyzingScanCard
+        } else if !organizeManager.hasCompletedFullScan {
+            unscannedActionCard
+        } else if junkCount == 0 {
+            cleanLibraryCard
+        } else {
+            junkResultsCard
+        }
+    }
+
+    /// 1. 扫描中卡片
+    private var analyzingScanCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 上行：标题 + 操作按钮
             HStack(spacing: 6) {
-                Text(scanTitleText)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Text(String(localized: "Scanning..."))
+                    .font(.system(.headline, design: .rounded))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
                 Spacer()
 
-                scanActionButton
+                scanPillButton(title: String(localized: "Cancel"), icon: "xmark.circle.fill") {
+                    organizeManager.cancelAnalysis()
+                }
             }
 
             Spacer(minLength: 0)
 
-            // 下行：大数字（可清理照片数 / 总数）或扫描进度（吸附于卡片底部）
-            if organizeManager.isAnalyzing {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(organizeManager.currentStep.isEmpty
-                         ? String(localized: "Scanning...")
-                         : organizeManager.currentStep)
-                        .font(.system(size: 13, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(1)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(organizeManager.currentStep.isEmpty
+                     ? String(localized: "Scanning...")
+                     : organizeManager.currentStep)
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
 
-                    ProgressView(value: organizeManager.analysisProgress)
-                        .tint(.white)
-                }
-            } else {
-                HStack(alignment: .center, spacing: 10) {
-                    // 百分比圆环
-                    percentageRingView
+                ProgressView(value: organizeManager.analysisProgress)
+                    .tint(.white)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+    }
 
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("\(junkCount)")
-                            .font(.system(size: 32, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
+    /// 2. 未扫描态大卡（引导开始扫描）
+    private var unscannedActionCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(String(localized: "Smart Analysis"))
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
-                        Text("/")
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.2))
+                Spacer()
 
-                        Text("\(totalLibraryCount)")
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.2))
+                scanPillButton(title: String(localized: "Start Scan"), icon: "sparkles") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
                     }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Deep scan for duplicates, similar, and blurry photos"))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(String(localized: "Tap to analyze all \(totalLibraryCount) photos"))
+                        .font(.system(size: 11, design: .rounded))
+                }
+                .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                organizeManager.startFullAnalysis()
+            }
+        }
+    }
+
+    /// 3. 扫描后确实为 0 的正面反馈态
+    private var cleanLibraryCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(.headline, design: .rounded))
+                    Text(String(localized: "Library is Clean"))
+                        .font(.system(.headline, design: .rounded))
+                }
+                .foregroundColor(.white)
+
+                Spacer()
+
+                scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 42, height: 42)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "No junk photos found"))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text(String(localized: "Analyzed \(totalLibraryCount) photos · In great shape"))
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundColor(.white.opacity(0.75))
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity)
         .frame(height: 128)
-        // 卡面沿用设置页会员卡的 accentGradient 渐变 + 24pt 圆角，深浅模式下均为白字
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.accentGradient)
-                .shadow(
-                    color: Self.cardShadowColor,
-                    radius: Self.cardShadowRadius,
-                    x: Self.cardShadowX,
-                    y: Self.cardShadowY
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .background(scanCardBackground)
     }
 
-    /// 扫描卡标题与操作按钮（按扫描状态切换）
-    private var scanTitleText: String {
-        if organizeManager.isAnalyzing {
-            return String(localized: "Scanning...")
-        }
-        return organizeManager.hasLoadedInitialData
-            ? String(localized: "Junk Items")
-            : String(localized: "Start Scan")
-    }
+    /// 4. 有可清理照片态
+    private var junkResultsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(String(localized: "Junk Items"))
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
-    @ViewBuilder
-    private var scanActionButton: some View {
-        if organizeManager.isAnalyzing {
-            scanPillButton(title: String(localized: "Cancel"), icon: "xmark.circle.fill") {
-                organizeManager.cancelAnalysis()
-            }
-        } else if organizeManager.hasLoadedInitialData {
-            scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    organizeManager.startFullAnalysis()
+                Spacer()
+
+                scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
+                    }
                 }
             }
-        } else {
-            scanPillButton(title: String(localized: "Scan"), icon: "magnifyingglass") {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    organizeManager.startFullAnalysis()
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .center, spacing: 10) {
+                percentageRingView
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(junkCount)")
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("/")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.2))
+
+                    Text("\(totalLibraryCount.formatted())")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.2))
                 }
             }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+    }
+
+    private var scanCardBackground: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(.accentGradient)
+            .shadow(
+                color: Self.cardShadowColor,
+                radius: Self.cardShadowRadius,
+                x: Self.cardShadowX,
+                y: Self.cardShadowY
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+            )
     }
 
     /// 样式沿用设置页会员卡右侧的「升级」胶囊按钮
@@ -255,10 +358,18 @@ struct OrganizeView: View {
     private func categoryCard(for category: OrganizeCategory) -> some View {
         let count = organizeManager.stat(for: category)
         let isCategoryLoading = organizeManager.isCategoryLoading(category)
+        let isFunctional = Self.functionCategories.contains(category)
+        let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
 
         return Button {
-            // 点击立即推入二级结果页，不在外层阻滞或抢占加载
-            onCategorySelect(category)
+            if isPending {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    organizeManager.startFullAnalysis()
+                }
+            } else {
+                onCategorySelect(category)
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: category.icon)
@@ -276,10 +387,14 @@ struct OrganizeView: View {
                 if isCategoryLoading && count == 0 {
                     ProgressView()
                         .controlSize(.mini)
+                } else if isPending {
+                    Text(String(localized: "Pending Scan"))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.tertiaryLabel))
                 } else {
-                    Text("\(count)")
+                    Text("\(count.formatted())")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(Color(.systemGray))
+                        .foregroundColor(count == 0 ? Color(.tertiaryLabel) : Color(.systemGray))
                 }
             }
             .padding(.horizontal, 12)

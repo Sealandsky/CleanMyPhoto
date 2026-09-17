@@ -138,8 +138,9 @@ struct OrganizeCacheSummary: Codable {
     let duplicateGroups: [OrganizeCacheGroupItem]
     let blurryIds: [String]
     let poorFaceIds: [String]
+    let hasCompletedFullScan: Bool?
 
-    static let currentVersion = 8
+    static let currentVersion = 9
     static let fileName = "OrganizeCache.json"
 }
 
