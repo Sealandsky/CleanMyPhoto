@@ -75,6 +75,19 @@ class MembershipManager: ObservableObject {
         isLoadingProducts = true
         defer { isLoadingProducts = false }
 
+        // 诊断：xcode = 本地 .storekit 配置已注入；sandbox = 未注入（走沙盒网络）
+        do {
+            let appTransaction = try await AppTransaction.shared
+            switch appTransaction {
+            case .verified(let tx):
+                print("🧪 StoreKit environment: \(tx.environment.rawValue)")
+            case .unverified(_, let error):
+                print("🧪 StoreKit environment: unverified(\(error.localizedDescription))")
+            }
+        } catch {
+            print("🧪 StoreKit environment: unavailable(\(error.localizedDescription))")
+        }
+
         for attempt in 0...Self.productLoadRetryDelays.count {
             do {
                 let storeProducts = try await Product.products(for: SubscriptionType.allCases.map { $0.rawValue })

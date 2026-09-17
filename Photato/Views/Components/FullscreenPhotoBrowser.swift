@@ -51,10 +51,6 @@ struct FullscreenPhotoBrowser: View {
     // 删除后需在此即时剔除才能让大图滑向下一张；外层实例同样受益
     @State private var removedPhotoIDs: Set<String> = []
 
-    // 手势引导（全局只提示一次）
-    @AppStorage("hasShownGestureInstructions") private var hasShownGestureInstructions: Bool = false
-    @State private var showGestureInstructions = false
-
     /// 当前生效批次：剔除本实例内已删除的素材
     private var browsePhotos: [PhotoAsset] {
         photos.filter { !removedPhotoIDs.contains($0.id) }
@@ -102,17 +98,11 @@ struct FullscreenPhotoBrowser: View {
     }
 
     var body: some View {
-        ZStack {
-            Group {
-                if !browsePhotos.isEmpty {
-                    verticalDetailLayout
-                } else {
-                    emptyStateView
-                }
-            }
-
-            if showGestureInstructions {
-                gestureInstructionsOverlay
+        Group {
+            if !browsePhotos.isEmpty {
+                verticalDetailLayout
+            } else {
+                emptyStateView
             }
         }
         // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
@@ -250,9 +240,6 @@ struct FullscreenPhotoBrowser: View {
                 .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 8)
-                .onAppear {
-                    showGestureInstructionsIfNeeded()
-                }
 
                 actionBar
                 RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
@@ -731,49 +718,6 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    // MARK: - Gesture Instructions
-    private func showGestureInstructionsIfNeeded() {
-        if !hasShownGestureInstructions && !showGestureInstructions {
-            withAnimation(.easeIn(duration: 0.3)) {
-                showGestureInstructions = true
-            }
-        }
-    }
-
-    private var gestureInstructionsOverlay: some View {
-        VStack {
-            Spacer()
-            // 垂直流式版式仅保留左右滑动切换，垂直手势已交还页面滚动
-            VStack(spacing: 8) {
-                gestureHint(icon: "arrow.left", text: String(localized: "Older"))
-                gestureHint(icon: "arrow.right", text: String(localized: "Newer"))
-            }
-            .padding(.bottom, 120)
-        }
-        .allowsHitTesting(false)
-        .transition(.opacity)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showGestureInstructions = false
-                    hasShownGestureInstructions = true
-                }
-            }
-        }
-    }
-
-    private func gestureHint(icon: String, text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-            Text(text)
-        }
-        .font(.system(.caption, design: .rounded))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.6))
-        .foregroundColor(.white)
-        .cornerRadius(15)
-    }
 }
 
 #Preview {
@@ -841,10 +785,10 @@ private struct RelatedPhotosSection: View {
                 VStack(spacing: 8) {
                     ForEach(Self.skeletonColumns[column].indices, id: \.self) { index in
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(Color(.systemBackground))
+                            .fill(Color(UIColor.secondarySystemFill))
                             .frame(maxWidth: .infinity)
                             .frame(height: Self.skeletonColumns[column][index])
-                            .shimmering()
+                            .shimmering(cornerRadius: 24)
                     }
                 }
             }
@@ -863,14 +807,11 @@ private struct RelatedPhotosSection: View {
                         Button {
                             onSelect(asset)
                         } label: {
-                            AssetImage(
-                                asset: asset,
-                                targetSize: CGSize(width: 600, height: 600),
-                                contentMode: .fill
+                            PhotoCell(
+                                photo: PhotoAsset(asset: asset),
+                                forceOriginalRatio: true,
+                                cornerRadius: 24
                             )
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(Self.cellAspectRatio(of: asset), contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                         }
                         .buttonStyle(RelatedPhotoCardStyle())
                     }

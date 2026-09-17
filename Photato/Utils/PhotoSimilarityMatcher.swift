@@ -96,6 +96,81 @@ final class PhotoSimilarityMatcher {
     private static let pipelineVersion = "thumb256-v1|"
         + ProcessInfo.processInfo.operatingSystemVersionString
 
+    static let libraryIndexDidFinishNotification = Notification.Name("PhotoSimilarityMatcher.libraryIndexDidFinish")
+    private static let hasBuiltLibraryIndexKey = "PhotoSimilarityMatcher.hasBuiltLibraryIndex"
+    private var isBackgroundIndexing = false
+
+    /// 全图库是否已建立过 AI 特征索引（一次扫描，全库所有相簿共同解锁推荐）
+    var isLibraryIndexed: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: Self.hasBuiltLibraryIndexKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.hasBuiltLibraryIndexKey)
+        }
+    }
+
+    /// 启动后台静默特征索引构建（低优先级、分批温控让步、主线程零卡顿）
+    func startBackgroundIndexingIfNeeded() {
+        guard !isLibraryIndexed, !isBackgroundIndexing else { return }
+        isBackgroundIndexing = true
+
+        workQueue.async { [weak self] in
+            guard let self else { return }
+
+            // 1. 相册权限校验
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard status == .authorized || status == .limited else {
+                self.isBackgroundIndexing = false
+                return
+            }
+
+            // 2. 获取图库全部图片
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+            let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+
+            var assetsToIndex: [PHAsset] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                assetsToIndex.append(asset)
+            }
+
+            guard !assetsToIndex.isEmpty else {
+                self.isLibraryIndexed = true
+                self.isBackgroundIndexing = false
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: Self.libraryIndexDidFinishNotification, object: nil)
+                }
+                return
+            }
+
+            // 3. 逐批温和提取指纹（每 15 张让步 40ms，避免占用 CPU/GPU 发烫与抢占主线程）
+            var processed = 0
+            for asset in assetsToIndex {
+                // 如果用户在前台主动发起了相簿扫描任务，后台让步等待
+                while self.albumActiveToken != nil {
+                    Thread.sleep(forTimeInterval: 0.2)
+                }
+
+                _ = autoreleasepool {
+                    self.cachedOrCompute(asset)
+                }
+
+                processed += 1
+                if processed % 15 == 0 {
+                    usleep(40_000) // 40 毫秒温控微让步
+                }
+            }
+
+            self.isLibraryIndexed = true
+            self.isBackgroundIndexing = false
+
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Self.libraryIndexDidFinishNotification, object: nil)
+            }
+        }
+    }
+
     // MARK: - Public API
 
     /// 检索与基准照片视觉最相似的 Top N 张。
@@ -417,6 +492,9 @@ final class PhotoSimilarityMatcher {
                 }
             }
 
+            // 循环结束：派发满进度回报（覆盖提前收敛退出的情况，保证进度条平滑拉满）
+            DispatchQueue.main.async { progress(total, total) }
+
             // 5. 排序取前 topN（按距离升序，越近越相关）
             let results = Array(scored
                 .sorted { $0.distance < $1.distance }
@@ -428,12 +506,13 @@ final class PhotoSimilarityMatcher {
         }
     }
 
-    /// 异步获取相簿相似推荐照片
+    /// 异步获取相簿相似推荐照片（支持进度回调）
     func findSimilar(
         toAlbumAssets albumAssets: [PHAsset],
         excludingIDs: Set<String>,
         topN: Int = 30,
-        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance
+        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance,
+        onProgress: ((_ processed: Int, _ total: Int) -> Void)? = nil
     ) async throws -> [PHAsset] {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -441,7 +520,10 @@ final class PhotoSimilarityMatcher {
                     toAlbumAssets: albumAssets,
                     excludingIDs: excludingIDs,
                     topN: topN,
-                    maxDistance: maxDistance
+                    maxDistance: maxDistance,
+                    progress: { processed, total in
+                        onProgress?(processed, total)
+                    }
                 ) { assets, error in
                     if let error = error {
                         continuation.resume(throwing: error)
@@ -452,6 +534,151 @@ final class PhotoSimilarityMatcher {
             }
         } onCancel: {
             self.cancelAlbumSearch()
+        }
+    }
+
+    /// 建立全图库 AI 特征索引并检索当前相簿的相似照片推荐（支持进度回调，一次构建全库受益）
+    func indexLibraryAndFindSimilar(
+        toAlbumAssets albumAssets: [PHAsset],
+        excludingIDs: Set<String>,
+        topN: Int = 30,
+        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance,
+        onProgress: ((_ processed: Int, _ total: Int) -> Void)? = nil
+    ) async throws -> [PHAsset] {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                indexLibraryAndFindSimilar(
+                    toAlbumAssets: albumAssets,
+                    excludingIDs: excludingIDs,
+                    topN: topN,
+                    maxDistance: maxDistance,
+                    progress: { processed, total in
+                        onProgress?(processed, total)
+                    }
+                ) { assets, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: assets)
+                    }
+                }
+            }
+        } onCancel: {
+            self.cancelAlbumSearch()
+        }
+    }
+
+    /// 建立全图库 AI 特征索引并检索当前相簿的相似照片推荐（底层实现）
+    func indexLibraryAndFindSimilar(
+        toAlbumAssets albumAssets: [PHAsset],
+        excludingIDs: Set<String>,
+        topN: Int = 30,
+        maxDistance: Float = PhotoSimilarityMatcher.defaultAlbumMaxDistance,
+        progress: @escaping (_ processed: Int, _ total: Int) -> Void = { _, _ in },
+        completion: @escaping (_ results: [PHAsset], _ error: Error?) -> Void
+    ) {
+        workQueue.async { [weak self] in
+            guard let self else { return }
+
+            let token = UUID()
+            self.albumActiveToken = token
+
+            // 1. 权限校验
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard status == .authorized || status == .limited else {
+                self.finishAlbum([], MatcherError.photoAccessDenied(status), token: token, completion)
+                return
+            }
+
+            // 2. 基准特征提取
+            let imageAssets = albumAssets.filter { $0.mediaType == .image }
+            let candidateBaseAssets = imageAssets.isEmpty ? albumAssets : imageAssets
+            guard !candidateBaseAssets.isEmpty else {
+                self.finishAlbum([], nil, token: token, completion)
+                return
+            }
+
+            var basePrints: [VNFeaturePrintObservation] = []
+            for asset in candidateBaseAssets {
+                if let print = self.cachedOrCompute(asset) ?? self.computeFeaturePrintWithNetworkFallback(for: asset) {
+                    basePrints.append(print)
+                    if basePrints.count >= 20 { break }
+                }
+            }
+
+            guard !basePrints.isEmpty else {
+                self.finishAlbum([], MatcherError.baseFeatureUnavailable, token: token, completion)
+                return
+            }
+
+            // 3. 全库图片获取
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+            let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
+
+            var allCandidates: [PHAsset] = []
+            fetchResult.enumerateObjects { asset, _, _ in
+                allCandidates.append(asset)
+            }
+
+            let total = allCandidates.count
+            guard total > 0 else {
+                self.isLibraryIndexed = true
+                self.finishAlbum([], nil, token: token, completion)
+                return
+            }
+
+            // 4. 遍历全库建立特征索引并同时计算当前相簿相似度
+            var scored: [(asset: PHAsset, distance: Float)] = []
+            var processed = 0
+
+            for asset in allCandidates {
+                if self.albumActiveToken != token {
+                    self.finishAlbum([], MatcherError.cancelled, token: token, completion)
+                    return
+                }
+
+                // 提取并缓存特征（写通内存库与 Core Data）
+                if let candidatePrint = autoreleasepool(invoking: { self.cachedOrCompute(asset) }) {
+                    // 若不是被排除的素材，计算与当前相簿基准特征的距离
+                    if !excludingIDs.contains(asset.localIdentifier) {
+                        var minDistance: Float = .greatestFiniteMagnitude
+                        for basePrint in basePrints {
+                            var distance: Float = .greatestFiniteMagnitude
+                            if (try? basePrint.computeDistance(&distance, to: candidatePrint)) != nil {
+                                if distance < minDistance {
+                                    minDistance = distance
+                                }
+                            }
+                        }
+
+                        if minDistance <= maxDistance {
+                            scored.append((asset, minDistance))
+                        }
+                    }
+                }
+
+                processed += 1
+                if processed % Self.progressStride == 0 || processed == total {
+                    let done = processed
+                    DispatchQueue.main.async { progress(done, total) }
+                }
+            }
+
+            // 标记全库索引已完成
+            self.isLibraryIndexed = true
+
+            // 派发 100% 满进度
+            DispatchQueue.main.async { progress(total, total) }
+
+            // 5. 排序取前 topN
+            let results = Array(scored
+                .sorted { $0.distance < $1.distance }
+                .prefix(max(0, topN))
+                .map(\.asset)
+                .filter { !excludingIDs.contains($0.localIdentifier) })
+
+            self.finishAlbum(results, nil, token: token, completion)
         }
     }
 

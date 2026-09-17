@@ -95,6 +95,9 @@ struct MainTabView: View {
             // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
             PhotoSimilarityMatcher.shared.prewarm()
 
+            // 启动后台静默建库：低优先级温和提取全库特征索引，零卡顿不发烫
+            PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
+
             // 后台低优先级预热整理页快速缓存，避免首次切 Tab 时等待
             Task(priority: .utility) {
                 await organizeManager.quickAnalysis()

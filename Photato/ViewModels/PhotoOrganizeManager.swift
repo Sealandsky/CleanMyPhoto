@@ -12,6 +12,7 @@ final class PhotoOrganizeManager {
     var totalPhotoCount: Int = 0
     var categoryPageStates: [OrganizeCategory: OrganizeCategoryPageState] = [:]
     var hasLoadedInitialData = false
+    var hasCompletedFullScan = false
     var isQuickAnalyzing: Bool = false
     var completedCategories: Set<OrganizeCategory> = []
 
@@ -168,14 +169,16 @@ final class PhotoOrganizeManager {
             loadFlatCategoryFromCache(.poorFace, ids: summary.poorFaceIds)
 
             totalPhotoCount = summary.totalPhotoCount
+            hasCompletedFullScan = summary.hasCompletedFullScan ?? false
             return true
         } catch {
             try? FileManager.default.removeItem(at: cacheFileURL)
+            hasCompletedFullScan = false
             return false
         }
     }
 
-    private func saveCacheSummary(totalPhotoCount: Int) {
+    private func saveCacheSummary(totalPhotoCount: Int, isFullScan: Bool = false) {
         let screenshotIds = identifiers(for: .screenshots)
         let livePhotoIds = identifiers(for: .livePhotos)
         let videoIds = identifiers(for: .videos)
@@ -204,7 +207,8 @@ final class PhotoOrganizeManager {
             similarGroups: similarGroups,
             duplicateGroups: duplicateGroups,
             blurryIds: blurryIds,
-            poorFaceIds: poorFaceIds
+            poorFaceIds: poorFaceIds,
+            hasCompletedFullScan: isFullScan
         )
 
         do {
@@ -288,7 +292,8 @@ final class PhotoOrganizeManager {
 
             analysisProgress = 1.0
             currentStep = ""
-            saveCacheSummary(totalPhotoCount: totalPhotoCount)
+            saveCacheSummary(totalPhotoCount: totalPhotoCount, isFullScan: true)
+            hasCompletedFullScan = true
             isAnalyzing = false
         }
     }
