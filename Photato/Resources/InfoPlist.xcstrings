@@ -15,6 +15,12 @@
             "state" : "translated",
             "value" : "图豆"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖豆"
+          }
         }
       }
     },
@@ -31,6 +37,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图豆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖豆"
           }
         }
       }
@@ -49,6 +61,12 @@
             "state" : "translated",
             "value" : "图豆需要保存照片至图库的权限。"
           }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖豆需要儲存照片至相簿的許可權。"
+          }
         }
       }
     },
@@ -65,6 +83,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图豆需要访问您的照片图库，以帮助您整理并清理无用照片。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖豆需要訪問您的照片相簿，以幫助您整理並清理無用照片。"
           }
         }
       }
