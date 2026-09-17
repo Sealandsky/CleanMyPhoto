@@ -2,6 +2,7 @@ import Foundation
 import Photos
 import UIKit
 import Vision
+import CoreML
 import CoreData
 
 // MARK: - PhotoSimilarityMatcher
@@ -584,7 +585,9 @@ final class PhotoSimilarityMatcher {
             // 模拟器上 GPU/ANE 的 Espresso 上下文创建不稳定（NSOSStatus -1），
             // 强制 CPU 推理保证可用；真机保持默认加速路径
             #if targetEnvironment(simulator)
-            request.usesCPUOnly = true
+            if let cpuDevice = Self.cpuComputeDevice() {
+                request.setComputeDevice(cpuDevice, for: .main)
+            }
             #endif
             do {
                 try handler.perform([request])
@@ -597,6 +600,16 @@ final class PhotoSimilarityMatcher {
         }
         return nil
     }
+
+    /// 模拟器专用：从 CoreML 设备列表取 CPU 设备（VNRequest.usesCPUOnly 自 iOS 17 弃用后的等价写法）
+    #if targetEnvironment(simulator)
+    private static func cpuComputeDevice() -> MLComputeDevice? {
+        MLComputeDevice.allComputeDevices.first { device in
+            if case .cpu = device { return true }
+            return false
+        }
+    }
+    #endif
 
     /// 同步读取本地缩略图（禁网）：有则返回（可能是降级图，特征提取足够用），
     /// 本地完全无图时返回 nil
@@ -628,7 +641,9 @@ final class PhotoSimilarityMatcher {
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         let request = VNGenerateImageFeaturePrintRequest()
         #if targetEnvironment(simulator)
-        request.usesCPUOnly = true
+        if let cpuDevice = Self.cpuComputeDevice() {
+            request.setComputeDevice(cpuDevice, for: .main)
+        }
         #endif
         do {
             try handler.perform([request])
