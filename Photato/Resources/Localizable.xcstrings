@@ -793,6 +793,38 @@
         }
       }
     },
+    "Benefit Permanent Delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-Tap Permanent Deletion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一键永久删除待处理照片"
+          }
+        }
+      }
+    },
+    "Benefit Permanent Delete Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizing & moving to Pending is always free"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理与移入待处理永久免费"
+          }
+        }
+      }
+    },
     "Benefit Smart Grouping" : {
       "localizations" : {
         "en" : {
@@ -1304,6 +1336,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查找重复、相似照片、截图等"
+          }
+        }
+      }
+    },
+    "First Pending Hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permanently deleting requires Photato Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久删除需要图豆专业版"
           }
         }
       }
@@ -2236,6 +2284,22 @@
         }
       }
     },
+    "Pending Hint Bar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizing and moving photos here is free. Permanently deleting requires Photato Pro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理与移入待处理免费，永久删除需要图豆专业版"
+          }
+        }
+      }
+    },
     "Pending Photos" : {
       "localizations" : {
         "en" : {
@@ -2520,7 +2584,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "确认后即收取 %1$@%2$@；自动续订，可随时取消。"
+            "value" : "确认后即收取 %1$@%2$@，自动续订，可随时取消。"
           }
         }
       }
@@ -2536,7 +2600,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@；试用结束后将自动收取 %2$@%3$@，可随时取消。"
+            "value" : "%1$@，试用结束后将自动收取 %2$@%3$@，可随时取消。"
           }
         }
       }
@@ -3028,6 +3092,7 @@
       }
     },
     "Subscribe or one-time purchase" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3268,7 +3333,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@；试用结束后收取 %2$@%3$@"
+            "value" : "%1$@，试用结束后收取 %2$@%3$@"
           }
         }
       }
@@ -3326,6 +3391,7 @@
       }
     },
     "Unlock All Features" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3353,6 +3419,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "解锁终身会员"
+          }
+        }
+      }
+    },
+    "Unlock Permanent Deletion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock Permanent Deletion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁永久删除"
+          }
+        }
+      }
+    },
+    "Unlock permanent deletion & all AI cleanup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock permanent deletion & all AI cleanup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁永久删除与全部 AI 清理能力"
           }
         }
       }
@@ -3561,102 +3659,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的照片"
-          }
-        }
-      }
-    },
-    "Pending Hint Bar" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Organizing and moving photos here is free. Permanently deleting requires Photato Pro."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "整理与移入待处理免费；永久删除需要图豆专业版"
-          }
-        }
-      }
-    },
-    "Unlock permanent deletion & all AI cleanup" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unlock permanent deletion & all AI cleanup"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解锁永久删除与全部 AI 清理能力"
-          }
-        }
-      }
-    },
-    "Benefit Permanent Delete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One-Tap Permanent Deletion"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一键永久删除待处理照片"
-          }
-        }
-      }
-    },
-    "Benefit Permanent Delete Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Organizing & moving to Pending is always free"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "整理与移入待处理永久免费"
-          }
-        }
-      }
-    },
-    "First Pending Hint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Permanently deleting requires Photato Pro"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "永久删除需要图豆专业版"
-          }
-        }
-      }
-    },
-    "Unlock Permanent Deletion" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unlock Permanent Deletion"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "解锁永久删除"
           }
         }
       }
