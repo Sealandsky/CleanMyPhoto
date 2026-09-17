@@ -375,7 +375,6 @@ final class PhotoOrganizeManager {
 
         let startProgress: Double = 1.0 / 6.0
         let endProgress: Double = 2.0 / 6.0
-        let total = candidates.count
 
         // 批量获取大小（缓存一次预取 + 缺失补测 + 单次写回），替代逐张 N+1 Core Data 往返
         let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
