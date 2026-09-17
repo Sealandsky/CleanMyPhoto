@@ -165,7 +165,7 @@ struct TrashView: View {
                 .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
 
-            Text(String(localized: "Photos you swipe up to delete will appear here."))
+            Text(String(localized: "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list."))
                 .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -223,9 +223,9 @@ struct TrashView: View {
         if !membershipManager.isPremiumMember {
             HStack(spacing: 8) {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                 Text(String(localized: "Pending Hint Bar"))
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.system(size: 14, design: .rounded))
                     .multilineTextAlignment(.leading)
                 Spacer()
             }

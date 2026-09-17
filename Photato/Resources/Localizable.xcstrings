@@ -7162,52 +7162,6 @@
         }
       }
     },
-    "Photos you swipe up to delete will appear here." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photos you swipe up to delete will appear here."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上滑删除的照片会出现在这里。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上滑刪除的照片會出現在這裡。"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上にスワイプして削除した写真がここに表示されます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "위로 스와이프해 삭제한 사진이 여기에 표시됩니다."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las fotos que deslices hacia arriba para eliminar aparecerán aquí."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As fotos que você deslizar para cima para excluir aparecerão aqui."
-          }
-        }
-      }
-    },
     "Price Unavailable" : {
       "localizations" : {
         "en" : {
@@ -9187,53 +9141,6 @@
         }
       }
     },
-    "Swipe up to delete" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Swipe up to delete"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上划删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上劃刪除"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上にスワイプして削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "위로 스와이프하여 삭제"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desliza hacia arriba para eliminar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deslize para cima para excluir"
-          }
-        }
-      }
-    },
     "Tap a category below to review" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10704,6 +10611,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas fotos"
+          }
+        }
+      }
+    },
+    "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清理时选中的照片会先移到这里，清空前不会真正删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清理時選中的照片會先移到這裡，清空前不會真正刪除。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理で選んだ写真はまずここに移されます。すべて削除するまで完全には消えません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정리에서 선택한 사진은 먼저 여기로 이동됩니다. 모두 삭제하기 전까지 완전히 지워지지 않아요."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las fotos que limpies aparecerán aquí primero. No se eliminan de forma permanente hasta que vacíes la lista."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As fotos que você limpar aparecerão aqui primeiro. Nada é excluído em definitivo até você esvaziar a lista."
           }
         }
       }
