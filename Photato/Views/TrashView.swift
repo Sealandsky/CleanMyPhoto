@@ -107,8 +107,15 @@ struct TrashView: View {
                         }
                         showingDeleteConfirmation = true
                     } label: {
-                        Text(String(localized: "Empty Trash"))
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        HStack(spacing: 6) {
+                            // 非会员时按钮带锁标预告知：点击后才弹付费墙不显突兀
+                            if !membershipManager.isPremiumMember {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            }
+                            Text(String(localized: "Empty Trash"))
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        }
                     }
                 }
             }
@@ -158,7 +165,7 @@ struct TrashView: View {
                 .font(.system(.title2, design: .rounded))
                 .fontWeight(.semibold)
 
-            Text(String(localized: "Photos you swipe up to delete will appear here."))
+            Text(String(localized: "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list."))
                 .font(.system(.body, design: .rounded))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -171,7 +178,9 @@ struct TrashView: View {
     /// （原比例 → 瀑布流；1:1 / 3:4 → 固定列网格），由 AdaptivePhotoGrid + PhotoCell 统一处理
     private var trashContent: some View {
         ScrollView {
-            AdaptivePhotoGrid(photos: trashedPhotos) { photo in
+            VStack(spacing: 0) {
+                membershipHintBar
+                AdaptivePhotoGrid(photos: trashedPhotos) { photo in
                 PhotoCell(
                     photo: photo,
                     isSelected: selectionManager.isSelected(photo.id),
@@ -203,8 +212,34 @@ struct TrashView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 24)
+            }
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// 非会员常驻提示条：明确「整理与移入免费 / 永久删除需专业版」的分界线
+    @ViewBuilder
+    private var membershipHintBar: some View {
+        if !membershipManager.isPremiumMember {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                Text(String(localized: "Pending Hint Bar"))
+                    .font(.system(size: 14, design: .rounded))
+                    .multilineTextAlignment(.leading)
+                Spacer()
+            }
+            .foregroundColor(.blue)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.blue.opacity(0.08))
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+        }
     }
 }
 

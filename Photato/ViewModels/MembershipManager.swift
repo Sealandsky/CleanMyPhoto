@@ -21,12 +21,17 @@ class MembershipManager: ObservableObject {
 
     // MARK: - StoreKit Properties
     @Published var products: [Product] = []
+    /// 当前 Apple ID 是否有资格使用 introductory offer（已消耗过试用的用户为 false）
+    @Published private(set) var isEligibleForIntroOffer = true
+    /// 商品列表加载状态（付费墙据此区分「加载中」与「加载失败可重试」）
+    @Published private(set) var isLoadingProducts = false
     private var updateListenerTask: Task<Void, Error>?
 
     // MARK: - Computed Properties
-    /// 任一订阅配置了免费试用（用于付费墙展示试用条款）
+    /// 任一订阅配置了免费试用且当前 Apple ID 有资格（用于条款区试用说明）
     var hasFreeTrialOffer: Bool {
         products.contains { $0.subscription?.introductoryOffer?.paymentMode == .freeTrial }
+            && isEligibleForIntroOffer
     }
 
     #if DEBUG
@@ -61,15 +66,52 @@ class MembershipManager: ObservableObject {
     }
 
     // MARK: - StoreKit Integration
+
+    /// 商品自动重试间隔（1s / 3s）。StoreKit 2 冷缓存已知行为：首次请求可能
+    /// 返回空数组或失败，第二次起命中本地缓存；自动重试后仍失败才交给付费墙手动重试
+    private static let productLoadRetryDelays: [UInt64] = [1_000_000_000, 3_000_000_000]
+
     private func loadProducts() async {
-        do {
-            let storeProducts = try await Product.products(for: SubscriptionType.allCases.map { $0.rawValue })
-            self.products = storeProducts.sorted { $0.price < $1.price }
-            print("✅ Loaded \(products.count) products")
-        } catch {
-            print("❌ Failed to load products: \(error.localizedDescription)")
-            self.purchaseError = friendlyErrorMessage(error)
+        isLoadingProducts = true
+        defer { isLoadingProducts = false }
+
+        for attempt in 0...Self.productLoadRetryDelays.count {
+            do {
+                let storeProducts = try await Product.products(for: SubscriptionType.allCases.map { $0.rawValue })
+                if !storeProducts.isEmpty {
+                    self.products = storeProducts.sorted { $0.price < $1.price }
+                    await refreshIntroOfferEligibility()
+                    print("✅ Loaded \(products.count) products (attempt \(attempt + 1))")
+                    return
+                }
+                // 空结果视为未就绪，进入重试（StoreKit 首次调用的已知行为）
+                print("⚠️ Products empty on attempt \(attempt + 1)")
+            } catch {
+                print("❌ Failed to load products (attempt \(attempt + 1)): \(error.localizedDescription)")
+            }
+
+            if attempt < Self.productLoadRetryDelays.count {
+                try? await Task.sleep(nanoseconds: Self.productLoadRetryDelays[attempt])
+            }
         }
+        // 全部尝试失败：products 保持为空，付费墙显示手动重试入口
+    }
+
+    /// 付费墙「重试」入口：重新拉取商品并刷新试用资格
+    func reloadProducts() async {
+        await loadProducts()
+    }
+
+    /// App Store 试用资格校验：已消耗过 introductory offer 的 Apple ID 不再展示试用文案，
+    /// 避免「按钮承诺试用、实际立即扣费」的口径错位
+    private func refreshIntroOfferEligibility() async {
+        guard let monthlySubscription = products.first(where: {
+            $0.id == SubscriptionType.monthly.rawValue
+        })?.subscription else {
+            isEligibleForIntroOffer = false
+            return
+        }
+        isEligibleForIntroOffer = await monthlySubscription.isEligibleForIntroOffer
     }
 
     private func listenForTransactions() -> Task<Void, Error> {
@@ -137,8 +179,14 @@ class MembershipManager: ObservableObject {
                 break
             }
         } catch {
-            print("❌ Purchase failed: \(error.localizedDescription)")
-            purchaseError = friendlyErrorMessage(error)
+            // 用户主动取消购买：静默返回，不弹任何提示
+            let nsError = error as NSError
+            if nsError.domain == "SKErrorDomain", nsError.code == SKError.Code.paymentCancelled.rawValue {
+                print("ℹ️ Purchase cancelled by user")
+            } else {
+                print("❌ Purchase failed: \(error.localizedDescription)")
+                purchaseError = friendlyErrorMessage(error)
+            }
         }
 
         isLoadingPurchase = false
@@ -208,17 +256,10 @@ class MembershipManager: ObservableObject {
     }
 
     private func friendlyErrorMessage(_ error: Error) -> String {
-        let nsError = error as NSError
-        let code = nsError.code
-        let domain = nsError.domain
-
-        // StoreKit network errors
-        if domain == "SKErrorDomain" {
-            if code == 0 {
-                return String(localized: "Cannot connect to the App Store. Please check your network connection and try again.")
-            } else if code == 2 {
-                return String(localized: "Cannot connect to the App Store. Please check your network connection and try again.")
-            }
+        // StoreKit 层错误（家长审批拒绝、支付失败等）：用户取消已在调用方静默处理，
+        // 其余给通用文案，不再误报为网络错误
+        if (error as NSError).domain == "SKErrorDomain" {
+            return String(localized: "Purchase could not be completed. Please try again.")
         }
 
         // URLError / network errors

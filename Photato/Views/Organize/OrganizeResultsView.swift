@@ -5,6 +5,7 @@ struct OrganizeResultsView: View {
     var organizeManager: PhotoOrganizeManager
     let category: OrganizeCategory
     @ObservedObject var photoManager: PhotoManager
+    @EnvironmentObject var membershipManager: MembershipManager
     @State private var selectionManager = SelectionManager()
     @State private var showDeleteConfirm = false
     @State private var selectedSizeText = ByteFormatter.format(0)
@@ -13,6 +14,8 @@ struct OrganizeResultsView: View {
     // 删除反馈轻提示（显示约 2 秒后自动淡出）
     @State private var deleteToastText: String?
     @State private var deleteToastDismissTask: Task<Void, Never>?
+    // 非会员首次移入待处理时提示一次「永久删除需专业版」（之后不再打扰）
+    @AppStorage("hasShownPendingMembershipHint") private var hasShownPendingMembershipHint = false
 
     // 日期分节：相似/重复按拍摄日聚合分节；其他分类按拍摄年月归类
     @State private var dateSections: [DateSection] = []
@@ -731,10 +734,22 @@ struct OrganizeResultsView: View {
     // MARK: - Delete Toast（删除后「已移入待处理照片」轻提示）
 
     private func showDeleteToast(count: Int) {
-        deleteToastText = String(localized: "Moved \(count) photos to Pending Photos")
+        let base = String(localized: "Moved \(count) photos to Pending Photos")
+        var duration: UInt64 = 2_000_000_000
+
+        // 非会员首次移入待处理：追加「永久删除需专业版」提示，
+        // 在用户开始投入整理劳动时即设定免费/付费分界预期，只提示一次
+        if !membershipManager.isPremiumMember && !hasShownPendingMembershipHint {
+            hasShownPendingMembershipHint = true
+            deleteToastText = base + "\n" + String(localized: "First Pending Hint")
+            duration = 3_500_000_000
+        } else {
+            deleteToastText = base
+        }
+
         deleteToastDismissTask?.cancel()
         deleteToastDismissTask = Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: duration)
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.25)) {
                 deleteToastText = nil
@@ -745,12 +760,13 @@ struct OrganizeResultsView: View {
     private var deleteToast: some View {
         VStack {
             if let text = deleteToastText {
-                HStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 12, weight: .semibold))
                     Text(text)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)

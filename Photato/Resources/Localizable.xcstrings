@@ -178,6 +178,7 @@
       }
     },
     "%lldd %lldh remaining" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -194,6 +195,7 @@
       }
     },
     "%lldd remaining" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -210,6 +212,7 @@
       }
     },
     "%lldh remaining" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -221,6 +224,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩余 %lld小时"
+          }
+        }
+      }
+    },
+    "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• 免费试用结束后，订阅将自动续订，除非在试用结束前至少 24 小时取消。"
           }
         }
       }
@@ -278,6 +297,22 @@
     "3" : {},
     "3:4" : {},
     "4" : {},
+    "7 Days Free" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 days free"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天免费"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "en" : {
@@ -518,6 +553,310 @@
         }
       }
     },
+    "Auto-renews monthly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-renews monthly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按月自动续订"
+          }
+        }
+      }
+    },
+    "Benefit AI Junk" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Bad Photo Detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 智能识别废片"
+          }
+        }
+      }
+    },
+    "Benefit AI Junk Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurry, closed-eye & low-quality shots flagged"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动识别模糊、闭眼、低画质照片"
+          }
+        }
+      }
+    },
+    "Benefit AI Similar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Similar Photo Recommendations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 相似照片推荐"
+          }
+        }
+      }
+    },
+    "Benefit AI Similar Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-group similar shots and keep the best one"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相似照片自动成组，留住最佳一张"
+          }
+        }
+      }
+    },
+    "Benefit Album Complete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Album Completion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 帮你补齐相簿"
+          }
+        }
+      }
+    },
+    "Benefit Album Complete Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find matching photos and add them in one tap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "识别散落的同类照片，一键归入"
+          }
+        }
+      }
+    },
+    "Benefit Browsing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fullscreen Browsing & Grid Layout"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏浏览 · 自定义网格"
+          }
+        }
+      }
+    },
+    "Benefit Browsing Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swipe gestures and your preferred grid size"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手势滑动浏览，网格列数随心选"
+          }
+        }
+      }
+    },
+    "Benefit Cleanup Tools" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshots & Large Files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图清理 · 大文件扫描"
+          }
+        }
+      }
+    },
+    "Benefit Cleanup Tools Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Target the biggest space hogs, photos and videos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速定位最占空间的照片和视频"
+          }
+        }
+      }
+    },
+    "Benefit Duplicates" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复照片检测"
+          }
+        }
+      }
+    },
+    "Benefit Duplicates Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find and remove identical photos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找出并清理完全相同的照片"
+          }
+        }
+      }
+    },
+    "Benefit Memories" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Random Memory Rediscovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回忆随机重温"
+          }
+        }
+      }
+    },
+    "Benefit Memories Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A fresh batch of memories every refresh"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下拉刷新，换一批回忆"
+          }
+        }
+      }
+    },
+    "Benefit Permanent Delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-Tap Permanent Deletion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一键永久删除待处理照片"
+          }
+        }
+      }
+    },
+    "Benefit Permanent Delete Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizing & moving to Pending is always free"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理与移入待处理永久免费"
+          }
+        }
+      }
+    },
+    "Benefit Smart Grouping" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Grouping by Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按时间智能分组"
+          }
+        }
+      }
+    },
+    "Benefit Smart Grouping Sub" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Year & month albums with a review-before-delete pending list"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按年月归类，待处理清单确认后再删"
+          }
+        }
+      }
+    },
     "Best" : {
       "localizations" : {
         "en" : {
@@ -530,6 +869,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最优推荐"
+          }
+        }
+      }
+    },
+    "billed_yearly_format" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/yr"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/年"
           }
         }
       }
@@ -599,7 +955,24 @@
         }
       }
     },
+    "Cancel anytime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel anytime"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可随时取消"
+          }
+        }
+      }
+    },
     "Cannot connect to the App Store. Please check your network connection and try again." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -719,6 +1092,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "连接超时，请重试。"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
+    "Couldn't load subscription options" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load subscription options. Please check your network and retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载订阅方案，请检查网络后重试。"
           }
         }
       }
@@ -935,6 +1340,22 @@
         }
       }
     },
+    "First Pending Hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permanently deleting requires Photato Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久删除需要图豆专业版"
+          }
+        }
+      }
+    },
     "Found %lld items" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -964,6 +1385,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免费版"
+          }
+        }
+      }
+    },
+    "Free Trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free trial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费试用"
           }
         }
       }
@@ -1079,6 +1516,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "稍后升级"
+          }
+        }
+      }
+    },
+    "Launch Special" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launch Special"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首发特惠"
           }
         }
       }
@@ -1343,6 +1796,22 @@
         }
       }
     },
+    "monthly_breakdown_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/mo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折合 %@/月"
+          }
+        }
+      }
+    },
     "More like this photo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1603,6 +2072,22 @@
         }
       }
     },
+    "No purchases to restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No purchases to restore. Make sure you're signed in with the Apple ID used for the purchase."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可恢复的购买。请确认已登录购买时使用的 Apple ID。"
+          }
+        }
+      }
+    },
     "No similar photos yet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1669,6 +2154,7 @@
       }
     },
     "One-time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1684,7 +2170,25 @@
         }
       }
     },
+    "One-time payment" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-time payment"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次性付费"
+          }
+        }
+      }
+    },
     "One-time Purchase" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1696,6 +2200,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一次性购买"
+          }
+        }
+      }
+    },
+    "One-time Purchase · Lifetime Access" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-time Purchase · Lifetime Access"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次性购买 · 永久享受"
           }
         }
       }
@@ -1744,6 +2264,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "原比例"
+          }
+        }
+      }
+    },
+    "Original Price:" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was: "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原价："
+          }
+        }
+      }
+    },
+    "Pending Hint Bar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizing and moving photos here is free. Permanently deleting requires Photato Pro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理与移入待处理免费，永久删除需要图豆专业版"
           }
         }
       }
@@ -1893,18 +2445,18 @@
         }
       }
     },
-    "Photos you swipe up to delete will appear here." : {
+    "Price Unavailable" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Photos you swipe up to delete will appear here."
+            "value" : "Price unavailable"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上滑删除的照片会出现在这里。"
+            "value" : "价格获取中"
           }
         }
       }
@@ -1957,6 +2509,22 @@
         }
       }
     },
+    "Purchase could not be completed. Please try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase could not be completed. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购买未能完成，请稍后再试。"
+          }
+        }
+      }
+    },
     "Purchase pending confirmation" : {
       "localizations" : {
         "en" : {
@@ -1985,6 +2553,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "购买成功"
+          }
+        }
+      }
+    },
+    "purchase_disclosure_no_trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@ will be charged on confirmation. Renews automatically. Cancel anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认后即收取 %1$@%2$@，自动续订，可随时取消。"
+          }
+        }
+      }
+    },
+    "purchase_disclosure_trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@; after the trial ends, %2$@%3$@ is charged automatically. Cancel anytime."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，试用结束后将自动收取 %2$@%3$@，可随时取消。"
           }
         }
       }
@@ -2097,6 +2697,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复购买"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
           }
         }
       }
@@ -2378,6 +2994,22 @@
         }
       }
     },
+    "Start Free Trial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Free Trial"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始免费试用"
+          }
+        }
+      }
+    },
     "Start Scan" : {
       "localizations" : {
         "en" : {
@@ -2411,6 +3043,7 @@
       }
     },
     "Subscribe" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2426,7 +3059,24 @@
         }
       }
     },
+    "Subscribe Now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscribe Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即订阅"
+          }
+        }
+      }
+    },
     "Subscribe or one-time purchase" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2471,23 +3121,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下划关闭"
-          }
-        }
-      }
-    },
-    "Swipe up to delete" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Swipe up to delete"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上划删除"
           }
         }
       }
@@ -2656,7 +3289,24 @@
         }
       }
     },
+    "trial_then_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, then %2$@%3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，试用结束后收取 %2$@%3$@"
+          }
+        }
+      }
+    },
     "Try 7 Days Free" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2708,6 +3358,7 @@
       }
     },
     "Unlock All Features" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2719,6 +3370,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "订阅解锁所有功能"
+          }
+        }
+      }
+    },
+    "Unlock Lifetime Access" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock Lifetime Access"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁终身会员"
+          }
+        }
+      }
+    },
+    "Unlock Permanent Deletion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock Permanent Deletion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁永久删除"
+          }
+        }
+      }
+    },
+    "Unlock permanent deletion & all AI cleanup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock permanent deletion & all AI cleanup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解锁永久删除与全部 AI 清理能力"
           }
         }
       }
@@ -2931,418 +3630,48 @@
         }
       }
     },
-    "Benefit AI Similar" : {
+    "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Similar Photo Recommendations"
+            "value" : "Photos you clean up will appear here first. Nothing is permanently deleted until you empty the list."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 相似照片推荐"
-          }
-        }
-      }
-    },
-    "Benefit AI Similar Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auto-group similar shots and keep the best one"
+            "value" : "清理时选中的照片会先移到这里，清空前不会真正删除。"
           }
         },
-        "zh-Hans" : {
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "相似照片自动成组，留住最佳一张"
-          }
-        }
-      }
-    },
-    "Benefit AI Junk" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Bad Photo Detection"
+            "value" : "清理時選中的照片會先移到這裡，清空前不會真正刪除。"
           }
         },
-        "zh-Hans" : {
+        "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 智能识别废片"
-          }
-        }
-      }
-    },
-    "Benefit AI Junk Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blurry, closed-eye & low-quality shots flagged"
+            "value" : "整理で選んだ写真はまずここに移されます。すべて削除するまで完全には消えません。"
           }
         },
-        "zh-Hans" : {
+        "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自动识别模糊、闭眼、低画质照片"
-          }
-        }
-      }
-    },
-    "Benefit Duplicates" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duplicate Detection"
+            "value" : "정리에서 선택한 사진은 먼저 여기로 이동됩니다. 모두 삭제하기 전까지 완전히 지워지지 않아요."
           }
         },
-        "zh-Hans" : {
+        "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重复照片检测"
-          }
-        }
-      }
-    },
-    "Benefit Duplicates Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Find and remove identical photos"
+            "value" : "Las fotos que limpies aparecerán aquí primero. No se eliminan de forma permanente hasta que vacíes la lista."
           }
         },
-        "zh-Hans" : {
+        "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "找出并清理完全相同的照片"
-          }
-        }
-      }
-    },
-    "Benefit Smart Grouping" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Grouping by Time"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按时间智能分组"
-          }
-        }
-      }
-    },
-    "Benefit Smart Grouping Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Year & month albums with a review-before-delete pending list"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按年月归类，待处理清单确认后再删"
-          }
-        }
-      }
-    },
-    "Benefit Album Complete" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI Album Completion"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 帮你补齐相簿"
-          }
-        }
-      }
-    },
-    "Benefit Album Complete Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Find matching photos and add them in one tap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "识别散落的同类照片，一键归入"
-          }
-        }
-      }
-    },
-    "Benefit Cleanup Tools" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Screenshots & Large Files"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "截图清理 · 大文件扫描"
-          }
-        }
-      }
-    },
-    "Benefit Cleanup Tools Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Target the biggest space hogs, photos and videos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快速定位最占空间的照片和视频"
-          }
-        }
-      }
-    },
-    "Benefit Memories" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Random Memory Rediscovery"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回忆随机重温"
-          }
-        }
-      }
-    },
-    "Benefit Memories Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A fresh batch of memories every refresh"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下拉刷新，换一批回忆"
-          }
-        }
-      }
-    },
-    "Benefit Browsing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fullscreen Browsing & Grid Layout"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏浏览 · 自定义网格"
-          }
-        }
-      }
-    },
-    "Benefit Browsing Sub" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Swipe gestures and your preferred grid size"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "手势滑动浏览，网格列数随心选"
-          }
-        }
-      }
-    },
-    "7 Days Free" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 days free"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 天免费"
-          }
-        }
-      }
-    },
-    "Free Trial" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Free trial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "免费试用"
-          }
-        }
-      }
-    },
-    "Price Unavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Price unavailable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "价格获取中"
-          }
-        }
-      }
-    },
-    "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• After the free trial ends, your subscription automatically renews unless canceled at least 24 hours before it ends."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• 免费试用结束后，订阅将自动续订，除非在试用结束前至少 24 小时取消。"
-          }
-        }
-      }
-    },
-    "trial_then_format" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@, then %2$@%3$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@；试用结束后收取 %2$@%3$@"
-          }
-        }
-      }
-    },
-    "purchase_disclosure_trial" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@; after the trial ends, %2$@%3$@ is charged automatically. Cancel anytime."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@；试用结束后将自动收取 %2$@%3$@，可随时取消。"
-          }
-        }
-      }
-    },
-    "purchase_disclosure_no_trial" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@%2$@ will be charged on confirmation. Renews automatically. Cancel anytime."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确认后即收取 %1$@%2$@；自动续订，可随时取消。"
-          }
-        }
-      }
-    },
-    "Start Free Trial" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Free Trial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始免费试用"
-          }
-        }
-      }
-    },
-    "No purchases to restore" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No purchases to restore. Make sure you're signed in with the Apple ID used for the purchase."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有可恢复的购买。请确认已登录购买时使用的 Apple ID。"
-          }
-        }
-      }
-    },
-    "Continue" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continue"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "继续"
+            "value" : "As fotos que você limpar aparecerão aqui primeiro. Nada é excluído em definitivo até você esvaziar a lista."
           }
         }
       }
