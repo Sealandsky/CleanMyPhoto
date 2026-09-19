@@ -112,6 +112,7 @@ class AlbumManager: ObservableObject {
             }
         }
         invalidateRecommendationCache(for: album.id)
+        RecentAlbumsStore.shared.recordAlbumAdded(albumID: album.id)
         return newPhoto
     }
 
@@ -147,7 +148,37 @@ class AlbumManager: ObservableObject {
             }
         }
         invalidateRecommendationCache(for: album.id)
+        RecentAlbumsStore.shared.recordAlbumAdded(albumID: album.id)
         return newPhotos
+    }
+
+    /// 将素材从指定相簿移除并同步本地响应式数据（不动系统回收站，
+    /// 素材本身仍保留在图库中）
+    func removeAsset(_ asset: PHAsset, from album: AlbumModel) async throws {
+        try await PHPhotoLibrary.shared().performChanges {
+            let collections = PHAssetCollection.fetchAssetCollections(
+                withLocalIdentifiers: [album.id],
+                options: nil
+            )
+            guard let collection = collections.firstObject,
+                  let request = PHAssetCollectionChangeRequest(for: collection) else { return }
+            request.removeAssets([asset] as NSArray)
+        }
+
+        // 实时同步当前相簿照片列表（详情页/网格响应式收缩）
+        withAnimation(.easeInOut(duration: 0.32)) {
+            currentAlbumPhotos.removeAll { $0.id == asset.localIdentifier }
+        }
+
+        // 重新获取该相簿最新元数据（数量、封面、堆叠等），刷新相簿列表展示
+        let fetchResult = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [album.id], options: nil)
+        if let updatedCollection = fetchResult.firstObject {
+            let updatedAlbum = AlbumModel(collection: updatedCollection)
+            if let idx = albums.firstIndex(where: { $0.id == album.id }) {
+                albums[idx] = updatedAlbum
+            }
+        }
+        invalidateRecommendationCache(for: album.id)
     }
 
     // MARK: - Recommendation Cache Management

@@ -31,6 +31,8 @@ struct AlbumListView: View {
         }
         .background(Color(UIColor.systemGroupedBackground))
         .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     // MARK: - Skeleton Grid

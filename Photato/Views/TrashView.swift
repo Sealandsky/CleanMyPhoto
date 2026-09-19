@@ -24,6 +24,8 @@ struct TrashView: View {
             }
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
@@ -215,6 +217,8 @@ struct TrashView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     /// 非会员常驻提示条：明确「整理与移入免费 / 永久删除需专业版」的分界线

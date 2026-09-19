@@ -87,6 +87,8 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.settings)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
             // 稍作延迟（0.4s），避开冷启动首帧渲染与「回忆」页首批照片采样的瞬时 IO 竞争
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -132,22 +134,21 @@ struct MainTabView: View {
             }
             .navigationTitle(String(localized: "Albums"))
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .background(alignment: .top) {
-                TopBlurFadeBackground(height: 200)
-            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     PendingPhotosEntryButton()
                 }
             }
             .task {
-                // 首次进入相簿 Tab 时创建管理器并拉取相簿列表（TabView 懒加载，
-                // 未选中该 Tab 前不会执行）
+                // 首次进入相簿 Tab 时创建管理器（TabView 懒加载，未选中该 Tab
+                // 前不会执行）；每次进入都静默刷新相簿列表——详情页「添加到相簿/
+                // 新建相簿」不经过本管理器写入，靠此处保证计数与列表最新
                 if albumManager == nil {
                     albumManager = AlbumManager(photoManager: photoManager)
                 }
-                if let albumMgr = albumManager, albumMgr.albums.isEmpty {
+                if let albumMgr = albumManager {
                     await albumMgr.fetchUserAlbums()
                 }
             }
@@ -193,10 +194,8 @@ struct MainTabView: View {
             )
             .navigationTitle(String(localized: "Organize"))
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .background(alignment: .top) {
-                TopBlurFadeBackground(height: 200)
-            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     PendingPhotosEntryButton()

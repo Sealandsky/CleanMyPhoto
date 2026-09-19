@@ -106,12 +106,12 @@ struct AlbumDetailView: View {
         }
         .background(Color(UIColor.systemGroupedBackground))
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .background(alignment: .top) {
-            TopBlurFadeBackground(height: 200)
-        }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
@@ -128,6 +128,16 @@ struct AlbumDetailView: View {
                     onActivePhotoChange: { photo, _ in
                         currentPhotoID = photo.id
                     },
+                    albumContext: (
+                        album: album,
+                        onRemove: { photo in
+                            // 详情页批次是打开时的快照，移除需同步收缩才能滑向相邻素材
+                            fullscreenPhotos.removeAll { $0.id == photo.id }
+                            Task {
+                                try? await albumManager.removeAsset(photo.asset, from: album)
+                            }
+                        }
+                    ),
                     onDismiss: {
                         isFullscreenMode = false
                     }
