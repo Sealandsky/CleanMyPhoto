@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import UIKit
 
 // MARK: - Fullscreen Photo Browser
 /// 详情页全屏照片浏览器（可复用组件）：由 ContentView 的 photoBrowserView
@@ -20,9 +21,14 @@ struct FullscreenPhotoBrowser: View {
     var onFavoriteToggled: ((PhotoAsset, Bool) -> Void)? = nil
     /// 当前照片切换回调（photo, index）：用于图库页的索引预加载等
     var onActivePhotoChange: ((PhotoAsset, Int) -> Void)? = nil
+    /// 相簿上下文：从相簿页进入时提供，「更多」菜单据此展示「从相簿移除」；
+    /// onRemove 由调用方执行实际移除（持有 AlbumManager）。相似照片推入的
+    /// 下一级详情页不透传（素材可能不属于该相簿）
+    var albumContext: (album: AlbumModel, onRemove: (PhotoAsset) -> Void)? = nil
     let onDismiss: () -> Void
 
     @EnvironmentObject var photoManager: PhotoManager
+    @Environment(\.dismiss) private var dismiss
 
     @State private var currentPhotoID: String = ""
     @State private var deleteTrigger = 0
@@ -31,6 +37,19 @@ struct FullscreenPhotoBrowser: View {
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
     @State private var shareToast: String?
+
+    // 添加到相簿面板
+    @State private var showAddToAlbum = false
+
+    // 照片信息面板
+    @State private var showInfoSheet = false
+
+    // 大图展开（参考系统相册：单视图连续缩放，卡片 ↔ 全屏跟手无切换感）
+    /// 展开进度 0~1：由 DraggablePhotoView 的展开状态机驱动（捏合逐帧/动画吸附），
+    /// 页面级联动黑底淡入、其余区块淡出、禁滚动、照片区置顶
+    @State private var expandProgress: CGFloat = 0
+    /// 展开目标区 global frame（导航栏下安全区；恒定有效，无运行时反馈）
+    @State private var expandTargetFrame: CGRect = .zero
 
     // 标题（地址/拍摄日期时间）
     private var captionResolver: PhotoCaptionResolver { .shared }
@@ -71,6 +90,7 @@ struct FullscreenPhotoBrowser: View {
         onBlockedDelete: (() -> Void)? = nil,
         onFavoriteToggled: ((PhotoAsset, Bool) -> Void)? = nil,
         onActivePhotoChange: ((PhotoAsset, Int) -> Void)? = nil,
+        albumContext: (album: AlbumModel, onRemove: (PhotoAsset) -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.photos = photos
@@ -79,6 +99,7 @@ struct FullscreenPhotoBrowser: View {
         self.onBlockedDelete = onBlockedDelete
         self.onFavoriteToggled = onFavoriteToggled
         self.onActivePhotoChange = onActivePhotoChange
+        self.albumContext = albumContext
         self.onDismiss = onDismiss
 
         // 目标照片不在批次中（已被删除等异常）时回退首张
@@ -107,24 +128,68 @@ struct FullscreenPhotoBrowser: View {
         }
         // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
-        // 分享结果 toast：覆盖在详情页上，自动消失，不拦截触摸
+        // 操作结果反馈 toast：覆盖在详情页上，自动消失，高对比度深色胶囊，不拦截触摸
         .overlay(alignment: .bottom) {
             if let toast = shareToast {
-                Text(toast)
-                    .font(.system(.footnote, design: .rounded))
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.bottom, 130)
-                    .transition(.opacity)
-                    .allowsHitTesting(false)
+                HStack(spacing: 8) {
+                    if toast.localizedCaseInsensitiveContains("fail") || toast.contains("失败") {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.orange)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.green)
+                    }
+                    Text(toast)
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color(white: 0.12).opacity(0.92))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                )
+                .shadow(color: Color.black.opacity(0.25), radius: 10, x: 0, y: 5)
+                .padding(.bottom, 130)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                .allowsHitTesting(false)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: shareToast)
         .navigationBarTitleDisplayMode(.inline)
+        // 全屏渐隐（无位移）规则：ToolbarItem 永远存在（栏布局恒定，杜绝
+        // item 移除引发的系统重排位移）——
+        // · principal 标题：纯文本无玻璃容器，恒渲染 + opacity 渐隐
+        // · 两个按钮：前半程 opacity 渐隐；过半换同尺寸透明占位（玻璃容器
+        //   随 Button 消失，item 占位保持不变）
+        // · 系统返回按钮无法控制透明度：navigationBarBackButtonHidden 常驻，
+        //   改由自定义 leading 项承担（样式贴系统）
+        .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if expandProgress < 0.5 {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.backward")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(.accentColor)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(1 - expandProgress * 2)
+                } else {
+                    Color.clear.frame(width: 36, height: 36)
+                }
+            }
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 1) {
                     Text(captionTitle)
@@ -142,13 +207,33 @@ struct FullscreenPhotoBrowser: View {
                 }
                 .animation(.easeInOut(duration: 0.22), value: captionTitle)
                 .animation(.easeInOut(duration: 0.22), value: captionSubtitle)
+                .opacity(max(0, 1 - expandProgress * 2))
             }
             ToolbarItem(placement: .topBarTrailing) {
                 // 待处理照片入口：数量以文本实时展示，删除后立即增加
-                PendingPhotosEntryButton()
+                if expandProgress < 0.5 {
+                    PendingPhotosEntryButton()
+                        .opacity(1 - expandProgress * 2)
+                } else {
+                    Color.clear.frame(width: 44, height: 36)
+                }
             }
         }
         .toolbar(.hidden, for: .tabBar)
+        // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
+        .sheet(isPresented: $showAddToAlbum) {
+            if let photo = currentPhoto {
+                AddToAlbumSheet(asset: photo.asset) { albumTitle in
+                    showShareToast(String(localized: "Added to \"\(albumTitle)\""))
+                }
+            }
+        }
+        // 照片信息面板
+        .sheet(isPresented: $showInfoSheet) {
+            if let photo = currentPhoto {
+                PhotoInfoSheet(photo: photo)
+            }
+        }
         .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
             Button(String(localized: "OK"), role: .cancel) {}
         } message: {
@@ -197,54 +282,110 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // MARK: - 垂直流式版式（对齐 Figma 639-3025）
-    /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
-    /// 大图预览区域 → 操作按钮栏 → 相关图片列表推荐
-    private var verticalDetailLayout: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
-                // 视频播放与加载 loading 逻辑不变。高度取屏幕的 55%
-                DraggablePhotoView(
-                    photos: browsePhotos,
-                    currentPhotoID: currentPhotoID,
-                    deleteTrigger: $deleteTrigger,
-                    onPhotoChange: { id, index in
-                        // 删除流转会在数组收缩前回报旧素材 id：此时以回退
-                        // 索引对齐生效批次（索引即 DraggablePhotoView 落定
-                        // 的邻近位），避免删除后当前素材悬空（标题/操作栏/
-                        // 相似区失效）；正常滑动回报的 id 必在批次内
-                        if browsePhotos.contains(where: { $0.id == id }) {
-                            currentPhotoID = id
-                        } else {
-                            currentPhotoID = browsePhotos.indices.contains(index)
-                                ? browsePhotos[index].id
-                                : browsePhotos.first?.id ?? ""
-                        }
-                        if let photo = browsePhotos.first(where: { $0.id == currentPhotoID }) {
-                            onActivePhotoChange?(photo, index)
-                        }
-                    },
-                    onDelete: handlePhotoDeleted,
-                    onBlockedDelete: {
-                        showFavoriteDeleteAlert = true
-                    },
-                    onDismiss: {
-                        onDismiss()
-                    },
-                    screenSize: ScreenSizeHelper.screenSize,
-                    cardPresentation: .embeddedSection,
-                    isFavorite: { photo in
-                        photoManager.isFavorite(photo)
-                    }
-                )
-                .frame(height: ScreenSizeHelper.screenSize.height * 0.55)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+    /// 操作栏布局高度（50pt 按钮 + 上下 16pt padding）
+    private static let actionBarHeight: CGFloat = 82
+    /// 相似照片首屏恒定露出量：卡片圆角顶部弧线，作为「下方还有内容」的滚动暗示
+    private static let relatedPeekHeight: CGFloat = 48
+    /// 照片区最小高度兜底（iPad 分屏等极端小可视区域）
+    private static let minPhotoHeight: CGFloat = 240
 
-                actionBar
-                RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
+    /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
+    /// 大图预览区域 → 缩略图条 → 操作按钮栏 → 相关图片列表推荐。
+    /// 大图区高度动态填充可视区剩余空间（参考系统相册）：可视高度减去
+    /// 缩略条/操作栏/首屏相似区露出量，各尺寸设备下相似卡片恒定露出一点
+    private var verticalDetailLayout: some View {
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {                VStack(spacing: 0) {
+                    // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
+                    // 视频播放与加载 loading 逻辑不变；单击进入沉浸全屏、
+                    // 双指/双击缩放（缩放态禁用本页滚动）
+                    DraggablePhotoView(
+                        photos: browsePhotos,
+                        currentPhotoID: currentPhotoID,
+                        deleteTrigger: $deleteTrigger,
+                        onPhotoChange: { id, index in
+                            // 删除流转会在数组收缩前回报旧素材 id：此时以回退
+                            // 索引对齐生效批次（索引即 DraggablePhotoView 落定
+                            // 的邻近位），避免删除后当前素材悬空（标题/操作栏/
+                            // 相似区失效）；正常滑动回报的 id 必在批次内
+                            if browsePhotos.contains(where: { $0.id == id }) {
+                                currentPhotoID = id
+                            } else {
+                                currentPhotoID = browsePhotos.indices.contains(index)
+                                    ? browsePhotos[index].id
+                                    : browsePhotos.first?.id ?? ""
+                            }
+                            if let photo = browsePhotos.first(where: { $0.id == currentPhotoID }) {
+                                onActivePhotoChange?(photo, index)
+                            }
+                        },
+                        onDelete: handlePhotoDeleted,
+                        onBlockedDelete: {
+                            showFavoriteDeleteAlert = true
+                        },
+                        onDismiss: {
+                            onDismiss()
+                        },
+                        screenSize: ScreenSizeHelper.screenSize,
+                        cardPresentation: .embeddedSection,
+                        isFavorite: { photo in
+                            photoManager.isFavorite(photo)
+                        },
+                        expandTargetFrame: expandTargetFrame,
+                        expandProgress: $expandProgress
+                    )
+                    .frame(height: max(
+                        Self.minPhotoHeight,
+                        proxy.size.height - 8 - PhotoFilmStrip.layoutHeight
+                            - Self.actionBarHeight - Self.relatedPeekHeight
+                    ))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    // 展开时照片区置顶（图要盖过缩略条/操作栏铺满全屏）
+                    .zIndex(expandProgress > 0.01 ? 2 : 0)
+
+                    // 缩略图条：点击跳转直接写入 currentPhotoID（DraggablePhotoView
+                    // 的 onChange 联动同步 localIndex）；同步回报索引保持外部网格
+                    // 关闭详情页后的回滚定位一致
+                    PhotoFilmStrip(
+                        photos: browsePhotos,
+                        currentPhotoID: currentPhotoID,
+                        onSelect: { photo in
+                            currentPhotoID = photo.id
+                            if let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
+                                onActivePhotoChange?(photo, index)
+                            }
+                        }
+                    )
+                    .opacity(1 - expandProgress)
+                    .allowsHitTesting(expandProgress < 0.5)
+
+                    actionBar
+                        .opacity(1 - expandProgress)
+                        .allowsHitTesting(expandProgress < 0.5)
+                    RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
+                        .opacity(1 - expandProgress)
+                        .allowsHitTesting(expandProgress < 0.5)
+                }
             }
+            // 展开时禁用页面滚动（捏合/平移独占手势）；黑底随进度淡入
+            .scrollDisabled(expandProgress > 0.01)
+            .background(
+                Color.black
+                    .opacity(expandProgress)
+                    .ignoresSafeArea()
+            )
         }
+        // 展开目标区 = 页面可视区 global 几何（导航栏下安全区），恒定采集
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { expandTargetFrame = geo.frame(in: .global) }
+                    .onChange(of: geo.frame(in: .global)) { _, frame in
+                        expandTargetFrame = frame
+                    }
+            }
+        )
     }
 
     /// 本实例内删除：记入删除集使生效批次即时收缩（DraggablePhotoView 依赖
@@ -267,8 +408,9 @@ struct FullscreenPhotoBrowser: View {
         HStack {
             HStack(spacing: 10) {
                 favoriteButton
+                addToAlbumButton
                 shareButton
-                // 「添加」「更多」为占位入口，能力接入前暂时隐藏
+                moreButton
             }
             Spacer()
             deleteButton
@@ -297,12 +439,14 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    // 「添加」：入口占位（对齐 Figma 加号按钮），加入相册等能力后续迭代接入
+    // 「添加」：唤起相簿选择面板，把当前素材加入已有相簿或新建相簿
     private var addToAlbumButton: some View {
         glassActionButton {
             Image(systemName: "plus")
                 .foregroundColor(.primary)
-        } action: {}
+        } action: {
+            showAddToAlbum = true
+        }
     }
 
     // 分享：图片请求高清图、视频导出原文件后唤起系统分享面板
@@ -321,12 +465,72 @@ struct FullscreenPhotoBrowser: View {
         .disabled(isPreparingShare)
     }
 
-    // 「更多」：入口占位，具体能力后续迭代接入
+    // 「更多」：照片信息 / 拷贝图片（仅图片类）/ 从相簿移除（仅相簿上下文）
     private var moreButton: some View {
-        glassActionButton {
-            Image(systemName: "ellipsis")
-                .foregroundColor(.primary)
-        } action: {}
+        Menu {
+            Button {
+                showInfoSheet = true
+            } label: {
+                Label(String(localized: "Info"), systemImage: "info.circle")
+            }
+
+            if let photo = currentPhoto, photo.mediaType != .video {
+                Button {
+                    copyCurrentImage()
+                } label: {
+                    Label(String(localized: "Copy"), systemImage: "doc.on.doc")
+                }
+            }
+
+            if albumContext != nil {
+                Button(role: .destructive) {
+                    removeFromCurrentAlbum()
+                } label: {
+                    Label(
+                        String(localized: "Remove from Album"),
+                        systemImage: "minus.circle"
+                    )
+                }
+            }
+        } label: {
+            glassLabel(iconSize: 19) {
+                Image(systemName: "ellipsis")
+                    .foregroundColor(.primary)
+            }
+        }
+    }
+
+    /// 从当前相簿移除当前素材：移除业务经相簿上下文回调交还调用方执行
+    /// （列表响应式收缩，本页批次随 onChange(of: photos) 自动滑向相邻素材）
+    private func removeFromCurrentAlbum() {
+        guard let photo = currentPhoto, let context = albumContext else { return }
+        context.onRemove(photo)
+        showShareToast(String(localized: "Removed from \"\(context.album.title)\""))
+    }
+
+    /// 拷贝当前图片到系统剪贴板（原始数据 + 类型），结果以 toast 反馈
+    private func copyCurrentImage() {
+        guard let photo = currentPhoto else { return }
+        Task {
+            let copied = await Self.copyImageToPasteboard(asset: photo.asset)
+            showShareToast(String(localized: copied ? "Copied" : "Copy failed"))
+        }
+    }
+
+    private static func copyImageToPasteboard(asset: PHAsset) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let options = PHImageRequestOptions()
+            options.isNetworkAccessAllowed = true
+            options.deliveryMode = .highQualityFormat
+            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, uti, _, _ in
+                guard let data, let uti else {
+                    continuation.resume(returning: false)
+                    return
+                }
+                UIPasteboard.general.setData(data, forPasteboardType: uti)
+                continuation.resume(returning: true)
+            }
+        }
     }
 
     // 删除：沿用 deleteTrigger 触发既有删除流转（收藏拦截提示不变）；
@@ -352,36 +556,42 @@ struct FullscreenPhotoBrowser: View {
         @ViewBuilder content: @escaping () -> Content,
         action: @escaping () -> Void
     ) -> some View {
+        Button(action: action) {
+            glassLabel(size: size, iconSize: iconSize, tint: tint, content: content)
+        }
+    }
+
+    /// 玻璃圆形样式内容（glassActionButton 与「更多」Menu label 共用，
+    /// 保证按钮几何尺寸与视觉完全一致）
+    @ViewBuilder
+    private func glassLabel<Content: View>(
+        size: CGFloat = 50,
+        iconSize: CGFloat = 19,
+        tint: Color? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
         if #available(iOS 26.0, *) {
             if let tint {
-                Button(action: action) {
-                    content()
-                        .font(.system(size: iconSize, weight: .semibold))
-                        .frame(width: size, height: size)
-                        .glassEffect(.regular.tint(tint).interactive(), in: Circle())
-                }
+                content()
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .frame(width: size, height: size)
+                    .glassEffect(.regular.tint(tint).interactive(), in: Circle())
             } else {
-                Button(action: action) {
-                    content()
-                        .font(.system(size: iconSize, weight: .semibold))
-                        .frame(width: size, height: size)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
+                content()
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .frame(width: size, height: size)
+                    .glassEffect(.regular.interactive(), in: Circle())
             }
         } else if let tint {
-            Button(action: action) {
-                content()
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .frame(width: size, height: size)
-                    .background(tint, in: Circle())
-            }
+            content()
+                .font(.system(size: iconSize, weight: .semibold))
+                .frame(width: size, height: size)
+                .background(tint, in: Circle())
         } else {
-            Button(action: action) {
-                content()
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .frame(width: size, height: size)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
+            content()
+                .font(.system(size: iconSize, weight: .semibold))
+                .frame(width: size, height: size)
+                .background(.ultraThinMaterial, in: Circle())
         }
     }
 
@@ -736,9 +946,9 @@ private enum RelatedPhotosState: Equatable {
 }
 
 // MARK: - 相关照片列表模块
-/// 「More like this photo」：以当前照片为基准的相似照片双列瀑布流。
-/// 数据来自 PhotoSimilarityMatcher（Vision 特征检索）；布局沿用占位期的
-/// 版式（8pt 页边距与列距、24pt 圆角、双列错落）。
+/// 以当前照片为基准的相似照片双列瀑布流（无标题，首屏仅露出顶部弧线，
+/// 参考 system 相册的滚动暗示）。数据来自 PhotoSimilarityMatcher（Vision
+/// 特征检索）；布局沿用占位期的版式（8pt 页边距与列距、24pt 圆角、双列错落）。
 /// 单元格可点击：跳转由宿主 FullscreenPhotoBrowser 分流（批次内切换 /
 /// 批次外推入下一级详情页），本模块只上报被点素材
 private struct RelatedPhotosSection: View {
@@ -764,18 +974,12 @@ private struct RelatedPhotosSection: View {
         }
     }
 
-    /// 统一容器：标题（对齐 Figma：20pt semibold）+ 内容区
+    /// 统一容器：无标题版式（参考系统相册——卡片自身即区块标识，
+    /// 首屏仅露出顶部弧线）；顶部 12pt 与操作栏保持呼吸间距
     private func sectionContent<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(String(localized: "More like this photo"))
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.primary)
-                .padding(.horizontal, 16)
-                .padding(.top, 26)
-                .padding(.bottom, 20)
-            content()
-        }
-        .padding(.bottom, 16)
+        content()
+            .padding(.top, 12)
+            .padding(.bottom, 16)
     }
 
     /// 匹配中骨架屏：占位单元格 + 项目既有 shimmer 微光动画（不阻塞任何手势）

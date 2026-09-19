@@ -210,10 +210,8 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)  // 隐藏滚动条
             .navigationTitle(String(localized: "Settings"))
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .background(alignment: .top) {
-                TopBlurFadeBackground(height: 200)
-            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)

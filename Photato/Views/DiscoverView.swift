@@ -426,6 +426,8 @@ struct DiscoverView: View {
             .simultaneousGesture(pullGesture)
             .overlay(alignment: .top) { refreshIndicator }
             .scrollIndicators(.hidden)  // 隐藏滚动条
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             // 外部滚顶信号（双击「回忆」Tab 或外部请求）：平滑滚动回最顶部，
             // edge 滚动落位 offset 0 → 大标题完全展开，无闪动
             .onChange(of: scrollToTopSignal) { _, newValue in
@@ -480,6 +482,8 @@ struct DiscoverView: View {
         .simultaneousGesture(pullGesture)
         .overlay(alignment: .top) { refreshIndicator }
         .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     // MARK: - Skeleton Loading Grid
@@ -503,6 +507,8 @@ struct DiscoverView: View {
         }
         .scrollDisabled(true)
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     // MARK: - Permission Hint

@@ -49,3 +49,36 @@ struct TopBlurFadeBackground: View {
             .foregroundColor(.white)
     }
 }
+
+// MARK: - Scroll Edge Effect Style Compatibility (iOS 26+)
+
+/// 兼容低版本 iOS 的 ScrollEdgeEffectStyle 枚举
+public enum CompatibleScrollEdgeEffectStyle: Sendable {
+    case automatic
+    case hard
+    case soft
+}
+
+extension View {
+    /// 为滚动容器或视图配置边缘渐变模糊（兼容 iOS 18~26+）
+    /// - Parameters:
+    ///   - style: 边缘样式（.automatic, .hard, .soft）
+    ///   - edges: 作用边缘（如 .top, .bottom, .all 等）
+    @ViewBuilder
+    public func scrollEdgeEffectStyle(_ style: CompatibleScrollEdgeEffectStyle?, for edges: Edge.Set) -> some View {
+        if #available(iOS 26.0, *) {
+            let systemStyle: SwiftUI.ScrollEdgeEffectStyle? = {
+                switch style {
+                case .automatic: return .automatic
+                case .hard: return .hard
+                case .soft: return .soft
+                case .none: return nil
+                }
+            }()
+            self.scrollEdgeEffectStyle(systemStyle, for: edges)
+        } else {
+            self
+        }
+    }
+}
+

@@ -98,6 +98,8 @@ struct AlbumPhotoListView: View {
                 }
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue
@@ -107,6 +109,8 @@ struct AlbumPhotoListView: View {
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
                 FullscreenPhotoBrowser(
@@ -122,6 +126,16 @@ struct AlbumPhotoListView: View {
                         currentPhotoID = photo.id
                         targetScrollPhotoID = photo.id
                     },
+                    albumContext: (
+                        album: album,
+                        onRemove: { photo in
+                            // photos 直读 albumManager.displayedAlbumPhotos，
+                            // 移除后响应式收缩，详情页批次自动滑向相邻素材
+                            Task {
+                                try? await albumManager.removeAsset(photo.asset, from: album)
+                            }
+                        }
+                    ),
                     onDismiss: {
                         targetScrollPhotoID = currentPhotoID
                         isFullscreenMode = false

@@ -146,6 +146,8 @@ struct OrganizeResultsView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationDestination(isPresented: $isFullscreenMode) {
             fullscreenBrowserDestination
         }
@@ -238,6 +240,8 @@ struct OrganizeResultsView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     private var groupedEmptyView: some View {
@@ -312,6 +316,8 @@ struct OrganizeResultsView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
     private var flatEmptyView: some View {

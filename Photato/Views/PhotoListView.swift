@@ -143,6 +143,8 @@ struct PhotoListView: View {
                 }
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue

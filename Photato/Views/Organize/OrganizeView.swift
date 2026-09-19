@@ -71,6 +71,8 @@ struct OrganizeView: View {
         }
         .background(Color(UIColor.systemGroupedBackground))
         .scrollIndicators(.hidden)  // 隐藏滚动条
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
             let options = PHFetchOptions()
             options.includeHiddenAssets = false

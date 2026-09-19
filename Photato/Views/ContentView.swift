@@ -123,16 +123,21 @@ struct ContentView: View {
             )
             .navigationTitle(String(localized: "Memories"))
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .background(alignment: .top) {
-                if discoverManager.hasLoadedOnce && !discoverManager.photos.isEmpty {
-                    TopBlurFadeBackground(height: 200)
-                        .transition(.opacity)
-                }
-            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
+                // 第一组：筛选菜单，独立胶囊
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     formatFilterMenu
+                }
+
+                if #available(iOS 26.0, *) {
+                    // Spacer 放在 ItemGroup 外面同级，切断分组
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                }
+
+                // 第二组：待处理照片按钮，独立胶囊
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     PendingPhotosEntryButton()
                 }
             }
