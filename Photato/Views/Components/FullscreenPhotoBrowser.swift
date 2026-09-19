@@ -28,7 +28,6 @@ struct FullscreenPhotoBrowser: View {
     let onDismiss: () -> Void
 
     @EnvironmentObject var photoManager: PhotoManager
-    @Environment(\.dismiss) private var dismiss
 
     @State private var currentPhotoID: String = ""
     @State private var deleteTrigger = 0
@@ -164,59 +163,44 @@ struct FullscreenPhotoBrowser: View {
         }
         .animation(.easeInOut(duration: 0.25), value: shareToast)
         .navigationBarTitleDisplayMode(.inline)
-        // 全屏渐隐（无位移）规则：ToolbarItem 永远存在（栏布局恒定，杜绝
-        // item 移除引发的系统重排位移）——
-        // · principal 标题：纯文本无玻璃容器，恒渲染 + opacity 渐隐
-        // · 两个按钮：前半程 opacity 渐隐；过半换同尺寸透明占位（玻璃容器
-        //   随 Button 消失，item 占位保持不变）
-        // · 系统返回按钮无法控制透明度：navigationBarBackButtonHidden 常驻，
-        //   改由自定义 leading 项承担（样式贴系统）
-        .navigationBarBackButtonHidden(true)
+        // 导航栏内容不做隐藏（展开全屏时完整保留）；返回按钮为系统原生
+        // （颜色/热区/侧滑返回全系统行为，不做自定义替代）
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if expandProgress < 0.5 {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.backward")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(.accentColor)
-                            .frame(width: 36, height: 36)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(1 - expandProgress * 2)
-                } else {
-                    Color.clear.frame(width: 36, height: 36)
-                }
-            }
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(captionTitle)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    if !captionSubtitle.isEmpty {
-                        Text(captionSubtitle)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                // 标题按钮（参考系统图库）：Liquid Glass 胶囊样式，点击弹出照片信息面板
+                Button {
+                    showInfoSheet = true
+                } label: {
+                    VStack(spacing: 1) {
+                        Text(captionTitle)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
+                        if !captionSubtitle.isEmpty {
+                            Text(captionSubtitle)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
                     }
+                    // 刻意不加 .animation(value:)：文本内容变化伴随宽度变化，
+                    // 动画会把文字横向拉伸变形（切页时方向不一、超出的根源）；
+                    // 允许水平压缩（fixedSize false）保证长文本在胶囊内截断不溢出
+                    .fixedSize(horizontal: false, vertical: false)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 5)
+                    // iOS 26 Liquid Glass 胶囊（interactive 支持按压高光）；
+                    // iOS 18 回退半透明材质
+                    .modifier(TitleGlassCapsule())
+                    .contentShape(Capsule())
                 }
-                .animation(.easeInOut(duration: 0.22), value: captionTitle)
-                .animation(.easeInOut(duration: 0.22), value: captionSubtitle)
-                .opacity(max(0, 1 - expandProgress * 2))
+                .buttonStyle(.plain)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 // 待处理照片入口：数量以文本实时展示，删除后立即增加
-                if expandProgress < 0.5 {
-                    PendingPhotosEntryButton()
-                        .opacity(1 - expandProgress * 2)
-                } else {
-                    Color.clear.frame(width: 44, height: 36)
-                }
+                PendingPhotosEntryButton()
             }
         }
         .toolbar(.hidden, for: .tabBar)
@@ -731,9 +715,9 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    // MARK: - 标题（地址/拍摄日期时间）
-    /// 标题双行规则（图片/视频同套渲染逻辑）：
-    /// - 有地址：主标题=地址，副标题=完整拍摄日期+时间
+    // MARK: - 标题（地址 / 拍摄日期时间）
+    /// 标题双行规则（对齐系统相册查看器截图实测）：
+    /// - 有地址：主标题=地址（大字），副标题=「日期 时间」同行（小字）
     /// - 无地址：主标题=拍摄日期，副标题=拍摄时间
     /// - 拍摄日期时间元数据缺失：主、副标题置空，不渲染占位文案
     private func updateCaption(for photo: PhotoAsset?) {
@@ -1072,3 +1056,17 @@ private struct RelatedPhotoCardStyle: ButtonStyle {
 }
 
 
+
+// MARK: - 标题胶囊 Liquid Glass 背景
+/// iOS 26 用 glassEffect（interactive 支持按压高光），iOS 18 回退半透明材质
+private struct TitleGlassCapsule: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+}

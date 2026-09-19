@@ -119,7 +119,8 @@ struct ContentView: View {
                     scrollToPhotoID = nil
                     isFullscreenMode = true
                 },
-                scrollToTopSignal: discoverScrollSignal
+                scrollToTopSignal: discoverScrollSignal,
+                scrollToPhotoID: scrollToPhotoID
             )
             .navigationTitle(String(localized: "Memories"))
             .navigationBarTitleDisplayMode(.large)
@@ -155,12 +156,31 @@ struct ContentView: View {
                         },
                         onActivePhotoChange: { photo, _ in
                             currentPhotoID = photo.id
+                            // 切图即请求网格定位：详情页仍盖着网格，滚动发生在
+                            // 遮盖之下用户无感知，返回时已就位（不依赖 pop 信号——
+                            // 侧滑返回时 onDismiss 与 binding 变化时机均不可靠）
                         },
                         onDismiss: {
+                            // 内部退出路径（删空批次/下滑关闭）
                             isFullscreenMode = false
                         }
                     )
                     .environmentObject(photoManager)
+                    // 返回定位（转场开始时机）：binding 在 pop 转场开始的瞬间被
+                    // 置 false——此刻立即定位，0.35s 转场窗口足够掩盖滚动（视觉
+                    // 上网格随转场露出时已在目标位）。切图时的实时定位（上方
+                    // onActivePhotoChange）与销毁兜底（onDisappear）多路覆盖同一
+                    // 目标，谁先生效用谁
+                    .onDisappear {
+                        scrollToPhotoID = currentPhotoID
+                    }
+                }
+            }
+            // pop 转场开始即定位：比 onDisappear（转场结束）早 0.35s，
+            // 与切图时的实时定位、销毁兜底共同多路覆盖
+            .onChange(of: isFullscreenMode) { oldValue, newValue in
+                if oldValue && !newValue {
+                    scrollToPhotoID = currentPhotoID
                 }
             }
         }

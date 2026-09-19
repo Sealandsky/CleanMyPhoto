@@ -117,12 +117,12 @@ struct PhotoInfoSheet: View {
     private func loadAsyncInfo() async {
         let asset = photo.asset
 
-        // 1. 地址：命中缓存同步取，否则异步解析后回填
-        let cached = PhotoCaptionResolver.shared.cachedAddress(of: asset)
-        if cached.isCached {
-            if let address = cached.address, !address.isEmpty { addressText = address }
+        // 1. 地址（完整地址：标题用精简地名，信息面板展示完整地点行）：
+        //    命中缓存同步取，否则异步解析后回填
+        if let cachedFull = PhotoCaptionResolver.shared.cachedFullAddress(of: asset) {
+            if !cachedFull.isEmpty { addressText = cachedFull }
         } else {
-            PhotoCaptionResolver.shared.resolveAddress(of: asset) { address in
+            PhotoCaptionResolver.shared.resolveFullAddress(of: asset) { address in
                 if let address, !address.isEmpty { addressText = address }
             }
         }

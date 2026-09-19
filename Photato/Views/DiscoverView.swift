@@ -215,6 +215,9 @@ struct DiscoverView: View {
     var onPhotoSelect: (PhotoAsset) -> Void
     /// 滚顶信号：外部递增时网格滚回顶部（如双击「重温」Tab）
     var scrollToTopSignal: Int = 0
+    /// 定位到指定照片：详情页返回时传入最后浏览的照片 id，网格滚动对齐
+    /// 该 cell（nil = 不定位；置位一次定位后由外部复位）
+    var scrollToPhotoID: String? = nil
     @EnvironmentObject var photoManager: PhotoManager
     @Environment(GridSettings.self) private var gridSettings
 
@@ -388,7 +391,11 @@ struct DiscoverView: View {
 
     // MARK: - Grid
     private var gridView: some View {
-        ScrollView {
+        // ScrollViewReader 提供按 id 精准定位（ScrollPosition.scrollTo(id:) 对
+        // LazyVGrid/瀑布流中未实例化的 cell 不可靠，proxy.scrollTo 会先实例化
+        // 目标 cell 再滚动——与相簿页同一套已验证方案）
+        ScrollViewReader { proxy in
+            ScrollView {
             // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
                 AdaptivePhotoGrid(photos: manager.photos) { photo in
                     PhotoCell(photo: photo)
@@ -442,6 +449,19 @@ struct DiscoverView: View {
                     scrollPosition.scrollTo(edge: .top)
                 }
             }
+            // 详情页返回定位：滚动对齐最后浏览的照片 cell（无动画，与相簿页一致）
+            .onChange(of: scrollToPhotoID) { _, newValue in
+                guard let photoID = newValue else { return }
+                let photoExists = manager.photos.contains(where: { $0.id == photoID })
+                if photoExists {
+                    // 立即定位（无延迟）：请求多来自详情页切图（网格被遮盖，
+                    // 静默就位无闪跳）；ScrollPosition(id:) 直接赋值走已有绑定
+                    withTransaction(Transaction(animation: nil)) {
+                        scrollPosition = ScrollPosition(id: photoID, anchor: .center)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - 下拉刷新（含最小时长保障）
