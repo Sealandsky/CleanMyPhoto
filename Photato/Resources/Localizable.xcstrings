@@ -7001,43 +7001,43 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maximize Your Photo Storage"
+            "value" : "Effortlessly Organize Photos"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aprovecha al máximo tu almacenamiento"
+            "value" : "Organiza tus fotos fácilmente"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写真のストレージを最大化"
+            "value" : "写真をかんたんに整理"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사진 저장 공간을 최대로 활용하세요"
+            "value" : "손쉬운 사진 정리"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aproveite ao máximo seu armazenamento"
+            "value" : "Organize suas fotos facilmente"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最大程度节省手机图片空间"
+            "value" : "轻松整理照片"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最大程度節省手機圖片空間"
+            "value" : "輕鬆整理照片"
           }
         }
       }
