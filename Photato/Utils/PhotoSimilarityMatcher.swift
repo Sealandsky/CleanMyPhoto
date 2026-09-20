@@ -69,10 +69,9 @@ final class PhotoSimilarityMatcher {
     private static let fallbackPixelSize: CGFloat = 160
     /// 进度回报节流步长：每处理 N 张向主线程回报一次（大相册防主线程刷屏）
     private static let progressStride = 10
-    /// 会话级特征库容量上限：每条 VNFeaturePrintObservation 约 8~9KB，
-    /// 超大相册（5 万张）全量驻留约 300MB+。超出上限后淘汰任意条目，
-    /// 磁盘缓存仍保留全量，跨会话可复用
-    private static let maxSessionFeatureCount = 12_000
+    /// 会话级特征库容量上限：保持在 2,000 条（内存常驻仅 ~20MB）。
+    /// 超出后由二级 LRU 机制淘汰，Core Data 磁盘持久层仍保留全量，支持毫秒级按需补查
+    private static let maxSessionFeatureCount = 2_000
 
     // MARK: - Threading
 
@@ -149,6 +148,7 @@ final class PhotoSimilarityMatcher {
             for asset in assetsToIndex {
                 // 如果用户在前台主动发起了相簿扫描任务或正在详情页查看单张相似照片，后台主动让步
                 while self.albumActiveToken != nil || self.activeToken != nil {
+                    self.cache.flush()
                     Thread.sleep(forTimeInterval: 0.15)
                 }
 
@@ -162,6 +162,7 @@ final class PhotoSimilarityMatcher {
                 }
             }
 
+            self.cache.flush()
             self.isLibraryIndexed = true
             self.isBackgroundIndexing = false
 
@@ -339,6 +340,7 @@ final class PhotoSimilarityMatcher {
     func cancel() {
         workQueue.async { [weak self] in
             self?.activeToken = nil
+            self?.cache.flush()
         }
     }
 
@@ -686,6 +688,7 @@ final class PhotoSimilarityMatcher {
     nonisolated func cancelAlbumSearch() {
         workQueue.async { [weak self] in
             self?.albumActiveToken = nil
+            self?.cache.flush()
         }
     }
 
@@ -698,6 +701,7 @@ final class PhotoSimilarityMatcher {
         token: UUID,
         _ completion: @escaping ([PHAsset], Error?) -> Void
     ) {
+        cache.flush()
         if error == nil, albumActiveToken != token { return }
         DispatchQueue.main.async { completion(results, error) }
     }
@@ -711,6 +715,7 @@ final class PhotoSimilarityMatcher {
         token: UUID,
         _ completion: @escaping ([PHAsset], Error?) -> Void
     ) {
+        cache.flush()
         if error == nil, activeToken != token { return }
         DispatchQueue.main.async { completion(results, error) }
     }
@@ -725,22 +730,29 @@ final class PhotoSimilarityMatcher {
         return observation
     }
 
-    /// 会话特征库查询：素材被编辑过（modificationDate 变化）视为失效
+    /// 会话特征库查询：素材被编辑过（modificationDate 变化）视为失效。
+    /// 支持二级缓存：内存未命中时按需从 Core Data 磁盘读取并写回内存 LRU
     private func cachedObservation(for asset: PHAsset) -> VNFeaturePrintObservation? {
         ensureFeatureStoreLoaded()
         storeLock.lock()
-        defer { storeLock.unlock() }
-        guard let feature = featureStore?[asset.localIdentifier],
-              feature.modificationDate == asset.modificationDate else {
-            return nil
+        if let feature = featureStore?[asset.localIdentifier],
+           feature.modificationDate == asset.modificationDate {
+            storeLock.unlock()
+            return feature.observation
         }
-        return feature.observation
+        storeLock.unlock()
+
+        // 二级缓存兜底：从 Core Data 磁盘持久层按需读取（内存占用极低）
+        if let observation = cache.loadObservation(for: asset, pipelineVersion: Self.pipelineVersion) {
+            rememberInMemoryOnly(observation, for: asset)
+            return observation
+        }
+
+        return nil
     }
 
-    /// 写入会话特征库并持久化到磁盘（写通：扫描中断不丢已完成部分）。
-    /// 内存库超过容量上限时先淘汰任意条目再写入，防超大相册全量常驻内存
-    private func remember(_ observation: VNFeaturePrintObservation, for asset: PHAsset) {
-        ensureFeatureStoreLoaded()
+    /// 仅写入内存字典（LRU 淘汰），不再重复写磁盘
+    private func rememberInMemoryOnly(_ observation: VNFeaturePrintObservation, for asset: PHAsset) {
         storeLock.lock()
         if featureStore?.count ?? 0 >= Self.maxSessionFeatureCount,
            let evicted = featureStore?.keys.first {
@@ -751,6 +763,12 @@ final class PhotoSimilarityMatcher {
             modificationDate: asset.modificationDate
         )
         storeLock.unlock()
+    }
+
+    /// 写入会话特征库并持久化到磁盘（写通：扫描中断不丢已完成部分）。
+    /// 内存库超过容量上限时先淘汰任意条目再写入，防超大相册全量常驻内存
+    private func remember(_ observation: VNFeaturePrintObservation, for asset: PHAsset) {
+        rememberInMemoryOnly(observation, for: asset)
         cache.store(observation, for: asset, pipelineVersion: Self.pipelineVersion)
     }
 
@@ -848,13 +866,15 @@ final class PhotoSimilarityMatcher {
         options.resizeMode = .fast
 
         var cgImage: CGImage?
-        PHImageManager.default().requestImage(
-            for: asset,
-            targetSize: CGSize(width: maxPixel, height: maxPixel),
-            contentMode: .aspectFit,
-            options: options
-        ) { image, _ in
-            cgImage = image?.cgImage
+        _ = autoreleasepool {
+            PHImageManager.default().requestImage(
+                for: asset,
+                targetSize: CGSize(width: maxPixel, height: maxPixel),
+                contentMode: .aspectFit,
+                options: options
+            ) { image, _ in
+                cgImage = image?.cgImage
+            }
         }
         return cgImage
     }
@@ -940,6 +960,9 @@ private final class FeaturePrintCache {
         return context
     }()
 
+    private let batchSize = 50
+    private var pendingCount = 0
+
     /// 全量读取当前管线版本的指纹（identifier, modificationDate, data）。
     /// 供会话启动时一次性载入内存，此后查询不再触库
     func loadAll(pipelineVersion: String) -> [(identifier: String,
@@ -957,12 +980,13 @@ private final class FeaturePrintCache {
                                 record.modificationDate,
                                 record.featureData))
             }
+            // 关键：读取完后立即释放查询出的托管对象与快照内存
+            self.context.reset()
         }
         return results
     }
 
-    /// 写入/更新缓存（写通：每次即存，扫描中断也不丢已完成部分）。
-    /// 序列化走 NSSecureCoding 归档（VNFeaturePrintObservation 遵循）
+    /// 写入/更新缓存（分批批量写入 + 内存复位，避免逐张刷盘且锁定内存恒定 < 20MB）
     func store(_ observation: VNFeaturePrintObservation,
                for asset: PHAsset,
                pipelineVersion: String) {
@@ -987,8 +1011,48 @@ private final class FeaturePrintCache {
             record.featureData = data
             record.modificationDate = modificationDate
             record.computedAt = Date()
-            try? self.context.save()
+
+            self.pendingCount += 1
+            if self.pendingCount >= self.batchSize {
+                try? self.context.save()
+                self.context.reset()
+                self.pendingCount = 0
+            }
         }
+    }
+
+    /// 提交当前未满批次的改动，并清空上下文内存
+    func flush() {
+        context.performAndWait {
+            if self.pendingCount > 0 || self.context.hasChanges {
+                try? self.context.save()
+            }
+            self.context.reset()
+            self.pendingCount = 0
+        }
+    }
+
+    /// 从磁盘单条读取指定资产的特征指纹（用于二级缓存兜底，读完即释放）
+    func loadObservation(for asset: PHAsset, pipelineVersion: String) -> VNFeaturePrintObservation? {
+        var observation: VNFeaturePrintObservation?
+        let identifier = asset.localIdentifier
+        context.performAndWait {
+            let request = CachedFeaturePrint.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "localIdentifier == %@ AND pipelineVersion == %@",
+                identifier, pipelineVersion
+            )
+            request.fetchLimit = 1
+            if let record = (try? context.fetch(request))?.first,
+               let obs = try? NSKeyedUnarchiver.unarchivedObject(
+                   ofClass: VNFeaturePrintObservation.self,
+                   from: record.featureData
+               ) {
+                observation = obs
+            }
+            self.context.reset()
+        }
+        return observation
     }
 
     // MARK: - Core Data Model (programmatic)
