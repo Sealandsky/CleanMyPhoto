@@ -36,14 +36,20 @@ class PhotoManager: NSObject, ObservableObject {
     init(statisticsManager: StatisticsManager? = nil) {
         super.init()
         self.statisticsManager = statisticsManager
+        // 初始化时从 statisticsManager 继承历史缓存（如有），主线程 0 延迟
+        if let cachedCount = statisticsManager?.currentPhotoCount, cachedCount > 0 {
+            self.totalPhotoCount = cachedCount
+        }
         // 初始化时检查当前的权限状态
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         // 监听系统相册变更（外部增删改、iCloud 下载完成等），保持数据与相册一致
         PHPhotoLibrary.shared().register(self)
 
-        // 若已有权限，预先获取系统照片总数（同清理页卡片口径，开销极小）
+        // 若已有权限，异步校验刷新系统照片总数，绝不阻塞主线程启动
         if authorizationStatus == .authorized || authorizationStatus == .limited {
-            updateTotalPhotoCountFromSystem()
+            Task(priority: .utility) { [weak self] in
+                self?.updateTotalPhotoCountFromSystem()
+            }
         }
     }
 

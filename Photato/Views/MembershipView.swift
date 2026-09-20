@@ -44,6 +44,9 @@ struct MembershipView: View {
                 Text(error)
             }
         }
+        .task {
+            await membershipManager.ensureProductsLoaded()
+        }
     }
 
     // MARK: - Scroll View

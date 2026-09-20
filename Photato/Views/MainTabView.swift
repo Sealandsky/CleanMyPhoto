@@ -96,20 +96,19 @@ struct MainTabView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
-            // 稍作延迟（0.4s），避开冷启动首帧渲染与「回忆」页首批照片采样的瞬时 IO 竞争
-            try? await Task.sleep(nanoseconds: 400_000_000)
-
-            // 启动预热：提前把相似照片特征库载入内存，
-            // 详情页初始化的同步快照即为纯内存查询（与首帧同在）
+            // 1. 首屏渲染完成即刻轻量预热特征内存库（~20ms），确保用户点进详情页秒出相似照片
+            try? await Task.sleep(nanoseconds: 150_000_000)
             PhotoSimilarityMatcher.shared.prewarm()
 
-            // 启动后台静默建库：低优先级温和提取全库特征索引，零卡顿不发烫
-            PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
-
-            // 后台低优先级预热整理页快速缓存，避免首次切 Tab 时等待
+            // 2. 待首屏交互彻底稳定后（2s），后台低优先级预热整理页快速缓存
+            try? await Task.sleep(nanoseconds: 1_850_000_000)
             Task(priority: .utility) {
                 await organizeManager.quickAnalysis()
             }
+
+            // 3. 梯次延迟（3s）启动后台全相册 AI 特征静默建库，零卡顿、不抢占前台算力
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
         }
         .sheet(isPresented: $photoManager.showTrash) {
             TrashView(photoManager: photoManager)

@@ -98,18 +98,14 @@ class MembershipManager: ObservableObject {
 
     // MARK: - Init
     init() {
-        // 从 UserDefaults 加载状态
+        // 从 UserDefaults 快速恢复本地会员身份与免费额度，0 毫秒完成
         self.membershipStatus = MembershipStatus.loadFromStorage()
         self.freeDeletionsUsed = UserDefaults.standard.integer(forKey: Self.freeDeletionsUsedKey)
 
-        // 监听 StoreKit 更新
+        // 监听 StoreKit 交易更新（苹果规范后台流，无交易时挂起零开销）
         updateListenerTask = listenForTransactions()
 
-        // 加载产品并校验当前权益（订阅到期/退款后自动降级）
-        Task {
-            await loadProducts()
-            await refreshEntitlements()
-        }
+        // 商品与权益改为在用户真正打开付费页时按需加载，彻底免除启动期网络 I/O 与并发争抢
     }
 
     deinit {
@@ -161,9 +157,18 @@ class MembershipManager: ObservableObject {
         // 全部尝试失败：products 保持为空，付费墙显示手动重试入口
     }
 
-    /// 付费墙「重试」入口：重新拉取商品并刷新试用资格
+    /// 确保商品与权益已就绪（付费页打开时按需调用，内存已有商品时直接秒显复用）
+    func ensureProductsLoaded() async {
+        if products.isEmpty {
+            await loadProducts()
+        }
+        await refreshEntitlements()
+    }
+
+    /// 付费墙「重试」入口：重新拉取商品并刷新试用资格与权益
     func reloadProducts() async {
         await loadProducts()
+        await refreshEntitlements()
     }
 
     /// App Store 试用资格校验：已消耗过 introductory offer 的 Apple ID 不再展示试用文案，

@@ -7,12 +7,13 @@ class StatisticsManager: ObservableObject {
     // 持久化数据键
     private let totalDeletedPhotosKey = "totalDeletedPhotos"
     private let storageSpaceSavedBytesKey = "storageSpaceSavedBytes"
+    private let lastPhotoCountKey = "lastPhotoCount"
 
     // 持久化数据
     @Published private(set) var totalDeletedPhotos: Int = 0
     @Published private(set) var storageSpaceSavedBytes: Int = 0
 
-    // 实时数据
+    // 实时数据（支持本地历史缓存快速呈现）
     @Published var currentPhotoCount: Int = 0
     @Published var videoCount: Int = 0
     @Published var trashCount: Int = 0
@@ -22,6 +23,7 @@ class StatisticsManager: ObservableObject {
         // 从 UserDefaults 加载持久化数据
         self.totalDeletedPhotos = userDefaults.integer(forKey: totalDeletedPhotosKey)
         self.storageSpaceSavedBytes = userDefaults.integer(forKey: storageSpaceSavedBytesKey)
+        self.currentPhotoCount = userDefaults.integer(forKey: lastPhotoCountKey)
     }
 
     // MARK: - 格式化的统计信息
@@ -53,6 +55,9 @@ class StatisticsManager: ObservableObject {
         currentPhotoCount = photoCount
         self.videoCount = videoCount
         trashCount = trash
+        if photoCount > 0 {
+            userDefaults.set(photoCount, forKey: lastPhotoCountKey)
+        }
     }
 
     /// 批量记录删除操作（唯一统计口径：照片真实删除成功后调用）

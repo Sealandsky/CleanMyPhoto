@@ -147,9 +147,9 @@ final class PhotoSimilarityMatcher {
             // 3. 逐批温和提取指纹（每 15 张让步 40ms，避免占用 CPU/GPU 发烫与抢占主线程）
             var processed = 0
             for asset in assetsToIndex {
-                // 如果用户在前台主动发起了相簿扫描任务，后台让步等待
-                while self.albumActiveToken != nil {
-                    Thread.sleep(forTimeInterval: 0.2)
+                // 如果用户在前台主动发起了相簿扫描任务或正在详情页查看单张相似照片，后台主动让步
+                while self.albumActiveToken != nil || self.activeToken != nil {
+                    Thread.sleep(forTimeInterval: 0.15)
                 }
 
                 _ = autoreleasepool {
