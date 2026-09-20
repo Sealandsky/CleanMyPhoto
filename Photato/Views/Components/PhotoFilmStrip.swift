@@ -29,26 +29,30 @@ struct PhotoFilmStrip: View {
 
     // 默认步长（全收起 3:4 状态下各相邻项中心距：30 + 2.5 = 32.5pt）
     private static let stepNormal: CGFloat = unselectedWidth + spacing
+    // 静止时选中项中心与相邻项中心的间距：20 + 9 + 2.5 + 15 = 46.5pt
+    private static let stepFirstIdle: CGFloat = selectedWidth / 2 + selectedMargin + spacing + unselectedWidth / 2
 
     @State private var isDragging: Bool = false
-    @State private var dragOffset: CGFloat = 0
-    @State private var accumulatedDrag: CGFloat = 0
+    @State private var dragTranslation: CGFloat = 0
+    @State private var dragStartIndex: Int = 0
     @State private var internalIndex: Int = 0
+    @State private var lastHapticIndex: Int = -1
     private let feedback = UISelectionFeedbackGenerator()
 
     var body: some View {
         GeometryReader { geo in
             let containerWidth = geo.size.width > 0 ? geo.size.width : ScreenSizeHelper.screenSize.width
             let c = activeIndex
+            let currentCenter = currentCenterIndex
 
             ZStack {
                 Color.clear
 
-                let visibleRange = getVisibleRange(center: c)
+                let visibleRange = getVisibleRange(center: currentCenter)
                 ForEach(visibleRange, id: \.self) { i in
                     let photo = photos[i]
-                    let isCurrent = i == c
-                    let xOffset = xOffsetFor(index: i, activeIndex: c, isDragging: isDragging) + dragOffset
+                    let isCurrent = (i == c && !isDragging)
+                    let xOffset = xOffsetFor(index: i, activeIndex: c, isDragging: isDragging)
 
                     stripCell(photo, isCurrent: isCurrent, isDragging: isDragging)
                         .offset(x: xOffset)
@@ -77,13 +81,15 @@ struct PhotoFilmStrip: View {
             syncIndexWithCurrentPhotoID()
         }
         .onChange(of: currentPhotoID) { _, _ in
-            syncIndexWithCurrentPhotoID()
+            guard !isDragging else { return }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                syncIndexWithCurrentPhotoID()
+            }
         }
     }
 
-    // MARK: - Layout & Index Calculation
+    // MARK: - Indices & Offsets
 
-    /// 当前激活的照片索引（始终以 currentPhotoID 为准，找不到时兜底 internalIndex）
     private var activeIndex: Int {
         if let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) {
             return idx
@@ -91,7 +97,13 @@ struct PhotoFilmStrip: View {
         return min(max(0, internalIndex), max(0, photos.count - 1))
     }
 
-    /// 仅渲染视口及周边缓冲范围内的图片，降低图层与内存开销
+    /// 拖拽进行中当前位于屏幕中轴线的图片索引
+    private var currentCenterIndex: Int {
+        guard isDragging, !photos.isEmpty else { return activeIndex }
+        let indexDelta = Int(round(-dragTranslation / Self.stepNormal))
+        return min(max(0, dragStartIndex + indexDelta), photos.count - 1)
+    }
+
     private func getVisibleRange(center: Int) -> ClosedRange<Int> {
         guard !photos.isEmpty else { return 0...(-1) }
         let low = max(0, center - 15)
@@ -99,124 +111,107 @@ struct PhotoFilmStrip: View {
         return low <= high ? low...high : 0...0
     }
 
-    /// 选中项中心与相邻项中心的间距：
-    /// - 静止时：(40/2) + 9 + 2.5 + (30/2) = 46.5pt，两端展现 11.5pt 明显留白；
-    /// - 拖拽中：(30/2) + 0 + 2.5 + (30/2) = 32.5pt，完全收起与普通间距无异。
-    private func stepFirst(isDragging: Bool) -> CGFloat {
-        let currentWidth = isDragging ? Self.unselectedWidth : Self.selectedWidth
-        let currentMargin = isDragging ? 0 : Self.selectedMargin
-        return (currentWidth / 2) + currentMargin + Self.spacing + (Self.unselectedWidth / 2)
-    }
-
-    /// 严格以屏幕中轴（offset 0）为基准计算各图片位置：
-    /// 无论静止还是拖拽，当前项永远处于 offset 0（屏幕正中）
+    /// 每个缩略图的 X 偏移量：
+    /// - 拖拽中：以 dragStartIndex 为纯线性基准点，位置严格等于 (i - dragStartIndex) * 32.5 + dragTranslation，绝无跳动与抖动！
+    /// - 静止时：当前项严格居中（offset 0），两侧展现 11.5pt 大留白。
     private func xOffsetFor(index: Int, activeIndex: Int, isDragging: Bool) -> CGFloat {
-        if index == activeIndex {
-            return 0
-        }
-        let first = stepFirst(isDragging: isDragging)
-        if index > activeIndex {
-            return first + CGFloat(index - (activeIndex + 1)) * Self.stepNormal
+        if isDragging {
+            return CGFloat(index - dragStartIndex) * Self.stepNormal + dragTranslation
         } else {
-            return -(first + CGFloat((activeIndex - 1) - index) * Self.stepNormal)
+            if index == activeIndex {
+                return 0
+            } else if index > activeIndex {
+                return Self.stepFirstIdle + CGFloat(index - (activeIndex + 1)) * Self.stepNormal
+            } else {
+                return -(Self.stepFirstIdle + CGFloat((activeIndex - 1) - index) * Self.stepNormal)
+            }
         }
     }
 
     // MARK: - Interactions
 
-    /// 点击某缩略图：平滑弹簧滑入屏幕中央，即时切换素材
     private func selectIndex(_ index: Int) {
         guard photos.indices.contains(index) else { return }
         internalIndex = index
         feedback.selectionChanged()
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-            dragOffset = 0
-            accumulatedDrag = 0
+            dragTranslation = 0
             onSelect(photos[index])
         }
     }
 
-    /// 左右拖动底片：开始拖拽时中间图片收起为 3:4，两边无间距无描边；滑动时实时跟手步进
     private func handleDragChanged(_ value: DragGesture.Value) {
         guard !photos.isEmpty else { return }
         if !isDragging {
-            withAnimation(.easeInOut(duration: 0.15)) {
+            dragStartIndex = activeIndex
+            lastHapticIndex = dragStartIndex
+            withAnimation(.easeInOut(duration: 0.12)) {
                 isDragging = true
             }
         }
 
-        var currentDrag = value.translation.width - accumulatedDrag
-        let step = Self.stepNormal
-        let threshold = step * 0.7
+        // 阻尼系数（滑出首尾边界时产生平滑弹性阻尼）
+        var translation = value.translation.width
+        let minTranslation = CGFloat(-(photos.count - 1 - dragStartIndex)) * Self.stepNormal
+        let maxTranslation = CGFloat(dragStartIndex) * Self.stepNormal
 
-        var updated = false
-        while currentDrag < -threshold && activeIndex < photos.count - 1 {
-            accumulatedDrag -= step
-            currentDrag = value.translation.width - accumulatedDrag
-            let nextIndex = activeIndex + 1
-            internalIndex = nextIndex
-            onSelect(photos[nextIndex])
-            updated = true
+        if translation > maxTranslation {
+            let over = translation - maxTranslation
+            translation = maxTranslation + over * 0.3
+        } else if translation < minTranslation {
+            let over = translation - minTranslation
+            translation = minTranslation + over * 0.3
         }
 
-        while currentDrag > threshold && activeIndex > 0 {
-            accumulatedDrag += step
-            currentDrag = value.translation.width - accumulatedDrag
-            let prevIndex = activeIndex - 1
-            internalIndex = prevIndex
-            onSelect(photos[prevIndex])
-            updated = true
-        }
+        dragTranslation = translation
 
-        if updated {
+        // 纯线性无抖动步进：按移动距离直接推算中轴线索引
+        let indexDelta = Int(round(-translation / Self.stepNormal))
+        let targetIndex = min(max(0, dragStartIndex + indexDelta), photos.count - 1)
+
+        if targetIndex != lastHapticIndex {
+            lastHapticIndex = targetIndex
+            internalIndex = targetIndex
             feedback.selectionChanged()
+            onSelect(photos[targetIndex])
         }
-        dragOffset = currentDrag
     }
 
-    /// 拖动释放：中间图片放大为 1:1 正方形，两边展开留白间距，描边淡入，吸附中轴
     private func handleDragEnded(_ value: DragGesture.Value) {
-        accumulatedDrag = 0
-        let velocityX = value.velocity.width
-        let predictedX = value.predictedEndTranslation.width
+        guard !photos.isEmpty else { return }
 
-        // 仅在明确的高速轻扫手势下，才额外步进 1 张
-        if velocityX < -400 || predictedX < -60 {
-            let nextIndex = min(activeIndex + 1, photos.count - 1)
-            if nextIndex != activeIndex {
-                internalIndex = nextIndex
-                feedback.selectionChanged()
-                onSelect(photos[nextIndex])
-            }
-        } else if velocityX > 400 || predictedX > 60 {
-            let prevIndex = max(activeIndex - 1, 0)
-            if prevIndex != activeIndex {
-                internalIndex = prevIndex
-                feedback.selectionChanged()
-                onSelect(photos[prevIndex])
-            }
+        // 计算落点索引（支持轻度高速挥弹惯性 step 1 张）
+        let velocityX = value.velocity.width
+        let indexDelta = Int(round(-dragTranslation / Self.stepNormal))
+        var finalIndex = min(max(0, dragStartIndex + indexDelta), photos.count - 1)
+
+        if velocityX < -450 && finalIndex < photos.count - 1 {
+            finalIndex += 1
+        } else if velocityX > 450 && finalIndex > 0 {
+            finalIndex -= 1
         }
 
+        internalIndex = finalIndex
+        onSelect(photos[finalIndex])
+
+        // 放手动画：平滑恢复静止态（中间变正方形、两边展开留白、描边浮现）
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             isDragging = false
-            dragOffset = 0
+            dragTranslation = 0
         }
     }
 
     private func syncIndexWithCurrentPhotoID() {
         if let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) {
             internalIndex = idx
+            dragStartIndex = idx
         }
     }
 
     // MARK: - Cell
 
-    /// 单个缩略图：
-    /// - 静止时：选中项为 1:1 正方形（40x40）带描边，非选中项为 3:4 竖照（30x40）无描边；
-    /// - 拖动时：全部收起为 3:4 竖照（30x40）且无描边，形成匀称胶卷连贯滑动。
     private func stripCell(_ photo: PhotoAsset, isCurrent: Bool, isDragging: Bool) -> some View {
-        let width = (isCurrent && !isDragging) ? Self.selectedWidth : Self.unselectedWidth
-        let showBorder = isCurrent && !isDragging
+        let width = isCurrent ? Self.selectedWidth : Self.unselectedWidth
 
         return AssetImage(
             asset: photo.asset,
@@ -230,11 +225,9 @@ struct PhotoFilmStrip: View {
         }
         .overlay(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .strokeBorder(showBorder ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(isCurrent ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .opacity(isCurrent ? 1.0 : (isDragging ? 0.95 : 0.88))
-        .animation(.easeInOut(duration: 0.15), value: isDragging)
-        .animation(.easeInOut(duration: 0.18), value: isCurrent)
     }
 
     /// 视频/LivePhoto 角标：小尺寸半透明底衬托，白字保证任意缩略图上可读
