@@ -639,16 +639,16 @@ struct VideoControlsOverlay: View {
                 Text(Self.formatTime(state.isScrubbing
                     ? state.scrubProgress * state.totalDuration
                     : state.currentTime))
-                    .font(.caption.monospacedDigit())
+                    .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundColor(.white)
-                    .frame(width: 36, alignment: .trailing)
+                    .frame(width: 38, alignment: .trailing)
 
                 VideoScrubber(state: state)
 
                 Text(Self.formatTime(state.totalDuration))
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 36, alignment: .leading)
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundColor(.white.opacity(0.8))
+                    .frame(width: 38, alignment: .leading)
             }
 
             Spacer(minLength: 0)
@@ -665,8 +665,19 @@ struct VideoControlsOverlay: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        // 核心视觉升级：深色高质感半透明磨砂背板。
+        // 彻底解决浅色背景/高亮画面下白色文字失真、对比度不足的问题；
+        // 无论是在浅色详情卡片页还是全屏黑色底色下，均提供恒定、清晰的 WCAG AAA 对比度
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(white: 0.12).opacity(0.88))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            }
+        )
+        .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 3)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 12)
         .opacity(isDragging || !controlsVisible ? 0 : 1)
         .animation(.easeInOut(duration: 0.2), value: isDragging)
@@ -848,21 +859,22 @@ struct VideoScrubber: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Rectangle()
-                .fill(.white.opacity(0.3))
+            Capsule()
+                .fill(Color.white.opacity(0.35))
                 .frame(height: 4)
 
-            Rectangle()
-                .fill(.white)
-                .frame(width: scrubberWidth * progress, height: 4)
+            Capsule()
+                .fill(Color.white)
+                .frame(width: max(0, scrubberWidth * progress), height: 4)
 
             Circle()
-                .fill(.white)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.35), radius: 3, x: 0, y: 1)
                 .frame(width: 16, height: 16)
-                .offset(x: scrubberWidth * progress - 8)
+                .offset(x: max(-8, min(scrubberWidth - 8, scrubberWidth * progress - 8)))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 20)
+        .frame(height: 32) // 扩大触控热区，方便手指轻松抓取拖拽
         .contentShape(Rectangle())
         .background(
             GeometryReader { geo in
