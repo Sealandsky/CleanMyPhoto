@@ -1,10 +1,21 @@
 
 
 import SwiftUI
+import Photos
 
 struct SettingsView: View {
+    @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
+    @Environment(PhotoOrganizeManager.self) private var environmentOrganizeManager: PhotoOrganizeManager?
+    var organizeManager: PhotoOrganizeManager?
+    var onNavigateToOrganize: (() -> Void)? = nil
+
+    private var activeOrganizeManager: PhotoOrganizeManager? {
+        organizeManager ?? environmentOrganizeManager
+    }
+
+    @State private var totalLibraryCount = 0
     @State private var showMembership = false
     @Environment(GridSettings.self) private var gridSettings
 
@@ -77,17 +88,22 @@ struct SettingsView: View {
 
                 // 使用统计
                 Section(String(localized: "Statistics")) {
-                    StatRow(icon: "photo.stack",
+                    // 免费删除额度（置于首位）：会员（含试用期）不受额度约束显示「无限」，
+                    // 免费用户显示剩余/总额，用尽引导升级
+                    StatRow(icon: "checkmark.seal",
+                            title: String(localized: "Free Deletion Quota"),
+                            value: quotaDisplayText)
+
+                    StatRow(icon: "square.on.square",
                             title: String(localized: "Total Photos"),
-                            value: statisticsManager.totalPhotosText)
+                            value: totalPhotosDisplayText)
+
+                    // 可清理照片：数据来源于清理页；无数据时显示「待扫描」可点击跳转至清理页
+                    cleanablePhotosRow
 
                     StatRow(icon: "trash",
                             title: String(localized: "Deleted Photos"),
                             value: statisticsManager.deletedPhotosText)
-
-                    StatRow(icon: "tray.full",
-                            title: String(localized: "Pending Photos"),
-                            value: statisticsManager.trashCountText)
 
                     StatRow(icon: "externaldrive",
                             title: String(localized: "Space Saved"),
@@ -95,8 +111,8 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Color.cardBackground)
 
-                // 显示设置
-                Section(String(localized: "Display")) {
+                // 排列方式设置
+                Section(String(localized: "Layout")) {
                     HStack {
                         Image(systemName: "square.grid.2x2")
                             .foregroundColor(.blue)
@@ -206,12 +222,28 @@ struct SettingsView: View {
                     .foregroundColor(.primary)
                 }
                 .listRowBackground(Color.cardBackground)
+
+                #if DEBUG
+                Section("Debug") {
+                    Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
+                    Button("Reset Free Quota (100 left)") {
+                        membershipManager.resetFreeQuotaForTesting()
+                    }
+                    Button("Exhaust Free Quota (0 left)") {
+                        membershipManager.exhaustFreeQuotaForTesting()
+                    }
+                }
+                .listRowBackground(Color.cardBackground)
+                #endif
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
             .navigationTitle(String(localized: "Settings"))
             .navigationBarTitleDisplayMode(.large)
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .task {
+                refreshLibraryPhotoCount()
+            }
         }
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)
@@ -219,6 +251,89 @@ struct SettingsView: View {
     }
 
     // MARK: - 计算属性
+
+    /// 总照片数展示：复用系统相册资源总数（单位为“张”）
+    private var totalPhotosDisplayText: String {
+        let count = max(totalLibraryCount, photoManager.totalPhotoCount, statisticsManager.currentPhotoCount)
+        if count > 0 {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .decimal
+            let formatted = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+            return String(localized: "Photo Count Unit \(formatted)")
+        }
+        return statisticsManager.totalPhotosText
+    }
+
+    /// 查询系统相册资源总数（与清理页卡片口径一致：无隐藏照片的总资产数）
+    private func refreshLibraryPhotoCount() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if status == .authorized || status == .limited {
+            let options = PHFetchOptions()
+            options.includeHiddenAssets = false
+            totalLibraryCount = PHAsset.fetchAssets(with: options).count
+            if totalLibraryCount > 0 && statisticsManager.currentPhotoCount != totalLibraryCount {
+                statisticsManager.currentPhotoCount = totalLibraryCount
+            }
+        }
+    }
+
+    // MARK: - 可清理照片行
+    @ViewBuilder
+    private var cleanablePhotosRow: some View {
+        Button {
+            onNavigateToOrganize?()
+        } label: {
+            HStack {
+                Image(systemName: "eraser")
+                    .foregroundColor(.blue)
+                    .frame(width: 30)
+
+                Text(String(localized: "Cleanable Photos"))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                if let manager = activeOrganizeManager, manager.hasCompletedFullScan {
+                    HStack(spacing: 4) {
+                        Text(cleanablePhotosDisplayText)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.6))
+                    }
+                } else if let manager = activeOrganizeManager, manager.isAnalyzing {
+                    HStack(spacing: 4) {
+                        Text(String(localized: "Scanning..."))
+                            .foregroundColor(.blue)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(.blue)
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Text(String(localized: "To Scan"))
+                            .foregroundColor(.blue)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 可清理照片显示文案（复用 PhotoOrganizeManager 数据，单位为“张”）
+    private var cleanablePhotosDisplayText: String {
+        guard let manager = activeOrganizeManager else {
+            return String(localized: "To Scan")
+        }
+        let count = manager.cleanablePhotoCount
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let formatted = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+        return String(localized: "Photo Count Unit \(formatted)")
+    }
 
     private var membershipStatusText: String {
         if membershipManager.isPremiumMember {
@@ -246,6 +361,12 @@ struct SettingsView: View {
         }
     }
 
+    /// 免费删除额度显示（复用 MembershipManager.quotaDisplayText）：
+    /// 会员「无限」；免费显示剩余/总额；用尽提示升级
+    private var quotaDisplayText: String {
+        membershipManager.quotaDisplayText
+    }
+
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
@@ -262,6 +383,7 @@ struct SettingsView: View {
 #Preview {
     NavigationView {
         SettingsView()
+            .environmentObject(PhotoManager())
             .environmentObject(MembershipManager())
             .environmentObject(StatisticsManager())
             .environment(GridSettings())

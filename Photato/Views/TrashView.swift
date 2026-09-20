@@ -66,7 +66,14 @@ struct TrashView: View {
                     }
                 }
             } message: {
-                Text(String(localized: "Permanently delete \(photoManager.trashCount) photos? This cannot be undone."))
+                // 免费用户追加额度消耗提示（消耗数封顶为剩余额度）；会员保持原文案
+                if membershipManager.isPremiumMember {
+                    Text(String(localized: "Permanently delete \(photoManager.trashCount) photos? This cannot be undone."))
+                } else {
+                    let consumed = min(photoManager.trashCount, membershipManager.freeDeletionsRemaining)
+                    let remainingAfter = max(0, membershipManager.freeDeletionsRemaining - photoManager.trashCount)
+                    Text(String(localized: "Free Quota Delete Message \(photoManager.trashCount) \(consumed) \(remainingAfter)"))
+                }
             }
             .sheet(isPresented: $showMembershipPaywall) {
                 MembershipView(isMandatory: true)
@@ -103,15 +110,16 @@ struct TrashView: View {
                     }
 
                     liquidGlassCapsule(tint: .red, prominent: true) {
-                        guard membershipManager.isPremiumMember else {
+                        // 门槛：会员或仍有免费额度即可清空；两者皆无才弹会员墙
+                        guard membershipManager.isPremiumMember || membershipManager.hasFreeDeletionQuota else {
                             showMembershipPaywall = true
                             return
                         }
                         showingDeleteConfirmation = true
                     } label: {
                         HStack(spacing: 6) {
-                            // 非会员时按钮带锁标预告知：点击后才弹付费墙不显突兀
-                            if !membershipManager.isPremiumMember {
+                            // 非会员且免费额度用尽时按钮带锁标预告知：点击后才弹付费墙不显突兀
+                            if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
                                 Image(systemName: "lock.fill")
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                             }
@@ -172,6 +180,13 @@ struct TrashView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+
+            // 空态同样展示额度信息（免费用户），保持额度感知贯穿回收站
+            if !membershipManager.isPremiumMember {
+                Text(membershipManager.quotaDisplayText)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -221,28 +236,60 @@ struct TrashView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
-    /// 非会员常驻提示条：明确「整理与移入免费 / 永久删除需专业版」的分界线
+    /// 回收站顶部提示条（会员感知三态）：
+    /// · 会员（含试用期）：不显示——会员不受额度约束
+    /// · 免费有额度：蓝色额度条「剩余 X/100 张免费删除额度」
+    /// · 免费已用尽：可点击的升级引导条 → 弹会员墙
     @ViewBuilder
     private var membershipHintBar: some View {
         if !membershipManager.isPremiumMember {
-            HStack(spacing: 8) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                Text(String(localized: "Pending Hint Bar"))
-                    .font(.system(size: 14, design: .rounded))
-                    .multilineTextAlignment(.leading)
-                Spacer()
+            if membershipManager.freeDeletionsRemaining > 0 {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    Text(String(localized: "Free Deletion Quota Bar \(membershipManager.freeDeletionsRemaining)"))
+                        .font(.system(size: 14, design: .rounded))
+                        .multilineTextAlignment(.leading)
+                    Spacer()
+                }
+                .foregroundColor(.blue)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.blue.opacity(0.08))
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+            } else {
+                Button {
+                    showMembershipPaywall = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        Text(String(localized: "Free Quota Exhausted Bar"))
+                            .font(.system(size: 14, design: .rounded))
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.orange.opacity(0.1))
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
             }
-            .foregroundColor(.blue)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.blue.opacity(0.08))
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
         }
     }
 }

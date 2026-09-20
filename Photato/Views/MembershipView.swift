@@ -135,6 +135,9 @@ struct MembershipView: View {
                 .foregroundColor(.primary)
                 .padding(.bottom, 2)
 
+            benefitRow(icon: "gift.fill",
+                       title: String(localized: "Benefit Free Quota"),
+                       subtitle: String(localized: "Benefit Free Quota Sub"))
             benefitRow(icon: "lock.open.fill",
                        title: String(localized: "Benefit Permanent Delete"),
                        subtitle: String(localized: "Benefit Permanent Delete Sub"))

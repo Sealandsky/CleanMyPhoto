@@ -71,7 +71,10 @@ class StatisticsManager: ObservableObject {
     // MARK: - 格式化辅助
 
     private func formatNumber(_ count: Int) -> String {
-        return "\(count)"
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let formatted = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+        return String(localized: "Photo Count Unit \(formatted)")
     }
 
     private func formatBytes(_ bytes: Int) -> String {

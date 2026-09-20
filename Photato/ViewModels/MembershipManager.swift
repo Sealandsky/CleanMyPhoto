@@ -36,6 +36,18 @@ class MembershipManager: ObservableObject {
 
     #if DEBUG
     @Published var isDebugPremium = false
+
+    /// 调试方法：重置免费额度（已消耗数归零）
+    func resetFreeQuotaForTesting() {
+        freeDeletionsUsed = 0
+        UserDefaults.standard.set(0, forKey: Self.freeDeletionsUsedKey)
+    }
+
+    /// 调试方法：耗尽免费额度（已消耗数设为上限）
+    func exhaustFreeQuotaForTesting() {
+        freeDeletionsUsed = Self.freeDeletionQuota
+        UserDefaults.standard.set(freeDeletionsUsed, forKey: Self.freeDeletionsUsedKey)
+    }
     #endif
 
     var isPremiumMember: Bool {
@@ -46,10 +58,49 @@ class MembershipManager: ObservableObject {
         #endif
     }
 
+    // MARK: - 免费删除额度
+    /// 免费用户的一次性永久删除额度：仅对非会员生效（会员含试用期内不扣不减）。
+    /// 在清空回收站（永久删除）成功后按张数消耗，上限封顶。
+    static let freeDeletionQuota = 100
+    private static let freeDeletionsUsedKey = "freeDeletionsUsed"
+
+    /// 已消耗的免费删除张数（UserDefaults 持久化，一次性额度不随会员状态复位）
+    @Published private(set) var freeDeletionsUsed: Int
+
+    /// 剩余免费删除张数（钳制 ≥0）
+    var freeDeletionsRemaining: Int {
+        max(0, Self.freeDeletionQuota - freeDeletionsUsed)
+    }
+
+    /// 是否还有免费额度可用于永久删除
+    var hasFreeDeletionQuota: Bool {
+        freeDeletionsRemaining > 0
+    }
+
+    /// 额度展示文案：会员「无限」；免费显示剩余/总额；用尽提示升级
+    var quotaDisplayText: String {
+        if isPremiumMember {
+            return String(localized: "Unlimited (Member)")
+        }
+        if freeDeletionsRemaining > 0 {
+            return String(localized: "Free Deletion Quota Value \(freeDeletionsRemaining)")
+        }
+        return String(localized: "Free Quota Exhausted Value")
+    }
+
+    /// 消耗免费删除额度：仅非会员生效；消耗数封顶为剩余额度。
+    /// 在 emptyTrash 实际删除成功后调用（失败路径不调用，不扣）
+    func consumeFreeDeletions(_ count: Int) {
+        guard !isPremiumMember, count > 0 else { return }
+        freeDeletionsUsed = min(freeDeletionsUsed + count, Self.freeDeletionQuota)
+        UserDefaults.standard.set(freeDeletionsUsed, forKey: Self.freeDeletionsUsedKey)
+    }
+
     // MARK: - Init
     init() {
         // 从 UserDefaults 加载状态
         self.membershipStatus = MembershipStatus.loadFromStorage()
+        self.freeDeletionsUsed = UserDefaults.standard.integer(forKey: Self.freeDeletionsUsedKey)
 
         // 监听 StoreKit 更新
         updateListenerTask = listenForTransactions()
