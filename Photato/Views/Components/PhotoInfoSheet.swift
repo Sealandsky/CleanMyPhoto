@@ -45,10 +45,20 @@ struct PhotoInfoSheet: View {
                 .padding(.bottom, 24)
             }
         }
+        .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: allRows)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        .presentationBackground {
+            if #available(iOS 26.0, *) {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .glassEffect(.regular)
+            } else {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            }
+        }
         .task {
             await loadAsyncInfo()
         }
@@ -70,10 +80,15 @@ struct PhotoInfoSheet: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(
-            Color(UIColor.secondarySystemGroupedBackground).opacity(0.68),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
+        .background {
+            if #available(iOS 26.0, *) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemFill).opacity(0.35))
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemGroupedBackground).opacity(0.45))
+            }
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
