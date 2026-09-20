@@ -424,7 +424,21 @@ final class PlayerUIView: UIView {
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
     var player: AVPlayer? {
-        didSet { playerLayer.player = player }
+        didSet {
+            if oldValue !== player {
+                playerLayer.player = player
+            }
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        playerLayer.videoGravity = .resizeAspect
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        playerLayer.videoGravity = .resizeAspect
     }
 }
 
@@ -433,7 +447,9 @@ struct PlayerLayerView: UIViewRepresentable {
     let player: AVPlayer?
 
     func makeUIView(context: Context) -> PlayerUIView {
-        PlayerUIView()
+        let view = PlayerUIView()
+        view.player = player
+        return view
     }
 
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
@@ -441,7 +457,7 @@ struct PlayerLayerView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: PlayerUIView, context: Context) {
-        uiView.player = nil
+        // 不在此清空 uiView.player，防止 SwiftUI 动画重排 Representable 导致播放器意外中断
     }
 }
 
@@ -460,6 +476,11 @@ class VideoPlayerState: ObservableObject {
     /// 不逐帧 seek（消除拖动卡顿）；松手 endScrub 时一次性跳转
     @Published var isScrubbing = false
     @Published var scrubProgress: Double = 0
+    /// Seek 异步缓冲状态：松手后到 AVPlayer 实际跳转定位完成前为 true，
+    /// 期间滑块与时间标签严格锁定在松手目标位置，防止被旧播放时间戳污染而弹跳
+    @Published var isSeeking = false
+    private var wasPlayingBeforeScrub = false
+    private var seekToken = 0
 
     // 会话级静音记忆：仅存活于内存（static 属性随 @MainActor 类在主线程访问）。
     // App 全局默认视频音频为开启状态（sessionMuted = false）；
@@ -497,9 +518,11 @@ class VideoPlayerState: ObservableObject {
                     // cycle (self -> player -> observer closure -> self).
                     strongSelf.timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
                         Task { @MainActor in
-                            self?.currentTime = time.seconds
+                            // 拖动中或松手 Seek 缓冲期间坚决丢弃旧的播放进度回调，杜绝滑块与时间标签跳动
+                            guard let self = self, !self.isScrubbing, !self.isSeeking else { return }
+                            self.currentTime = time.seconds
                             if let dur = player.currentItem?.duration, dur.isValid, !dur.isIndefinite {
-                                self?.totalDuration = dur.seconds
+                                self.totalDuration = dur.seconds
                             }
                         }
                     }
@@ -557,29 +580,69 @@ class VideoPlayerState: ObservableObject {
         Self.sessionMuted = isMuted
     }
 
-    func seek(to progress: Double) {
-        guard let player, totalDuration > 0 else { return }
+    func seek(to progress: Double, completion: (() -> Void)? = nil) {
+        guard let player, totalDuration > 0 else {
+            completion?()
+            return
+        }
         let time = CMTime(seconds: progress * totalDuration, preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            Task { @MainActor in
+                completion?()
+            }
+        }
     }
 
-    // MARK: - Scrub（拖动只在松手时一次性 seek，拖动过程纯 UI 预览）
+    // MARK: - Scrub（拖动中保持 UI 预览，松手后执行 Seek 并加锁，零跳动平滑衔接）
 
     func beginScrub() {
+        if !isScrubbing && !isSeeking {
+            wasPlayingBeforeScrub = isPlaying
+        }
+        isSeeking = false
         isScrubbing = true
+        // 拖动开始时暂停播放，避免后台持续推进播放时间引发音画错位与松手回跳
+        player?.pause()
+        isPlaying = false
     }
 
     func updateScrub(_ progress: Double) {
-        scrubProgress = min(max(progress, 0), 1)
+        let clamped = min(max(progress, 0), 1)
+        scrubProgress = clamped
+        if totalDuration > 0 {
+            currentTime = clamped * totalDuration
+        }
     }
 
     func endScrub() {
         guard isScrubbing else { return }
         isScrubbing = false
-        seek(to: scrubProgress)
+        isSeeking = true
+        if totalDuration > 0 {
+            currentTime = scrubProgress * totalDuration
+        }
+        let targetProgress = scrubProgress
+        seekToken += 1
+        let currentToken = seekToken
+
+        seek(to: targetProgress) { [weak self] in
+            guard let self = self else { return }
+            guard self.seekToken == currentToken else { return }
+            // 若用户在 seek 完成前已开始新的拖拽，不打断新拖拽
+            guard !self.isScrubbing else { return }
+            self.isSeeking = false
+            if self.wasPlayingBeforeScrub {
+                self.player?.play()
+                self.isPlaying = true
+            }
+        }
     }
 
     func cleanup() {
+        seekToken += 1
+        isSeeking = false
+        isScrubbing = false
+        wasPlayingBeforeScrub = false
         if let observer = timeObserver, let player {
             player.removeTimeObserver(observer)
         }
@@ -599,17 +662,118 @@ class VideoPlayerState: ObservableObject {
     }
 }
 
+// MARK: - Video Controls Overlay
+struct VideoControlsOverlay: View {
+    @ObservedObject var state: VideoPlayerState
+    var isDragging: Bool = false
+    @Binding var controlsVisible: Bool
+    var onInteraction: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                state.togglePlayPause()
+                onInteraction?()
+            } label: {
+                Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 20, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+            }
+
+            if state.totalDuration > 0 {
+                // 拖动中及 Seek 缓冲期显示目标时间，平时显示当前播放时间，杜绝松手瞬跳
+                Text(Self.formatTime((state.isScrubbing || state.isSeeking)
+                    ? state.scrubProgress * state.totalDuration
+                    : state.currentTime))
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 38, alignment: .trailing)
+
+                VideoScrubber(state: state)
+
+                Text(Self.formatTime(state.totalDuration))
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundColor(.white.opacity(0.8))
+                    .frame(width: 38, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                state.toggleMute()
+                onInteraction?()
+            } label: {
+                Image(systemName: state.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 18, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        // 核心视觉升级：深色高质感半透明磨砂背板。
+        // 彻底解决浅色背景/高亮画面下白色文字失真、对比度不足的问题；
+        // 无论是在浅色详情卡片页还是全屏黑色底色下，均提供恒定、清晰的 WCAG AAA 对比度
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(white: 0.12).opacity(0.88))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            }
+        )
+        .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 3)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 12)
+        .opacity(isDragging || !controlsVisible ? 0 : 1)
+        .animation(.easeInOut(duration: 0.2), value: isDragging)
+        .animation(.easeInOut(duration: 0.25), value: controlsVisible)
+        .allowsHitTesting(controlsVisible && !isDragging)
+    }
+
+    static func formatTime(_ time: TimeInterval) -> String {
+        let s = Int(max(0, time))
+        if s < 3600 {
+            return String(format: "%d:%02d", s / 60, s % 60)
+        }
+        return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+    }
+}
+
 // MARK: - Video Player View
 struct VideoPlayerView: View {
     let asset: PHAsset
+    @ObservedObject var state: VideoPlayerState
     var isDragging: Binding<Bool> = .constant(false)
 
     /// 视频区域点按回调：详情页卡片=进沉浸全屏、沉浸全屏内=退出回详情页。
     /// 由内部 SwiftUI 手势调用——与控件条按钮天然互斥（Button 优先消费点击，
     /// 点播放/进度/静音按钮不会触发本回调）
     var onAreaTap: (() -> Void)? = nil
-    @StateObject private var state = VideoPlayerState()
+    var showsControls: Bool = true
     @Environment(\.scenePhase) private var scenePhase
+    private let ownsState: Bool
+
+    init(
+        asset: PHAsset,
+        state: VideoPlayerState? = nil,
+        isDragging: Binding<Bool> = .constant(false),
+        onAreaTap: (() -> Void)? = nil,
+        showsControls: Bool = true
+    ) {
+        self.asset = asset
+        if let state {
+            self._state = ObservedObject(wrappedValue: state)
+            self.ownsState = false
+        } else {
+            self._state = ObservedObject(wrappedValue: VideoPlayerState())
+            self.ownsState = true
+        }
+        self.isDragging = isDragging
+        self.onAreaTap = onAreaTap
+        self.showsControls = showsControls
+    }
 
     /// 控件条是否可见：播放中无交互 2.5 秒自动淡出（沉浸浏览），
     /// 暂停/加载/拖动进度时保持显示，点按视频或操作控件即唤回
@@ -623,6 +787,7 @@ struct VideoPlayerView: View {
         Group {
             if let onAreaTap {
                 playerContent
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         onAreaTap()
                     }
@@ -632,16 +797,24 @@ struct VideoPlayerView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: state.isLoading)
         .onAppear {
-            state.loadVideo(for: asset)
-            revealControls()
+            if ownsState {
+                state.loadVideo(for: asset)
+                revealControls()
+            } else if state.player == nil {
+                state.loadVideo(for: asset)
+            }
         }
         .onChange(of: asset.localIdentifier) { _, _ in
-            state.cleanup()
-            state.loadVideo(for: asset)
-            revealControls()
+            if ownsState {
+                state.cleanup()
+                state.loadVideo(for: asset)
+                revealControls()
+            }
         }
         .onDisappear {
-            state.cleanup()
+            if ownsState {
+                state.cleanup()
+            }
         }
         // 拖动进度条期间保持控件常显（拖动开始即唤回），松手后若在播放则重新计时
         .onChange(of: state.isScrubbing) { _, scrubbing in
@@ -677,12 +850,17 @@ struct VideoPlayerView: View {
                 PlayerLayerView(player: state.player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if state.player != nil {
-                    controlsOverlay
-                        .opacity(isDragging.wrappedValue || !controlsVisible ? 0 : 1)
-                        .animation(.easeInOut(duration: 0.2), value: isDragging.wrappedValue)
-                        .animation(.easeInOut(duration: 0.25), value: controlsVisible)
-                        .allowsHitTesting(controlsVisible && !isDragging.wrappedValue)
+                if showsControls, state.player != nil {
+                    VStack(spacing: 0) {
+                        Spacer()
+                        VideoControlsOverlay(
+                            state: state,
+                            isDragging: isDragging.wrappedValue,
+                            controlsVisible: $controlsVisible,
+                            onInteraction: { revealControls() }
+                        )
+                        .padding(.bottom, 20)
+                    }
                 }
             }
 
@@ -705,66 +883,6 @@ struct VideoPlayerView: View {
         }
         autoHideToken += 1
     }
-
-    private var controlsOverlay: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            HStack(spacing: 12) {
-                Button {
-                    state.togglePlayPause()
-                    revealControls()
-                } label: {
-                    Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                }
-
-                if state.totalDuration > 0 {
-                    // 拖动中显示预览时间（目标位置），平时显示当前播放时间
-                    Text(formatTime(state.isScrubbing
-                        ? state.scrubProgress * state.totalDuration
-                        : state.currentTime))
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.white)
-                        .frame(width: 36, alignment: .trailing)
-
-                    VideoScrubber(state: state)
-
-                    Text(formatTime(state.totalDuration))
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 36, alignment: .leading)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    state.toggleMute()
-                    revealControls()
-                } label: {
-                    Image(systemName: state.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.system(size: 18, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-            .padding(.horizontal, 12)
-            .padding(.bottom, 20)
-        }
-    }
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        let s = Int(max(0, time))
-        if s < 3600 {
-            return String(format: "%d:%02d", s / 60, s % 60)
-        }
-        return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
-    }
 }
 
 // MARK: - Scrubber Width Preference Key
@@ -780,29 +898,30 @@ struct VideoScrubber: View {
     @ObservedObject var state: VideoPlayerState
     @State private var scrubberWidth: CGFloat = 0
 
-    /// 滑块显示进度：拖动中取预览进度（不随播放时间回跳），平时取当前播放进度
+    /// 滑块显示进度：拖动中与 Seek 异步缓冲期均取目标进度，严格钉住滑块圆钮，零弹跳过渡
     private var progress: Double {
-        if state.isScrubbing { return state.scrubProgress }
+        if state.isScrubbing || state.isSeeking { return state.scrubProgress }
         return state.totalDuration > 0 ? min(max(state.currentTime / state.totalDuration, 0), 1) : 0
     }
 
     var body: some View {
         ZStack(alignment: .leading) {
-            Rectangle()
-                .fill(.white.opacity(0.3))
+            Capsule()
+                .fill(Color.white.opacity(0.35))
                 .frame(height: 4)
 
-            Rectangle()
-                .fill(.white)
-                .frame(width: scrubberWidth * progress, height: 4)
+            Capsule()
+                .fill(Color.white)
+                .frame(width: max(0, scrubberWidth * progress), height: 4)
 
             Circle()
-                .fill(.white)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.35), radius: 3, x: 0, y: 1)
                 .frame(width: 16, height: 16)
-                .offset(x: scrubberWidth * progress - 8)
+                .offset(x: max(-8, min(scrubberWidth - 8, scrubberWidth * progress - 8)))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 20)
+        .frame(height: 32) // 扩大触控热区，方便手指轻松抓取拖拽
         .contentShape(Rectangle())
         .background(
             GeometryReader { geo in
@@ -821,7 +940,11 @@ struct VideoScrubber: View {
                     if !state.isScrubbing { state.beginScrub() }
                     state.updateScrub(p)
                 }
-                .onEnded { _ in
+                .onEnded { value in
+                    if scrubberWidth > 0 {
+                        let p = max(0, min(1, value.location.x / scrubberWidth))
+                        state.updateScrub(p)
+                    }
                     state.endScrub()
                 }
         )
