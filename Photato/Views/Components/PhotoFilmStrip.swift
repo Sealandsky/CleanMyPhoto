@@ -11,22 +11,30 @@ struct PhotoFilmStrip: View {
     let currentPhotoID: String
     var onSelect: (PhotoAsset) -> Void
 
-    /// 布局总高度（46pt 缩略图 + 描边外扩 6pt + 上下 padding 10pt）：
+    /// 缩略图统一基准高度（参考 iOS 原生相册底部底片高度）
+    static let thumbHeight: CGFloat = 38
+    /// 缩略图条间距（原生相册紧凑胶卷风格）
+    static let itemSpacing: CGFloat = 2.5
+    /// 垂直边距（上下各 7pt）
+    static let verticalPadding: CGFloat = 7
+
+    /// 布局总高度（38pt 缩略图 + 上下边距 14pt）：
     /// 供详情页动态计算大图区高度时引用，与实际渲染高度保持同步
-    static let layoutHeight: CGFloat = 62
+    static let layoutHeight: CGFloat = thumbHeight + verticalPadding * 2
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 8) {
+                LazyHStack(spacing: Self.itemSpacing) {
                     ForEach(photos) { photo in
                         stripCell(photo)
                             .id(photo.id)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 5)
+                .padding(.vertical, Self.verticalPadding)
             }
+            .frame(height: Self.layoutHeight)
             // 翻页/删除/点击跳转等任何当前素材变化：平滑滚动让其居中
             .onChange(of: currentPhotoID) { _, newID in
                 guard !newID.isEmpty else { return }
@@ -46,34 +54,53 @@ struct PhotoFilmStrip: View {
         }
     }
 
+    // MARK: - Sizing
+
+    /// 单个缩略图宽度：参考系统相册，按照片真实原始宽高比（pixelAspectRatio）动态计算。
+    /// 钳制在 [0.45, 2.5] 之间，常规照片（3:4 竖拍、4:3 横拍、16:9、9:16等）完全按原比例，极端全景仅轻度限制。
+    private func itemWidth(for photo: PhotoAsset) -> CGFloat {
+        let ratio = photo.pixelAspectRatio
+        let clampedRatio = min(max(ratio, 0.45), 2.5)
+        return (Self.thumbHeight * clampedRatio).rounded()
+    }
+
+    /// 缩略图请求尺寸：按目标宽高的 3x 像素请求，兼顾清晰度与内存/解码速度
+    private func targetSize(for width: CGFloat) -> CGSize {
+        CGSize(
+            width: max(60, (width * 3).rounded()),
+            height: (Self.thumbHeight * 3).rounded()
+        )
+    }
+
     // MARK: - Cell
 
-    /// 单个缩略图：48pt 方图 + 当前项外扩 2pt 主色描边；视频/LivePhoto 右下角角标
+    /// 单个缩略图：根据照片原始比例动态自适应宽 + 当前项外边距呼吸感与描边高亮
     private func stripCell(_ photo: PhotoAsset) -> some View {
         let isCurrent = photo.id == currentPhotoID
+        let width = itemWidth(for: photo)
 
         return Button {
             onSelect(photo)
         } label: {
             AssetImage(
                 asset: photo.asset,
-                targetSize: CGSize(width: 112, height: 112),
+                targetSize: targetSize(for: width),
                 contentMode: .fill
             )
-            .frame(width: 46, height: 46)
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .frame(width: width, height: Self.thumbHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 mediaBadge(photo)
             }
-            // 描边画在图片边界外 3pt 处，外层 padding 预留同等空间防止裁切
+            // 当前项高亮描边：贴合 4pt 圆角的精致 2pt 主色描边
             .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(isCurrent ? Color.accentColor : .clear, lineWidth: 2)
-                    .padding(-3)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(isCurrent ? Color.accentColor : Color.clear, lineWidth: 2)
             )
-            .padding(3)
-            .opacity(isCurrent ? 1 : 0.55)
-            .scaleEffect(isCurrent ? 1.02 : 1)
+            // 参考系统相册：当前选中项两侧预留额外的呼吸间距，在紧凑底片中自然凸显
+            .padding(.horizontal, isCurrent ? 7 : 0)
+            .opacity(isCurrent ? 1.0 : 0.88)
+            .scaleEffect(isCurrent ? 1.04 : 1.0)
             .animation(.easeInOut(duration: 0.18), value: isCurrent)
         }
         .buttonStyle(.plain)
@@ -87,11 +114,11 @@ struct PhotoFilmStrip: View {
             : (photo.mediaType == .livePhoto ? "livephoto" : nil)
         if let symbolName {
             Image(systemName: symbolName)
-                .font(.system(size: 8, weight: .semibold))
+                .font(.system(size: 7, weight: .semibold))
                 .foregroundColor(.white)
-                .padding(3)
-                .background(Color.black.opacity(0.45), in: Circle())
-                .offset(x: -1, y: 1)
+                .padding(2.5)
+                .background(Color.black.opacity(0.5), in: Circle())
+                .padding(2)
         }
     }
 }
