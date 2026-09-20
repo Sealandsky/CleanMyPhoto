@@ -36,10 +36,26 @@ struct PhotoFilmStrip: View {
     @State private var isDragging: Bool = false
     @State private var isCollapsed: Bool = false
     @State private var dragTranslation: CGFloat = 0
-    @State private var dragStartIndex: Int = 0
-    @State private var internalIndex: Int = 0
+    @State private var dragStartIndex: Int
+    @State private var internalIndex: Int
     @State private var lastHapticIndex: Int = -1
     private let feedback = UISelectionFeedbackGenerator()
+
+    init(
+        photos: [PhotoAsset],
+        currentPhotoID: String,
+        onSelect: @escaping (PhotoAsset) -> Void,
+        onScrubbingChanged: ((Bool) -> Void)? = nil
+    ) {
+        self.photos = photos
+        self.currentPhotoID = currentPhotoID
+        self.onSelect = onSelect
+        self.onScrubbingChanged = onScrubbingChanged
+
+        let initialIndex = photos.firstIndex(where: { $0.id == currentPhotoID }) ?? 0
+        _internalIndex = State(initialValue: initialIndex)
+        _dragStartIndex = State(initialValue: initialIndex)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -250,7 +266,7 @@ struct PhotoFilmStrip: View {
     }
 
     private func syncIndexWithCurrentPhotoID() {
-        if let idx = photos.firstIndex(where: { $0.id == currentPhotoID }) {
+        if let idx = photos.firstIndex(where: { $0.id == currentPhotoID }), idx != internalIndex {
             internalIndex = idx
             dragStartIndex = idx
         }
