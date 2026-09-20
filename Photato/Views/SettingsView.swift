@@ -334,28 +334,9 @@ struct SettingsView: View {
         let formatted = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
         return String(localized: "Photo Count Unit \(formatted)")
     }
-
-    private var membershipStatusText: String {
-        if membershipManager.isPremiumMember {
-            let tier = membershipManager.membershipStatus.currentTier
-            switch tier {
-            case .monthly:
-                return String(localized: "Monthly Member")
-            case .yearly:
-                return String(localized: "Yearly Member")
-            case .lifetime:
-                return String(localized: "Lifetime Member")
-            case .free:
-                return String(localized: "Free")
-            }
-        } else {
-            return String(localized: "Free")
-        }
-    }
-
     private var membershipCardSubtitle: String {
         if membershipManager.isPremiumMember {
-            return membershipStatusText
+            return String(localized: "Pro Activated")
         } else {
             return String(localized: "Unlock Permanent Deletion")
         }
