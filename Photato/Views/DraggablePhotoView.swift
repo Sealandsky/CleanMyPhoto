@@ -47,6 +47,13 @@ struct DraggablePhotoView: View {
     @State private var isDeleteTransitioning = false
     @Binding var deleteTrigger: Int
 
+    // 视频独立播放状态机与控件显示控制（控件脱离缩放视频容器外部，固定在可视区底部）
+    @StateObject private var videoPlayerState = VideoPlayerState()
+    @State private var videoControlsVisible = true
+    @State private var videoAutoHideToken = 0
+    @Environment(\.scenePhase) private var scenePhase
+    private static let videoAutoHideDelay: UInt64 = 2_500_000_000
+
     // MARK: 展开状态机（详情卡片 ↔ 全屏；参考系统相册：单视图连续缩放，跟手无「切换页面」感）
     /// 展开显示图宽：nil = 详情卡片基准；非 nil = 当前展开到的图宽
     /// （捏合逐帧驱动，松手按阈值吸附，动画驱动单击/双击路径）
@@ -242,6 +249,12 @@ struct DraggablePhotoView: View {
                     .zIndex(0)
                 }
 
+                // 视频操作控件条：脱离缩放平移容器，独立位于顶层，缩放/平移视频时完全保持不动
+                if currentPhoto.mediaType == .video && !isScrubbing && !isDeleteTransitioning && videoPlayerState.player != nil {
+                    videoControlsLayer(containerSize: geometry.size, progress: currentProgress)
+                        .zIndex(5)
+                }
+
                 // Delete indicator
                 if showDeleteIndicator && onDelete != nil {
                     VStack {
@@ -288,6 +301,11 @@ struct DraggablePhotoView: View {
                 } else {
                     expandProgress.wrappedValue = expandProgressValue(for: expandWidth ?? cardImageWidth)
                 }
+                if photos[idx].mediaType == .video {
+                    revealVideoControls()
+                } else {
+                    videoPlayerState.cleanup()
+                }
             }
         }
         .onChange(of: deleteTrigger) { oldValue, newValue in
@@ -299,6 +317,41 @@ struct DraggablePhotoView: View {
             DispatchQueue.main.async {
                 performDeleteAnimation()
             }
+        }
+        // 拖动进度条期间保持控件常显，松手后若在播放则重新计时
+        .onChange(of: videoPlayerState.isScrubbing) { _, scrubbing in
+            if scrubbing {
+                videoControlsVisible = true
+            } else {
+                videoAutoHideToken += 1
+            }
+        }
+        // 播放状态变化联动：暂停显示，播放重新计时隐藏
+        .onChange(of: videoPlayerState.isPlaying) { _, isPlaying in
+            if isPlaying {
+                videoAutoHideToken += 1
+            } else {
+                videoControlsVisible = true
+            }
+        }
+        // App 切后台/失活时暂停播放并显示控件
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                videoPlayerState.pausePlayback()
+                videoControlsVisible = true
+            }
+        }
+        // 自动隐藏计时：token 变化即重启；仅「播放中且不在拖动」才真正隐藏
+        .task(id: videoAutoHideToken) {
+            guard videoPlayerState.isPlaying, !videoPlayerState.isScrubbing else { return }
+            try? await Task.sleep(nanoseconds: Self.videoAutoHideDelay)
+            guard !Task.isCancelled, videoPlayerState.isPlaying, !videoPlayerState.isScrubbing else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                videoControlsVisible = false
+            }
+        }
+        .onDisappear {
+            videoPlayerState.cleanup()
         }
     }
 
@@ -378,8 +431,10 @@ struct DraggablePhotoView: View {
                     // 天然互斥）：与单击同语义——详情态进全屏、全屏态退出
                     VideoPlayerView(
                         asset: photoAsset.asset,
+                        state: videoPlayerState,
                         isDragging: $isDragging,
-                        onAreaTap: { handleVideoAreaTap() }
+                        onAreaTap: { handleVideoAreaTap() },
+                        showsControls: false
                     )
                     .frame(width: size.width, height: size.height)
                 }
@@ -467,6 +522,61 @@ struct DraggablePhotoView: View {
             content
         }
     }
+
+    // MARK: - Video Controls Layer
+    /// 独立视频操作控件条：脱离视频缩放/平移容器，独立位于顶层。
+    /// 卡片态固定于卡片底端，全屏态固定于屏幕可视底端（安全区底边）。
+    /// 在缩放与双轴平移视频画面时，控件条绝对不跟随移动或变形。
+    @ViewBuilder
+    private func videoControlsLayer(containerSize: CGSize, progress: CGFloat) -> some View {
+        let avail = CGSize(
+            width: max(0, containerSize.width - cardPadding * 2),
+            height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
+        )
+        let ratio = currentPhoto.pixelAspectRatio
+        let cardSize = Self.fittedSize(ratio: ratio, in: avail)
+        let fullWidth = expandTargetFrame.width > 0 ? expandTargetFrame.width : containerSize.width
+        let clampedProgress = min(max(progress, 0), 1)
+
+        // 宽度：卡片态对齐卡片宽度，全屏态对齐屏幕宽度（两侧由 VideoControlsOverlay 自带 12pt padding）
+        let targetWidth = cardSize.width + (fullWidth - cardSize.width) * clampedProgress
+
+        // Y 轴锚定：卡片态固定于卡片底端（cardBottom - 20pt），全屏态固定于屏幕可视底端（screenBottom - 20pt）
+        // 关键：位置计算坚决不引入 zoomScale 与 zoomOffset，实现缩放/平移完全解耦！
+        let cardBottomY = containerSize.height / 2 + cardSize.height / 2
+        let screenBottomY: CGFloat = {
+            if expandTargetFrame.height > 0 {
+                return expandTargetFrame.maxY - containerGlobalFrame.minY
+            } else {
+                return containerSize.height
+            }
+        }()
+        let targetBottomY = (cardBottomY - 20) + ((screenBottomY - 20) - (cardBottomY - 20)) * clampedProgress
+        let containerHeight = max(targetBottomY, 60)
+
+        ZStack(alignment: .bottom) {
+            VideoControlsOverlay(
+                state: videoPlayerState,
+                isDragging: isDragging,
+                controlsVisible: $videoControlsVisible,
+                onInteraction: { revealVideoControls() }
+            )
+            .frame(width: max(targetWidth, 100))
+        }
+        .frame(width: containerSize.width, height: containerHeight, alignment: .bottom)
+        .position(x: containerSize.width / 2 + offset.width, y: containerHeight / 2)
+    }
+
+    /// 唤回视频操作控件条并重置自动隐藏计时
+    private func revealVideoControls() {
+        if !videoControlsVisible {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                videoControlsVisible = true
+            }
+        }
+        videoAutoHideToken += 1
+    }
+
     // MARK: - Gesture Handlers
     @State private var showDeleteIndicator = false
 
@@ -727,9 +837,14 @@ struct DraggablePhotoView: View {
         // 半程中间态（捏合后未吸附）忽略
     }
 
-    /// 视频区域点按（VideoPlayerView 内部手势路径）：与单击同语义
+    /// 视频区域点按（VideoPlayerView 内部手势路径）：
+    /// 若控件隐藏则优先唤回控件；若控件已显示则切换全屏/卡片（与单击同语义）
     private func handleVideoAreaTap() {
         guard expandEnabled else { return }
+        if !videoControlsVisible {
+            revealVideoControls()
+            return
+        }
         let w = expandWidth ?? cardImageWidth
         if w <= cardImageWidth * 1.02 {
             animateExpand(to: fullImageWidth)
@@ -886,11 +1001,17 @@ struct DraggablePhotoView: View {
             }
             isNavigating = false
             hasTriggeredHaptic = false
+            if targetPhoto.mediaType == .video {
+                revealVideoControls()
+            } else {
+                videoPlayerState.cleanup()
+            }
         }
     }
 
     // MARK: - Dismiss Animation
     private func performDismissAnimation() {
+        videoPlayerState.cleanup()
         withAnimation(.easeOut(duration: 0.3)) {
             offset = CGSize(width: 0, height: screenSize.height)
         }
@@ -906,6 +1027,7 @@ struct DraggablePhotoView: View {
 
     // MARK: - Delete Animation
     private func performDeleteAnimation() {
+        videoPlayerState.cleanup()
         triggerConfirmHaptic()
         resetZoomStates()
         expandWidth = nil

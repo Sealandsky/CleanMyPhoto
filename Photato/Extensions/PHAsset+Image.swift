@@ -599,17 +599,100 @@ class VideoPlayerState: ObservableObject {
     }
 }
 
+// MARK: - Video Controls Overlay
+struct VideoControlsOverlay: View {
+    @ObservedObject var state: VideoPlayerState
+    var isDragging: Bool = false
+    @Binding var controlsVisible: Bool
+    var onInteraction: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                state.togglePlayPause()
+                onInteraction?()
+            } label: {
+                Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 20, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+            }
+
+            if state.totalDuration > 0 {
+                // 拖动中显示预览时间（目标位置），平时显示当前播放时间
+                Text(Self.formatTime(state.isScrubbing
+                    ? state.scrubProgress * state.totalDuration
+                    : state.currentTime))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.white)
+                    .frame(width: 36, alignment: .trailing)
+
+                VideoScrubber(state: state)
+
+                Text(Self.formatTime(state.totalDuration))
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 36, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                state.toggleMute()
+                onInteraction?()
+            } label: {
+                Image(systemName: state.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 18, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 12)
+        .opacity(isDragging || !controlsVisible ? 0 : 1)
+        .animation(.easeInOut(duration: 0.2), value: isDragging)
+        .animation(.easeInOut(duration: 0.25), value: controlsVisible)
+        .allowsHitTesting(controlsVisible && !isDragging)
+    }
+
+    static func formatTime(_ time: TimeInterval) -> String {
+        let s = Int(max(0, time))
+        if s < 3600 {
+            return String(format: "%d:%02d", s / 60, s % 60)
+        }
+        return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+    }
+}
+
 // MARK: - Video Player View
 struct VideoPlayerView: View {
     let asset: PHAsset
+    @ObservedObject var state: VideoPlayerState
     var isDragging: Binding<Bool> = .constant(false)
 
     /// 视频区域点按回调：详情页卡片=进沉浸全屏、沉浸全屏内=退出回详情页。
     /// 由内部 SwiftUI 手势调用——与控件条按钮天然互斥（Button 优先消费点击，
     /// 点播放/进度/静音按钮不会触发本回调）
     var onAreaTap: (() -> Void)? = nil
-    @StateObject private var state = VideoPlayerState()
+    var showsControls: Bool = true
     @Environment(\.scenePhase) private var scenePhase
+
+    init(
+        asset: PHAsset,
+        state: VideoPlayerState? = nil,
+        isDragging: Binding<Bool> = .constant(false),
+        onAreaTap: (() -> Void)? = nil,
+        showsControls: Bool = true
+    ) {
+        self.asset = asset
+        self._state = ObservedObject(wrappedValue: state ?? VideoPlayerState())
+        self.isDragging = isDragging
+        self.onAreaTap = onAreaTap
+        self.showsControls = showsControls
+    }
 
     /// 控件条是否可见：播放中无交互 2.5 秒自动淡出（沉浸浏览），
     /// 暂停/加载/拖动进度时保持显示，点按视频或操作控件即唤回
@@ -623,6 +706,7 @@ struct VideoPlayerView: View {
         Group {
             if let onAreaTap {
                 playerContent
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         onAreaTap()
                     }
@@ -677,12 +761,17 @@ struct VideoPlayerView: View {
                 PlayerLayerView(player: state.player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if state.player != nil {
-                    controlsOverlay
-                        .opacity(isDragging.wrappedValue || !controlsVisible ? 0 : 1)
-                        .animation(.easeInOut(duration: 0.2), value: isDragging.wrappedValue)
-                        .animation(.easeInOut(duration: 0.25), value: controlsVisible)
-                        .allowsHitTesting(controlsVisible && !isDragging.wrappedValue)
+                if showsControls, state.player != nil {
+                    VStack(spacing: 0) {
+                        Spacer()
+                        VideoControlsOverlay(
+                            state: state,
+                            isDragging: isDragging.wrappedValue,
+                            controlsVisible: $controlsVisible,
+                            onInteraction: { revealControls() }
+                        )
+                        .padding(.bottom, 20)
+                    }
                 }
             }
 
@@ -704,66 +793,6 @@ struct VideoPlayerView: View {
             controlsVisible = true
         }
         autoHideToken += 1
-    }
-
-    private var controlsOverlay: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            HStack(spacing: 12) {
-                Button {
-                    state.togglePlayPause()
-                    revealControls()
-                } label: {
-                    Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                }
-
-                if state.totalDuration > 0 {
-                    // 拖动中显示预览时间（目标位置），平时显示当前播放时间
-                    Text(formatTime(state.isScrubbing
-                        ? state.scrubProgress * state.totalDuration
-                        : state.currentTime))
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.white)
-                        .frame(width: 36, alignment: .trailing)
-
-                    VideoScrubber(state: state)
-
-                    Text(formatTime(state.totalDuration))
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 36, alignment: .leading)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    state.toggleMute()
-                    revealControls()
-                } label: {
-                    Image(systemName: state.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.system(size: 18, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-            .padding(.horizontal, 12)
-            .padding(.bottom, 20)
-        }
-    }
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        let s = Int(max(0, time))
-        if s < 3600 {
-            return String(format: "%d:%02d", s / 60, s % 60)
-        }
-        return String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
     }
 }
 
