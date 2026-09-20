@@ -64,6 +64,7 @@ struct PhotoFilmStrip: View {
                         isCenterDuringDrag: isCenterDuringDrag
                     )
                     .offset(x: itemBaseX(index: i, center: anchorIndex, isCollapsed: isCollapsed))
+                    .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isCollapsed)
                     .offset(x: dragTranslation)
                     .zIndex(isExpanded ? 1 : 0)
                     .onTapGesture {
@@ -150,11 +151,11 @@ struct PhotoFilmStrip: View {
         }
     }
 
-    /// 滑动准备缓冲区阈值（10pt）：
-    /// 当用户滑动一点点时（0~10pt），当前选中图片首先顺畅缩小为 3:4 竖图并收拢呼吸间隙，
+    /// 滑动准备缓冲区阈值（12pt）：
+    /// 当用户滑动一点点时（0~12pt），当前选中图片首先顺畅缩小为 3:4 竖图并收拢呼吸间隙，
     /// 此阶段缩略图条基本保持原位（仅产生 15% 微小阻尼蠕动），为后续滑动浏览做充分准备；
-    /// 超过 10pt 后，滑动位移无缝 1:1 跟手，开始平滑切换照片。
-    private static let prepDistance: CGFloat = 10.0
+    /// 超过 12pt 后，滑动位移无缝 1:1 跟手，开始平滑切换照片。
+    private static let prepDistance: CGFloat = 12.0
 
     private func calculateEffectiveTranslation(_ translation: CGFloat) -> CGFloat {
         if translation > Self.prepDistance {
@@ -173,10 +174,8 @@ struct PhotoFilmStrip: View {
             dragStartIndex = activeIndex
             lastHapticIndex = dragStartIndex
             isDragging = true
+            isCollapsed = true
             onScrubbingChanged?(true)
-            withAnimation(.spring(response: 0.20, dampingFraction: 0.88)) {
-                isCollapsed = true
-            }
         }
 
         // 阻尼系数（滑出首尾边界时产生平滑弹性阻尼）
@@ -272,6 +271,7 @@ struct PhotoFilmStrip: View {
                 .strokeBorder(isExpanded ? Color.accentColor : Color.clear, lineWidth: 2)
         )
         .opacity(isExpanded ? 1.0 : (isCenterDuringDrag ? 1.0 : 0.88))
+        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isExpanded)
     }
 
     /// 视频/LivePhoto 角标：小尺寸半透明底衬托，白字保证任意缩略图上可读
