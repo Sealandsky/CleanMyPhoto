@@ -150,6 +150,22 @@ struct PhotoFilmStrip: View {
         }
     }
 
+    /// 滑动准备缓冲区阈值（10pt）：
+    /// 当用户滑动一点点时（0~10pt），当前选中图片首先顺畅缩小为 3:4 竖图并收拢呼吸间隙，
+    /// 此阶段缩略图条基本保持原位（仅产生 15% 微小阻尼蠕动），为后续滑动浏览做充分准备；
+    /// 超过 10pt 后，滑动位移无缝 1:1 跟手，开始平滑切换照片。
+    private static let prepDistance: CGFloat = 10.0
+
+    private func calculateEffectiveTranslation(_ translation: CGFloat) -> CGFloat {
+        if translation > Self.prepDistance {
+            return (translation - Self.prepDistance) + Self.prepDistance * 0.15
+        } else if translation < -Self.prepDistance {
+            return (translation + Self.prepDistance) - Self.prepDistance * 0.15
+        } else {
+            return translation * 0.15
+        }
+    }
+
     private func handleDragChanged(_ value: DragGesture.Value) {
         guard !photos.isEmpty else { return }
 
@@ -158,23 +174,25 @@ struct PhotoFilmStrip: View {
             lastHapticIndex = dragStartIndex
             isDragging = true
             onScrubbingChanged?(true)
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
+            withAnimation(.spring(response: 0.20, dampingFraction: 0.88)) {
                 isCollapsed = true
             }
         }
 
         // 阻尼系数（滑出首尾边界时产生平滑弹性阻尼）
-        var translation = value.translation.width
+        var rawTranslation = value.translation.width
         let minTranslation = CGFloat(-(photos.count - 1 - dragStartIndex)) * Self.stepNormal
         let maxTranslation = CGFloat(dragStartIndex) * Self.stepNormal
 
-        if translation > maxTranslation {
-            let over = translation - maxTranslation
-            translation = maxTranslation + over * 0.3
-        } else if translation < minTranslation {
-            let over = translation - minTranslation
-            translation = minTranslation + over * 0.3
+        if rawTranslation > maxTranslation {
+            let over = rawTranslation - maxTranslation
+            rawTranslation = maxTranslation + over * 0.3
+        } else if rawTranslation < minTranslation {
+            let over = rawTranslation - minTranslation
+            rawTranslation = minTranslation + over * 0.3
         }
+
+        let translation = calculateEffectiveTranslation(rawTranslation)
 
         // 核心保证：手势位移绝对零延迟更新，不继承任何动画插值，实现 100% 跟手
         var trans = Transaction()
@@ -183,7 +201,7 @@ struct PhotoFilmStrip: View {
             dragTranslation = translation
         }
 
-        // 纯线性无抖动步进：按移动距离直接推算中轴线索引
+        // 纯线性无抖动步进：按有效移动距离推算中轴线索引
         let indexDelta = Int(round(-translation / Self.stepNormal))
         let targetIndex = min(max(0, dragStartIndex + indexDelta), photos.count - 1)
 
@@ -203,10 +221,12 @@ struct PhotoFilmStrip: View {
         let indexDelta = Int(round(-dragTranslation / Self.stepNormal))
         var finalIndex = min(max(0, dragStartIndex + indexDelta), photos.count - 1)
 
-        if velocityX < -450 && finalIndex < photos.count - 1 {
-            finalIndex += 1
-        } else if velocityX > 450 && finalIndex > 0 {
-            finalIndex -= 1
+        if abs(value.translation.width) > Self.prepDistance {
+            if velocityX < -450 && finalIndex < photos.count - 1 {
+                finalIndex += 1
+            } else if velocityX > 450 && finalIndex > 0 {
+                finalIndex -= 1
+            }
         }
 
         internalIndex = finalIndex
