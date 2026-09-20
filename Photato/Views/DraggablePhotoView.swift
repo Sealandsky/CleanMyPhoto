@@ -31,10 +31,19 @@ struct DraggablePhotoView: View {
     var cardPresentation: CardPresentation = .fullScreen
 
     private var effectiveCardTopPadding: CGFloat {
-        cardPresentation == .fullScreen ? cardTopPadding : 0
+        cardPresentation == .fullScreen ? cardTopPadding : 4
     }
     private var effectiveCardBottomPadding: CGFloat {
-        cardPresentation == .fullScreen ? cardBottomPadding : 0
+        cardPresentation == .fullScreen ? cardBottomPadding : 12
+    }
+    private var effectiveCardShadowRadius: CGFloat {
+        cardPresentation == .embeddedSection ? 10 : cardShadowRadius
+    }
+    private var effectiveCardShadowOpacity: CGFloat {
+        cardPresentation == .embeddedSection ? 0.08 : cardShadowOpacity
+    }
+    private var effectiveCardShadowY: CGFloat {
+        cardPresentation == .embeddedSection ? 2 : 4
     }
 
     @State private var localIndex: Int
@@ -273,9 +282,8 @@ struct DraggablePhotoView: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            // 裁剪边界外扩 20pt：滑动切页的相邻卡仍被裁住，同时保留当前卡投影；
-            // 展开态彻底放开裁剪（图要溢出容器铺满全屏）
-            .clipShape(Rectangle().inset(by: currentProgress > 0.01 ? -3000 : -20))
+            // 裁剪边界：展开态放开裁剪；卡片态底边严格对齐容器下边缘（0pt 溢出），彻底杜绝投影污染缩略图
+            .clipShape(CardStackClipShape(progress: currentProgress))
             .onAppear {
                 cardContainerSize = geometry.size
                 containerGlobalFrame = geometry.frame(in: .global)
@@ -412,8 +420,9 @@ struct DraggablePhotoView: View {
         let size = displaySize ?? cardSize(for: photoAsset, in: available)
         let radius = cardCornerRadius * chromeScale
         let strokeOpacity = 0.1 * chromeScale
-        let shadowOpacity = cardShadowOpacity * chromeScale
-        let shadowRadius = cardShadowRadius * chromeScale
+        let shadowOpacity = effectiveCardShadowOpacity * chromeScale
+        let shadowRadius = effectiveCardShadowRadius * chromeScale
+        let shadowY = effectiveCardShadowY * chromeScale
         let imageSize = cardTargetSize
 
         switch photoAsset.mediaType {
@@ -448,7 +457,8 @@ struct DraggablePhotoView: View {
                 radius: radius,
                 strokeOpacity: strokeOpacity,
                 shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
             )
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
@@ -476,7 +486,8 @@ struct DraggablePhotoView: View {
                 radius: radius,
                 strokeOpacity: strokeOpacity,
                 shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
             )
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
@@ -496,7 +507,8 @@ struct DraggablePhotoView: View {
                 radius: radius,
                 strokeOpacity: strokeOpacity,
                 shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
             )
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
@@ -510,7 +522,8 @@ struct DraggablePhotoView: View {
         radius: CGFloat,
         strokeOpacity: CGFloat,
         shadowOpacity: CGFloat,
-        shadowRadius: CGFloat
+        shadowRadius: CGFloat,
+        shadowY: CGFloat = 2
     ) -> some View {
         content
             .clipShape(RoundedRectangle(cornerRadius: max(0, radius), style: .continuous))
@@ -518,7 +531,7 @@ struct DraggablePhotoView: View {
                 RoundedRectangle(cornerRadius: max(0, radius), style: .continuous)
                     .strokeBorder(Color.white.opacity(max(0, strokeOpacity)), lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(max(0, shadowOpacity)), radius: max(0, shadowRadius), x: 0, y: 4)
+            .shadow(color: .black.opacity(max(0, shadowOpacity)), radius: shadowRadius, x: 0, y: shadowY)
     }
 
     // MARK: - Video Controls Layer
@@ -535,10 +548,10 @@ struct DraggablePhotoView: View {
         let targetWidth = containerSize.width + (fullWidth - containerSize.width) * clampedProgress
 
         // Y 轴锚定：
-        // 卡片态固定于卡片区域最底端（缩略图条上方留出 8pt 呼吸间距），完全不遮挡上方横屏视频！
+        // 卡片态固定于卡片区域最底端（缩略图条上方留出 10pt 呼吸间距），完全不遮挡上方横屏视频！
         // 全屏态固定于屏幕可视底端（安全区底边上方 20pt）。
         // 关键：位置计算坚决不引入 zoomScale 与 zoomOffset，实现画面缩放/平移完全解耦！
-        let cardModeBottomY = containerSize.height - 8
+        let cardModeBottomY = containerSize.height - 10
         let screenBottomY: CGFloat = {
             if expandTargetFrame.height > 0 {
                 return expandTargetFrame.maxY - containerGlobalFrame.minY - 20
@@ -1415,6 +1428,29 @@ struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
             default:
                 break
             }
+        }
+    }
+}
+
+// MARK: - Card Stack Clip Shape
+/// 卡片容器裁剪区域：
+/// - 展开全屏态：放开裁剪限制（-3000pt），允许照片铺满全屏幕
+/// - 卡片静止态：顶部与左右外扩 20pt 容纳卡片微投影，底边严格对齐容器下边界（0pt 外溢），
+///   物理隔断卡片与阴影，绝对不向下方缩略图胶卷条溢出任何像素
+struct CardStackClipShape: Shape {
+    var progress: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        if progress > 0.01 {
+            return Path(rect.insetBy(dx: -3000, dy: -3000))
+        } else {
+            let clippedRect = CGRect(
+                x: rect.minX - 20,
+                y: rect.minY - 20,
+                width: rect.width + 40,
+                height: rect.height + 20
+            )
+            return Path(clippedRect)
         }
     }
 }
