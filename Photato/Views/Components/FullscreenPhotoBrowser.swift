@@ -331,8 +331,8 @@ struct FullscreenPhotoBrowser: View {
                     ))
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
-                    // 展开时照片区置顶（图要盖过缩略条/操作栏铺满全屏）
-                    .zIndex(expandProgress > 0.01 ? 2 : 0)
+                    // 恒定置顶（图展开时盖过缩略条/操作栏铺满全屏；恒定层级杜绝 0.01 阈值处 SwiftUI 销毁重建图层带来的跳闪）
+                    .zIndex(1)
 
                     // 缩略图条：点击跳转直接写入 currentPhotoID（DraggablePhotoView
                     // 的 onChange 联动同步 localIndex）；滑动速览过程仅展示轻量预览，

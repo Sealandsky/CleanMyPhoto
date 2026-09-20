@@ -674,13 +674,17 @@ struct DraggablePhotoView: View {
             && cardContainerSize.width > 0
     }
 
-    /// 详情卡片基准图宽（aspectFit 于卡片可用区）
-    private var cardImageWidth: CGFloat {
-        let avail = CGSize(
-            width: cardContainerSize.width - cardPadding * 2,
-            height: cardContainerSize.height
+    /// 详情卡片可用绘图区域（扣除水平与垂直安全内边距）
+    private var cardAvailableSize: CGSize {
+        CGSize(
+            width: max(0, cardContainerSize.width - cardPadding * 2),
+            height: max(0, cardContainerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
         )
-        return Self.fittedSize(ratio: currentPhoto.pixelAspectRatio, in: avail).width
+    }
+
+    /// 详情卡片基准图宽（aspectFit 于卡片可用区，与 mediaCardLayer 严格统一）
+    private var cardImageWidth: CGFloat {
+        Self.fittedSize(ratio: currentPhoto.pixelAspectRatio, in: cardAvailableSize).width
     }
 
     /// 全屏基准图宽（aspectFit 于展开目标区）
@@ -730,8 +734,9 @@ struct DraggablePhotoView: View {
             progress = min(max(expandProgress.wrappedValue, 0), 1)
         }
 
-        let currentWidth = cardSize.width + widthDelta * progress
-        let currentHeight = currentWidth / max(ratio, 0.01)
+        // 双轴严格线性插值：确保 progress == 0 时完美吻合 cardSize（零像素差），progress == 1 时对齐全屏
+        let currentWidth = cardSize.width + (fullSize.width - cardSize.width) * progress
+        let currentHeight = cardSize.height + (fullSize.height - cardSize.height) * progress
         let zoomScale = max(1.0, w / max(fullSize.width, 1.0))
         let size = CGSize(width: currentWidth * zoomScale, height: currentHeight * zoomScale)
 
@@ -757,7 +762,7 @@ struct DraggablePhotoView: View {
 
         let clampedProgress = min(max(progress, 0), 1)
         let width = cardSize.width + (fullSize.width - cardSize.width) * clampedProgress
-        let height = width / max(ratio, 0.01)
+        let height = cardSize.height + (fullSize.height - cardSize.height) * clampedProgress
         let size = CGSize(width: width, height: height)
 
         let offset = CGSize(
@@ -803,29 +808,39 @@ struct DraggablePhotoView: View {
         guard fullW > cardW else { return }
         if width >= fullW { return }  // 放大态跟手保留
         let mid = (cardW + fullW) / 2
-        animateExpand(to: width < mid ? cardW : fullW)
+        if width < mid {
+            collapseToCard()
+        } else {
+            animateExpand(to: fullW)
+        }
     }
 
     /// 动画驱动展开（单击/双击/吸附路径；进度 binding 随同一动画事务联动页面级视觉）
-    private func animateExpand(to target: CGFloat) {
+    private func animateExpand(to target: CGFloat, completion: (() -> Void)? = nil) {
+        let isCollapsing = target <= cardImageWidth + 0.5
         withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
             expandWidth = target
             expandProgress.wrappedValue = expandProgressValue(for: target)
-        }
-        if target <= cardImageWidth + 0.5 {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+            if isCollapsing {
                 zoomOffset = .zero
             }
+        } completion: {
+            completion?()
         }
     }
 
     /// 收拢回详情卡片（退出全屏；平移一并复位）
     private func collapseToCard() {
-        animateExpand(to: cardImageWidth)
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            if expandProgress.wrappedValue <= 0.01 {
-                expandWidth = nil
+        animateExpand(to: cardImageWidth) {
+            // 弹簧动画完全自然停稳（completion）后静默清理 expandWidth 为 nil。
+            // 此时 cardImageWidth 的几何已经与 expand == nil 达到 100% 像素级一致，
+            // 杜绝 400ms 硬延时切断弹簧尾部震荡引起的突变与闪跳。
+            if (expandWidth ?? 0) <= cardImageWidth + 1.0 {
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    expandWidth = nil
+                }
             }
         }
     }
@@ -1434,24 +1449,32 @@ struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
 
 // MARK: - Card Stack Clip Shape
 /// 卡片容器裁剪区域：
-/// - 展开全屏态：放开裁剪限制（-3000pt），允许照片铺满全屏幕
-/// - 卡片静止态：顶部与左右外扩 20pt 容纳卡片微投影，底边严格对齐容器下边界（0pt 外溢），
+/// - 展开全屏态：放开裁剪限制，允许照片与控件平滑铺满全屏幕
+/// - 卡片静止态（progress == 0）：顶部与左右外扩 20pt 容纳卡片微投影，底边严格对齐容器下边界（0pt 外溢），
 ///   物理隔断卡片与阴影，绝对不向下方缩略图胶卷条溢出任何像素
+/// - 转场过程：实现 Animatable 协议并平滑插值边界，杜绝 0.01 阈值处裁剪矩形硬切变带来的视觉闪跳
 struct CardStackClipShape: Shape {
     var progress: CGFloat
 
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
     func path(in rect: CGRect) -> Path {
-        if progress > 0.01 {
-            return Path(rect.insetBy(dx: -3000, dy: -3000))
-        } else {
-            let clippedRect = CGRect(
-                x: rect.minX - 20,
-                y: rect.minY - 20,
-                width: rect.width + 40,
-                height: rect.height + 20
-            )
-            return Path(clippedRect)
-        }
+        let p = min(max(progress, 0), 1)
+        let extra = 3000 * p
+        let minX = rect.minX - 20 - extra
+        let maxX = rect.maxX + 20 + extra
+        let minY = rect.minY - 20 - extra
+        let maxY = rect.maxY + extra
+        let clippedRect = CGRect(
+            x: minX,
+            y: minY,
+            width: max(0, maxX - minX),
+            height: max(0, maxY - minY)
+        )
+        return Path(clippedRect)
     }
 }
 
