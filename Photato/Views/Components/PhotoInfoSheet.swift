@@ -48,7 +48,7 @@ struct PhotoInfoSheet: View {
         .animation(.easeInOut(duration: 0.25), value: allRows)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .background(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(.ultraThinMaterial)
         .task {
             await loadAsyncInfo()
         }
@@ -70,7 +70,14 @@ struct PhotoInfoSheet: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            Color(UIColor.secondarySystemGroupedBackground).opacity(0.68),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+        )
     }
 
     /// 同步基础信息（元数据直读，零 IO）
