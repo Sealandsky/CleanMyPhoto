@@ -10,6 +10,7 @@ struct PhotoFilmStrip: View {
     let photos: [PhotoAsset]
     let currentPhotoID: String
     var onSelect: (PhotoAsset) -> Void
+    var onScrubbingChanged: ((Bool) -> Void)? = nil
 
     /// 缩略图统一基准高度
     static let thumbHeight: CGFloat = 40
@@ -139,6 +140,7 @@ struct PhotoFilmStrip: View {
         guard photos.indices.contains(index) else { return }
         internalIndex = index
         dragStartIndex = index
+        onScrubbingChanged?(false)
         feedback.selectionChanged()
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             dragTranslation = 0
@@ -155,6 +157,7 @@ struct PhotoFilmStrip: View {
             dragStartIndex = activeIndex
             lastHapticIndex = dragStartIndex
             isDragging = true
+            onScrubbingChanged?(true)
             withAnimation(.spring(response: 0.22, dampingFraction: 0.88)) {
                 isCollapsed = true
             }
@@ -215,6 +218,7 @@ struct PhotoFilmStrip: View {
             isCollapsed = false
             dragTranslation = 0
         }
+        onScrubbingChanged?(false)
     }
 
     private func syncIndexWithCurrentPhotoID() {

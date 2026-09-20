@@ -32,6 +32,8 @@ struct FullscreenPhotoBrowser: View {
     @State private var currentPhotoID: String = ""
     @State private var deleteTrigger = 0
     @State private var showFavoriteDeleteAlert = false
+    @State private var isFilmStripDragging = false
+    @State private var prewarmedAssets: [PHAsset] = []
 
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
@@ -250,8 +252,12 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
+            guard !isFilmStripDragging else { return }
             prewarmNeighbors()
             await loadRelatedPhotos()
+        }
+        .onDisappear {
+            PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
         .onChange(of: photos) { oldPhotos, newPhotos in
@@ -286,6 +292,7 @@ struct FullscreenPhotoBrowser: View {
                     DraggablePhotoView(
                         photos: browsePhotos,
                         currentPhotoID: currentPhotoID,
+                        isScrubbing: isFilmStripDragging,
                         deleteTrigger: $deleteTrigger,
                         onPhotoChange: { id, index in
                             // 删除流转会在数组收缩前回报旧素材 id：此时以回退
@@ -329,15 +336,30 @@ struct FullscreenPhotoBrowser: View {
                     .zIndex(expandProgress > 0.01 ? 2 : 0)
 
                     // 缩略图条：点击跳转直接写入 currentPhotoID（DraggablePhotoView
-                    // 的 onChange 联动同步 localIndex）；同步回报索引保持外部网格
-                    // 关闭详情页后的回滚定位一致
+                    // 的 onChange 联动同步 localIndex）；滑动速览过程仅展示轻量预览，
+                    // 放手落定后才触发全量数据加载与外部网格定位同步，杜绝内存与 CPU 暴涨
                     PhotoFilmStrip(
                         photos: browsePhotos,
                         currentPhotoID: currentPhotoID,
                         onSelect: { photo in
                             currentPhotoID = photo.id
-                            if let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
-                                onActivePhotoChange?(photo, index)
+                            if !isFilmStripDragging {
+                                if let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
+                                    onActivePhotoChange?(photo, index)
+                                }
+                            }
+                        },
+                        onScrubbingChanged: { scrubbing in
+                            isFilmStripDragging = scrubbing
+                            if !scrubbing {
+                                // 手势松手落定：同步外部网格定位，并触发最终定稿大图的预热与相似匹配
+                                if let photo = currentPhoto, let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
+                                    onActivePhotoChange?(photo, index)
+                                }
+                                prewarmNeighbors()
+                                Task {
+                                    await loadRelatedPhotos()
+                                }
                             }
                         }
                     )
@@ -763,18 +785,35 @@ struct FullscreenPhotoBrowser: View {
     /// 预热相邻素材的数据缓存（包括地理位置地址、相似照片快照与卡片图片），
     /// 保证用户左右滑动切换到相邻照片时，卡片能瞬间（0ms）显示，彻底消除白屏与二次加载跳动。
     private func prewarmNeighbors() {
+        guard !isFilmStripDragging else { return }
         guard let currentIndex = browsePhotos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
         // 预热前后各 2 张，保证快速连续左右滑动时也能无缝命中内存缓存
         let neighborIndices = [currentIndex - 2, currentIndex - 1, currentIndex + 1, currentIndex + 2]
         let neighbors = neighborIndices.compactMap { idx in
             browsePhotos.indices.contains(idx) ? browsePhotos[idx] : nil
         }
+
+        let highResSize = ScreenSizeHelper.screenPhysicalSize
+        let neighborAssets = neighbors.map(\.asset)
+
+        // 停止已经移出邻居窗口的旧素材缓存，防止后台全尺寸大图无节制堆积引起内存暴涨
+        let toStop = prewarmedAssets.filter { oldAsset in
+            !neighborAssets.contains(where: { $0.localIdentifier == oldAsset.localIdentifier })
+        }
+        if !toStop.isEmpty {
+            PhotoAssetImageManager.shared.stopCachingImages(
+                for: toStop,
+                targetSize: highResSize,
+                contentMode: .aspectFit,
+                options: nil
+            )
+        }
+        prewarmedAssets = neighborAssets
+
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
         // 1. 预热相邻素材的高清大图缓存，保证切图后迅速获得最高画质
-        let highResSize = ScreenSizeHelper.screenPhysicalSize
-        let neighborAssets = neighbors.map(\.asset)
         let imageOptions = PHImageRequestOptions()
         imageOptions.deliveryMode = .opportunistic
         imageOptions.isNetworkAccessAllowed = true
