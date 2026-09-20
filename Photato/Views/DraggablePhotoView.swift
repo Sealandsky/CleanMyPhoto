@@ -176,13 +176,13 @@ struct DraggablePhotoView: View {
                 .gesture(
                     ZoomPanGesture(
                         isZoomEnabled: {
-                            !videoPlayerState.isScrubbing && (
+                            !videoPlayerState.isScrubbing && !videoPlayerState.isSeeking && (
                                 (expandWidth ?? cardImageWidth) > fullImageWidth * 1.02
                                     || expandProgress.wrappedValue > 0.5
                             )
                         },
                         onChanged: { translation in
-                            guard !videoPlayerState.isScrubbing else { return }
+                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
                             if isExpandZoomed {
                                 handleZoomPanChanged(translation: CGSize(width: translation.x, height: translation.y))
                             } else {
@@ -190,7 +190,7 @@ struct DraggablePhotoView: View {
                             }
                         },
                         onEnded: { _, _ in
-                            guard !videoPlayerState.isScrubbing else { return }
+                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
                             if isExpandZoomed {
                                 handleZoomPanEnded()
                             } else {
@@ -602,7 +602,7 @@ struct DraggablePhotoView: View {
 
     /// 判定触摸点是否落在视频控件条交互响应区或当前正处于拖拽进度中
     private func isPointInVideoControls(_ point: CGPoint) -> Bool {
-        if videoPlayerState.isScrubbing { return true }
+        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return true }
         guard currentPhoto.mediaType == .video,
               videoControlsVisible,
               videoPlayerState.player != nil,
@@ -630,7 +630,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势位移回调：驱动卡片横向视差滑动（缩放态由 ZoomPan 接管，拖拽进度条期间彻底互斥）
     private func handleHorizontalPanChanged(translation: CGPoint) {
-        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing { return }
+        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
         isDragging = true
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
             offset = CGSize(width: translation.x, height: 0)
@@ -639,7 +639,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势结束回调：判定滑动距离与速度决定是否切图
     private func handleHorizontalPanEnded(translation: CGPoint, velocity: CGPoint) {
-        if videoPlayerState.isScrubbing {
+        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
             resetPosition()
             return
         }
@@ -648,7 +648,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
-        if isNavigating || videoPlayerState.isScrubbing { return }
+        if isNavigating || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
 
         let translation = value.translation
 
@@ -679,7 +679,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragEnded(_ value: DragGesture.Value) {
-        if videoPlayerState.isScrubbing {
+        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
             resetPosition()
             return
         }

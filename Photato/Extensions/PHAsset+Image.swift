@@ -476,6 +476,11 @@ class VideoPlayerState: ObservableObject {
     /// 不逐帧 seek（消除拖动卡顿）；松手 endScrub 时一次性跳转
     @Published var isScrubbing = false
     @Published var scrubProgress: Double = 0
+    /// Seek 异步缓冲状态：松手后到 AVPlayer 实际跳转定位完成前为 true，
+    /// 期间滑块与时间标签严格锁定在松手目标位置，防止被旧播放时间戳污染而弹跳
+    @Published var isSeeking = false
+    private var wasPlayingBeforeScrub = false
+    private var seekToken = 0
 
     // 会话级静音记忆：仅存活于内存（static 属性随 @MainActor 类在主线程访问）。
     // App 全局默认视频音频为开启状态（sessionMuted = false）；
@@ -513,9 +518,11 @@ class VideoPlayerState: ObservableObject {
                     // cycle (self -> player -> observer closure -> self).
                     strongSelf.timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
                         Task { @MainActor in
-                            self?.currentTime = time.seconds
+                            // 拖动中或松手 Seek 缓冲期间坚决丢弃旧的播放进度回调，杜绝滑块与时间标签跳动
+                            guard let self = self, !self.isScrubbing, !self.isSeeking else { return }
+                            self.currentTime = time.seconds
                             if let dur = player.currentItem?.duration, dur.isValid, !dur.isIndefinite {
-                                self?.totalDuration = dur.seconds
+                                self.totalDuration = dur.seconds
                             }
                         }
                     }
@@ -573,29 +580,69 @@ class VideoPlayerState: ObservableObject {
         Self.sessionMuted = isMuted
     }
 
-    func seek(to progress: Double) {
-        guard let player, totalDuration > 0 else { return }
+    func seek(to progress: Double, completion: (() -> Void)? = nil) {
+        guard let player, totalDuration > 0 else {
+            completion?()
+            return
+        }
         let time = CMTime(seconds: progress * totalDuration, preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            Task { @MainActor in
+                completion?()
+            }
+        }
     }
 
-    // MARK: - Scrub（拖动只在松手时一次性 seek，拖动过程纯 UI 预览）
+    // MARK: - Scrub（拖动中保持 UI 预览，松手后执行 Seek 并加锁，零跳动平滑衔接）
 
     func beginScrub() {
+        if !isScrubbing && !isSeeking {
+            wasPlayingBeforeScrub = isPlaying
+        }
+        isSeeking = false
         isScrubbing = true
+        // 拖动开始时暂停播放，避免后台持续推进播放时间引发音画错位与松手回跳
+        player?.pause()
+        isPlaying = false
     }
 
     func updateScrub(_ progress: Double) {
-        scrubProgress = min(max(progress, 0), 1)
+        let clamped = min(max(progress, 0), 1)
+        scrubProgress = clamped
+        if totalDuration > 0 {
+            currentTime = clamped * totalDuration
+        }
     }
 
     func endScrub() {
         guard isScrubbing else { return }
         isScrubbing = false
-        seek(to: scrubProgress)
+        isSeeking = true
+        if totalDuration > 0 {
+            currentTime = scrubProgress * totalDuration
+        }
+        let targetProgress = scrubProgress
+        seekToken += 1
+        let currentToken = seekToken
+
+        seek(to: targetProgress) { [weak self] in
+            guard let self = self else { return }
+            guard self.seekToken == currentToken else { return }
+            // 若用户在 seek 完成前已开始新的拖拽，不打断新拖拽
+            guard !self.isScrubbing else { return }
+            self.isSeeking = false
+            if self.wasPlayingBeforeScrub {
+                self.player?.play()
+                self.isPlaying = true
+            }
+        }
     }
 
     func cleanup() {
+        seekToken += 1
+        isSeeking = false
+        isScrubbing = false
+        wasPlayingBeforeScrub = false
         if let observer = timeObserver, let player {
             player.removeTimeObserver(observer)
         }
@@ -635,8 +682,8 @@ struct VideoControlsOverlay: View {
             }
 
             if state.totalDuration > 0 {
-                // 拖动中显示预览时间（目标位置），平时显示当前播放时间
-                Text(Self.formatTime(state.isScrubbing
+                // 拖动中及 Seek 缓冲期显示目标时间，平时显示当前播放时间，杜绝松手瞬跳
+                Text(Self.formatTime((state.isScrubbing || state.isSeeking)
                     ? state.scrubProgress * state.totalDuration
                     : state.currentTime))
                     .font(.caption.monospacedDigit().weight(.semibold))
@@ -851,9 +898,9 @@ struct VideoScrubber: View {
     @ObservedObject var state: VideoPlayerState
     @State private var scrubberWidth: CGFloat = 0
 
-    /// 滑块显示进度：拖动中取预览进度（不随播放时间回跳），平时取当前播放进度
+    /// 滑块显示进度：拖动中与 Seek 异步缓冲期均取目标进度，严格钉住滑块圆钮，零弹跳过渡
     private var progress: Double {
-        if state.isScrubbing { return state.scrubProgress }
+        if state.isScrubbing || state.isSeeking { return state.scrubProgress }
         return state.totalDuration > 0 ? min(max(state.currentTime / state.totalDuration, 0), 1) : 0
     }
 
@@ -893,7 +940,11 @@ struct VideoScrubber: View {
                     if !state.isScrubbing { state.beginScrub() }
                     state.updateScrub(p)
                 }
-                .onEnded { _ in
+                .onEnded { value in
+                    if scrubberWidth > 0 {
+                        let p = max(0, min(1, value.location.x / scrubberWidth))
+                        state.updateScrub(p)
+                    }
                     state.endScrub()
                 }
         )
