@@ -5433,6 +5433,7 @@
       }
     },
     "Free" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6495,6 +6496,7 @@
       }
     },
     "Lifetime Member" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7320,6 +7322,7 @@
       }
     },
     "Monthly Member" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14045,6 +14048,7 @@
       }
     },
     "Yearly Member" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

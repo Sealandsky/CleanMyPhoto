@@ -51,6 +51,8 @@ struct FullscreenPhotoBrowser: View {
     @State private var expandProgress: CGFloat = 0
     /// 展开目标区 global frame（导航栏下安全区；恒定有效，无运行时反馈）
     @State private var expandTargetFrame: CGRect = .zero
+    /// 视频时间进度条拖拽中状态（用于禁用整个外层 ScrollView 纵向滚动，彻底杜绝误触上下翻页）
+    @State private var isVideoScrubbing = false
 
     // 标题（地址/拍摄日期时间）
     private var captionResolver: PhotoCaptionResolver { .shared }
@@ -292,6 +294,7 @@ struct FullscreenPhotoBrowser: View {
                         photos: browsePhotos,
                         currentPhotoID: currentPhotoID,
                         isScrubbing: isFilmStripDragging,
+                        isVideoScrubbing: $isVideoScrubbing,
                         deleteTrigger: $deleteTrigger,
                         onPhotoChange: { id, index in
                             // 删除流转会在数组收缩前回报旧素材 id：此时以回退
@@ -331,8 +334,8 @@ struct FullscreenPhotoBrowser: View {
                     ))
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
-                    // 展开时照片区置顶（图要盖过缩略条/操作栏铺满全屏）
-                    .zIndex(expandProgress > 0.01 ? 2 : 0)
+                    // 恒定置顶（图展开时盖过缩略条/操作栏铺满全屏；恒定层级杜绝 0.01 阈值处 SwiftUI 销毁重建图层带来的跳闪）
+                    .zIndex(1)
 
                     // 缩略图条：点击跳转直接写入 currentPhotoID（DraggablePhotoView
                     // 的 onChange 联动同步 localIndex）；滑动速览过程仅展示轻量预览，
@@ -373,8 +376,8 @@ struct FullscreenPhotoBrowser: View {
                         .allowsHitTesting(expandProgress < 0.5)
                 }
             }
-            // 展开时禁用页面滚动（捏合/平移独占手势）；黑底随进度淡入
-            .scrollDisabled(expandProgress > 0.01)
+            // 展开时或拖拽视频进度条时禁用页面垂直滚动（杜绝拖拽时间进度误触上下翻页/页面滚动抖动）；黑底随进度淡入
+            .scrollDisabled(expandProgress > 0.01 || isVideoScrubbing)
             .background(
                 Color.black
                     .opacity(expandProgress)
