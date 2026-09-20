@@ -188,6 +188,7 @@ struct DraggablePhotoView: View {
     private var cardStack: some View {
         GeometryReader { geometry in
             let expand = expandGeometry(containerSize: geometry.size)
+            let currentProgress = expand?.progress ?? expandProgress.wrappedValue
 
             ZStack {
                 backgroundLayer
@@ -196,9 +197,19 @@ struct DraggablePhotoView: View {
 
                 // 仅在手指拖拽或切图动画中渲染相邻卡片；静止闲置时只有当前照片存在，彻底杜绝矮宽图背后透出相邻图片
                 if (isDragging || isNavigating || offset != .zero), let prev = previousPhoto, !isDeleteTransitioning {
-                    mediaCardLayer(prev, isCurrent: false, containerSize: geometry.size)
-                        .offset(x: -geometry.size.width - photoSpacing + offset.width)
-                        .zIndex(0)
+                    let prevExpand = expandGeometry(for: prev, containerSize: geometry.size, progress: currentProgress)
+                    mediaCardLayer(
+                        prev,
+                        isCurrent: false,
+                        containerSize: geometry.size,
+                        displaySize: prevExpand?.size,
+                        chromeScale: 1 - (prevExpand?.progress ?? 0)
+                    )
+                    .offset(
+                        x: -geometry.size.width - photoSpacing + offset.width + (prevExpand?.offset.width ?? 0),
+                        y: offset.height + (prevExpand?.offset.height ?? 0)
+                    )
+                    .zIndex(0)
                 }
 
                 // 当前照片卡片：展开状态机驱动「详情基准 ↔ 全屏」的连续几何插值
@@ -216,9 +227,19 @@ struct DraggablePhotoView: View {
 
                 // 仅在手指拖拽或切图动画中渲染相邻卡片
                 if (isDragging || isNavigating || offset != .zero), let next = nextPhoto {
-                    mediaCardLayer(next, isCurrent: false, containerSize: geometry.size)
-                        .offset(x: geometry.size.width + photoSpacing + offset.width)
-                        .zIndex(0)
+                    let nextExpand = expandGeometry(for: next, containerSize: geometry.size, progress: currentProgress)
+                    mediaCardLayer(
+                        next,
+                        isCurrent: false,
+                        containerSize: geometry.size,
+                        displaySize: nextExpand?.size,
+                        chromeScale: 1 - (nextExpand?.progress ?? 0)
+                    )
+                    .offset(
+                        x: geometry.size.width + photoSpacing + offset.width + (nextExpand?.offset.width ?? 0),
+                        y: offset.height + (nextExpand?.offset.height ?? 0)
+                    )
+                    .zIndex(0)
                 }
 
                 // Delete indicator
@@ -241,7 +262,7 @@ struct DraggablePhotoView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
             // 裁剪边界外扩 20pt：滑动切页的相邻卡仍被裁住，同时保留当前卡投影；
             // 展开态彻底放开裁剪（图要溢出容器铺满全屏）
-            .clipShape(Rectangle().inset(by: expandProgress.wrappedValue > 0.01 ? -3000 : -20))
+            .clipShape(Rectangle().inset(by: currentProgress > 0.01 ? -3000 : -20))
             .onAppear {
                 cardContainerSize = geometry.size
                 containerGlobalFrame = geometry.frame(in: .global)
@@ -260,7 +281,13 @@ struct DraggablePhotoView: View {
                 localIndex = idx
                 resetZoomStates()
                 // 切页保持展开程度（全屏滑切页仍全屏），进度按新照片比例刷新
-                expandProgress.wrappedValue = expandProgressValue(for: expandWidth ?? cardImageWidth)
+                if expandProgress.wrappedValue > 0.8 {
+                    let newPhoto = photos[idx]
+                    expandWidth = Self.fittedSize(ratio: newPhoto.pixelAspectRatio, in: expandTargetFrame.size).width
+                    expandProgress.wrappedValue = 1.0
+                } else {
+                    expandProgress.wrappedValue = expandProgressValue(for: expandWidth ?? cardImageWidth)
+                }
             }
         }
         .onChange(of: deleteTrigger) { oldValue, newValue in
@@ -336,7 +363,7 @@ struct DraggablePhotoView: View {
 
         switch photoAsset.mediaType {
         case .video:
-            ZStack {
+            let content = ZStack {
                 AssetImage(
                     asset: photoAsset.asset,
                     targetSize: imageSize,
@@ -358,17 +385,19 @@ struct DraggablePhotoView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(strokeOpacity), lineWidth: 0.5)
+
+            applyCardChrome(
+                to: content,
+                radius: radius,
+                strokeOpacity: strokeOpacity,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius
             )
-            .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 4)
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
 
         case .livePhoto:
-            ZStack {
+            let content = ZStack {
                 AssetImage(
                     asset: photoAsset.asset,
                     targetSize: imageSize,
@@ -384,17 +413,19 @@ struct DraggablePhotoView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(strokeOpacity), lineWidth: 0.5)
+
+            applyCardChrome(
+                to: content,
+                radius: radius,
+                strokeOpacity: strokeOpacity,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius
             )
-            .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 4)
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
 
         default:
-            AssetImage(
+            let content = AssetImage(
                 asset: photoAsset.asset,
                 targetSize: imageSize,
                 contentMode: .fit,
@@ -402,14 +433,38 @@ struct DraggablePhotoView: View {
                 placeholderColor: Color(UIColor.secondarySystemFill)
             )
             .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(strokeOpacity), lineWidth: 0.5)
+
+            applyCardChrome(
+                to: content,
+                radius: radius,
+                strokeOpacity: strokeOpacity,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius
             )
-            .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 4)
             .frame(width: containerSize.width, height: containerSize.height)
             .id(photoAsset.id)
+        }
+    }
+
+    /// 卡片外观修饰：全屏态（radius <= 0.001）完全移除圆角裁剪、边框和阴影；卡片态保留圆角与微质感
+    @ViewBuilder
+    private func applyCardChrome<Content: View>(
+        to content: Content,
+        radius: CGFloat,
+        strokeOpacity: CGFloat,
+        shadowOpacity: CGFloat,
+        shadowRadius: CGFloat
+    ) -> some View {
+        if radius > 0.001 {
+            content
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(strokeOpacity), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 4)
+        } else {
+            content
         }
     }
     // MARK: - Gesture Handlers
@@ -519,7 +574,9 @@ struct DraggablePhotoView: View {
     private func expandProgressValue(for width: CGFloat) -> CGFloat {
         let cardW = cardImageWidth
         let fullW = fullImageWidth
-        guard cardW > 0, fullW > cardW else { return 0 }
+        guard cardW > 0, fullW > cardW else {
+            return expandWidth != nil ? 1.0 : 0.0
+        }
         return min(max((width - cardW) / (fullW - cardW), 0), 1)
     }
 
@@ -539,22 +596,57 @@ struct DraggablePhotoView: View {
         guard expandEnabled, let w = expandWidth, w > 0 else { return nil }
         let ratio = currentPhoto.pixelAspectRatio
         let avail = CGSize(
-            width: containerSize.width - cardPadding * 2,
-            height: containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding
+            width: max(0, containerSize.width - cardPadding * 2),
+            height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
         )
         let cardSize = Self.fittedSize(ratio: ratio, in: avail)
         let fullSize = Self.fittedSize(ratio: ratio, in: expandTargetFrame.size)
-        guard cardSize.width > 0, fullSize.width > cardSize.width else { return nil }
+        guard cardSize.width > 0, fullSize.width > 0 else { return nil }
 
-        let clamped = min(max(w, cardSize.width * 0.85), fullSize.width * maxZoomScale)
-        let progress = min(max((clamped - cardSize.width) / (fullSize.width - cardSize.width), 0), 1)
-        let size = CGSize(width: clamped, height: clamped / max(ratio, 0.01))
+        let widthDelta = fullSize.width - cardSize.width
+        let progress: CGFloat
+        if widthDelta > 0.5 {
+            let clamped = min(max(w, cardSize.width * 0.85), fullSize.width * maxZoomScale)
+            progress = min(max((clamped - cardSize.width) / widthDelta, 0), 1)
+        } else {
+            progress = min(max(expandProgress.wrappedValue, 0), 1)
+        }
+
+        let currentWidth = cardSize.width + widthDelta * progress
+        let currentHeight = currentWidth / max(ratio, 0.01)
+        let zoomScale = max(1.0, w / max(fullSize.width, 1.0))
+        let size = CGSize(width: currentWidth * zoomScale, height: currentHeight * zoomScale)
+
         // 中心从卡片容器中心插值到全屏目标区中心（global 差值即局部平移量）
         let offset = CGSize(
             width: (expandTargetFrame.midX - containerGlobalFrame.midX) * progress,
             height: (expandTargetFrame.midY - containerGlobalFrame.midY) * progress
         )
         return ExpandGeometry(size: size, offset: offset, progress: progress)
+    }
+
+    /// 计算相邻照片在当前展开进度下的几何属性（全屏态下无圆角、无投影描边、尺寸铺满全屏、垂直居中对齐全屏中心）
+    private func expandGeometry(for photo: PhotoAsset, containerSize: CGSize, progress: CGFloat) -> ExpandGeometry? {
+        guard expandEnabled, progress > 0.001 else { return nil }
+        let ratio = photo.pixelAspectRatio
+        let avail = CGSize(
+            width: max(0, containerSize.width - cardPadding * 2),
+            height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
+        )
+        let cardSize = Self.fittedSize(ratio: ratio, in: avail)
+        let fullSize = Self.fittedSize(ratio: ratio, in: expandTargetFrame.size)
+        guard cardSize.width > 0, fullSize.width > 0 else { return nil }
+
+        let clampedProgress = min(max(progress, 0), 1)
+        let width = cardSize.width + (fullSize.width - cardSize.width) * clampedProgress
+        let height = width / max(ratio, 0.01)
+        let size = CGSize(width: width, height: height)
+
+        let offset = CGSize(
+            width: (expandTargetFrame.midX - containerGlobalFrame.midX) * clampedProgress,
+            height: (expandTargetFrame.midY - containerGlobalFrame.midY) * clampedProgress
+        )
+        return ExpandGeometry(size: size, offset: offset, progress: clampedProgress)
     }
 
     /// 双指捏合：跟手逐帧更新展开宽度（系统规则——手指张合直接映射图宽，
@@ -779,6 +871,12 @@ struct DraggablePhotoView: View {
             guard navigationID == currentNavID else { return }
 
             localIndex = targetIndex
+
+            if expandProgress.wrappedValue > 0.8 {
+                let newFullW = Self.fittedSize(ratio: targetPhoto.pixelAspectRatio, in: expandTargetFrame.size).width
+                expandWidth = newFullW
+                expandProgress.wrappedValue = 1.0
+            }
 
             var t = Transaction()
             t.disablesAnimations = true
