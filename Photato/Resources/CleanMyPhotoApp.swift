@@ -12,9 +12,12 @@ struct CleanMyPhotoApp: App {
 
     init() {
         let stats = StatisticsManager()
+        let membership = MembershipManager()
         _statisticsManager = StateObject(wrappedValue: stats)
-        _photoManager = StateObject(wrappedValue: PhotoManager(statisticsManager: stats))
-        _membershipManager = StateObject(wrappedValue: MembershipManager())
+        _membershipManager = StateObject(wrappedValue: membership)
+        let photoManager = PhotoManager(statisticsManager: stats)
+        photoManager.membershipManager = membership
+        _photoManager = StateObject(wrappedValue: photoManager)
     }
 
     var body: some Scene {

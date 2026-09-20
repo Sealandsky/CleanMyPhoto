@@ -29,6 +29,21 @@ final class PhotoOrganizeManager {
         categoryStats[category] ?? 0
     }
 
+    /// 功能类型：清理功能分类，计入可清理照片统计（与清理页口径一致）
+    static let functionCategories: [OrganizeCategory] = [
+        .similar,
+        .duplicates,
+        .largeFiles,
+        .lowQuality,
+        .blurry,
+        .poorFace
+    ]
+
+    /// 可清理照片总数：功能分类去重后的唯一照片数
+    var cleanablePhotoCount: Int {
+        uniqueJunkCount(categories: Self.functionCategories)
+    }
+
     /// 可清理照片数量：给定功能分类下去重后的唯一照片数。
     /// 分类之间互相重叠（如重复组几乎必然也在相似组里，一张模糊截图同时
     /// 计入截图与模糊），简单求和会重复计数导致可清理照片数大于照片总数，

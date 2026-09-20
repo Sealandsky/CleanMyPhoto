@@ -81,11 +81,17 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.organize)
 
-            SettingsView()
-                .tabItem {
-                    Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
+            SettingsView(
+                organizeManager: organizeManager,
+                onNavigateToOrganize: {
+                    selectedTab = .organize
                 }
-                .tag(AppTab.settings)
+            )
+            .environment(organizeManager)
+            .tabItem {
+                Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
+            }
+            .tag(AppTab.settings)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)

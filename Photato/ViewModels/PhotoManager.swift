@@ -25,6 +25,8 @@ class PhotoManager: NSObject, ObservableObject {
     /// 当前分页所基于的相册查询结果；作为 PHChange 增量比对的基准
     private var fetchResult: PHFetchResult<PHAsset>?
     private(set) var statisticsManager: StatisticsManager?
+    /// 会员管理器引用：清空回收站成功后据实消耗免费删除额度（会员内部跳过）
+    weak var membershipManager: MembershipManager?
     private(set) var totalPhotoCount: Int = 0
 
     var trashCount: Int {
@@ -38,6 +40,11 @@ class PhotoManager: NSObject, ObservableObject {
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         // 监听系统相册变更（外部增删改、iCloud 下载完成等），保持数据与相册一致
         PHPhotoLibrary.shared().register(self)
+
+        // 若已有权限，预先获取系统照片总数（同清理页卡片口径，开销极小）
+        if authorizationStatus == .authorized || authorizationStatus == .limited {
+            updateTotalPhotoCountFromSystem()
+        }
     }
 
     // MARK: - Authorization
@@ -47,10 +54,20 @@ class PhotoManager: NSObject, ObservableObject {
         authorizationStatus = status
 
         if status == .authorized || status == .limited {
+            updateTotalPhotoCountFromSystem()
             await fetchAllPhotos()
         } else {
             errorMessage = String(localized: "Photo library access is required to use this app.")
         }
+    }
+
+    /// 查询系统相册资源总数并同步至统计（与清理页卡片口径一致）
+    func updateTotalPhotoCountFromSystem() {
+        let options = PHFetchOptions()
+        options.includeHiddenAssets = false
+        let count = PHAsset.fetchAssets(with: options).count
+        self.totalPhotoCount = count
+        self.statisticsManager?.updateStats(photoCount: count, videoCount: 0, trash: trashCount)
     }
 
     // MARK: - Fetch Photos
@@ -410,6 +427,8 @@ class PhotoManager: NSObject, ObservableObject {
                 totalSize += await getAssetSize(asset.asset)
             }
             statisticsManager?.recordDeletions(count: count, totalSize: totalSize)
+            // 免费删除额度按实际删除张数消耗（会员在 consume 内部跳过；失败路径不扣）
+            membershipManager?.consumeFreeDeletions(count)
 
             // Remove from all photos and clear pending deletions
             allPhotos.removeAll { trashedAssets.contains($0) }
