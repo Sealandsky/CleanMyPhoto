@@ -19,6 +19,8 @@ struct DraggablePhotoView: View {
     /// 展开进度 0~1（页面级联动：黑底淡入/其余区块淡出/禁滚动），
     /// 由本组件的展开状态机驱动（捏合跟手逐帧写、动画吸附随动画写）
     var expandProgress: Binding<CGFloat> = .constant(0)
+    /// 是否处于缩略图快速滑动/拖动预览中（拖动中仅解码轻量缩略图、暂缓视频播放器创建，杜绝内存峰值与卡顿）
+    var isScrubbing: Bool = false
 
     /// 卡片版式：fullScreen = 独立全屏页（默认，上下各留 120pt 给页面操作栏）；
     /// embeddedSection = 作为详情页垂直版式中的预览区嵌入（支持卡片 ↔ 全屏连续展开）
@@ -88,6 +90,7 @@ struct DraggablePhotoView: View {
     init(
         photos: [PhotoAsset],
         currentPhotoID: String,
+        isScrubbing: Bool = false,
         deleteTrigger: Binding<Int>,
         onPhotoChange: @escaping (String, Int) -> Void,
         onDelete: ((PhotoAsset) -> Void)? = nil,
@@ -101,6 +104,7 @@ struct DraggablePhotoView: View {
     ) {
         self.photos = photos
         self.currentPhotoID = currentPhotoID
+        self.isScrubbing = isScrubbing
         self._deleteTrigger = deleteTrigger
         self.onPhotoChange = onPhotoChange
         self.onDelete = onDelete
@@ -303,9 +307,9 @@ struct DraggablePhotoView: View {
         Self.fittedSize(ratio: photoAsset.pixelAspectRatio, in: available)
     }
 
-    /// 详情页大图目标尺寸：采用屏幕物理像素加载高清大图，配合缩略图平滑过渡替换
+    /// 详情页大图目标尺寸：采用屏幕物理像素加载高清大图，滑动速览时使用轻量缩略图防内存峰值
     private var cardTargetSize: CGSize {
-        ScreenSizeHelper.screenPhysicalSize
+        isScrubbing ? ScreenSizeHelper.cardThumbnailSize : ScreenSizeHelper.screenPhysicalSize
     }
 
     // MARK: - Media Card Layer（当前卡片与相邻卡片共用统一视图骨架，杜绝切图瞬间视图替换闪烁与卡顿）
@@ -337,12 +341,12 @@ struct DraggablePhotoView: View {
                     asset: photoAsset.asset,
                     targetSize: imageSize,
                     contentMode: .fit,
-                    highQuality: true,
+                    highQuality: !isScrubbing,
                     placeholderColor: Color(UIColor.secondarySystemFill)
                 )
                 .frame(width: size.width, height: size.height)
 
-                if isCurrent {
+                if isCurrent && !isScrubbing {
                     // 视频区域点按由播放器内部 SwiftUI 手势承担（与控件条按钮
                     // 天然互斥）：与单击同语义——详情态进全屏、全屏态退出
                     VideoPlayerView(
@@ -369,12 +373,12 @@ struct DraggablePhotoView: View {
                     asset: photoAsset.asset,
                     targetSize: imageSize,
                     contentMode: .fit,
-                    highQuality: true,
+                    highQuality: !isScrubbing,
                     placeholderColor: Color(UIColor.secondarySystemFill)
                 )
                 .frame(width: size.width, height: size.height)
 
-                if isCurrent {
+                if isCurrent && !isScrubbing {
                     LivePhotoPlayerView(asset: photoAsset.asset)
                         .frame(width: size.width, height: size.height)
                 }
@@ -394,7 +398,7 @@ struct DraggablePhotoView: View {
                 asset: photoAsset.asset,
                 targetSize: imageSize,
                 contentMode: .fit,
-                highQuality: true,
+                highQuality: !isScrubbing,
                 placeholderColor: Color(UIColor.secondarySystemFill)
             )
             .frame(width: size.width, height: size.height)

@@ -32,6 +32,8 @@ struct FullscreenPhotoBrowser: View {
     @State private var currentPhotoID: String = ""
     @State private var deleteTrigger = 0
     @State private var showFavoriteDeleteAlert = false
+    @State private var isFilmStripDragging = false
+    @State private var prewarmedAssets: [PHAsset] = []
 
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
@@ -250,8 +252,12 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
+            guard !isFilmStripDragging else { return }
             prewarmNeighbors()
             await loadRelatedPhotos()
+        }
+        .onDisappear {
+            PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
         .onChange(of: photos) { oldPhotos, newPhotos in
@@ -266,26 +272,26 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // MARK: - 垂直流式版式（对齐 Figma 639-3025）
-    /// 操作栏布局高度（50pt 按钮 + 上下 16pt padding）
-    private static let actionBarHeight: CGFloat = 82
-    /// 相似照片首屏恒定露出量：卡片圆角顶部弧线，作为「下方还有内容」的滚动暗示
-    private static let relatedPeekHeight: CGFloat = 48
+    /// 操作栏布局高度（50pt 按钮 + 底部 16pt padding，顶部间距由缩略图底边距等距提供）
+    private static let actionBarHeight: CGFloat = 66
     /// 照片区最小高度兜底（iPad 分屏等极端小可视区域）
     private static let minPhotoHeight: CGFloat = 240
 
     /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
     /// 大图预览区域 → 缩略图条 → 操作按钮栏 → 相关图片列表推荐。
-    /// 大图区高度动态填充可视区剩余空间（参考系统相册）：可视高度减去
-    /// 缩略条/操作栏/首屏相似区露出量，各尺寸设备下相似卡片恒定露出一点
+    /// 大图区高度动态填充可视区空间（参考系统相册）：最大化大图展示区域，
+    /// 缩略条与操作栏自然置于底部，上滑查看相关照片推荐
     private var verticalDetailLayout: some View {
         GeometryReader { proxy in
-            ScrollView(showsIndicators: false) {                VStack(spacing: 0) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
                     // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
                     // 视频播放与加载 loading 逻辑不变；单击进入沉浸全屏、
                     // 双指/双击缩放（缩放态禁用本页滚动）
                     DraggablePhotoView(
                         photos: browsePhotos,
                         currentPhotoID: currentPhotoID,
+                        isScrubbing: isFilmStripDragging,
                         deleteTrigger: $deleteTrigger,
                         onPhotoChange: { id, index in
                             // 删除流转会在数组收缩前回报旧素材 id：此时以回退
@@ -320,24 +326,39 @@ struct FullscreenPhotoBrowser: View {
                     )
                     .frame(height: max(
                         Self.minPhotoHeight,
-                        proxy.size.height - 8 - PhotoFilmStrip.layoutHeight
-                            - Self.actionBarHeight - Self.relatedPeekHeight
+                        proxy.size.height - 4 - PhotoFilmStrip.layoutHeight
+                            - Self.actionBarHeight
                     ))
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                     // 展开时照片区置顶（图要盖过缩略条/操作栏铺满全屏）
                     .zIndex(expandProgress > 0.01 ? 2 : 0)
 
                     // 缩略图条：点击跳转直接写入 currentPhotoID（DraggablePhotoView
-                    // 的 onChange 联动同步 localIndex）；同步回报索引保持外部网格
-                    // 关闭详情页后的回滚定位一致
+                    // 的 onChange 联动同步 localIndex）；滑动速览过程仅展示轻量预览，
+                    // 放手落定后才触发全量数据加载与外部网格定位同步，杜绝内存与 CPU 暴涨
                     PhotoFilmStrip(
                         photos: browsePhotos,
                         currentPhotoID: currentPhotoID,
                         onSelect: { photo in
                             currentPhotoID = photo.id
-                            if let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
-                                onActivePhotoChange?(photo, index)
+                            if !isFilmStripDragging {
+                                if let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
+                                    onActivePhotoChange?(photo, index)
+                                }
+                            }
+                        },
+                        onScrubbingChanged: { scrubbing in
+                            isFilmStripDragging = scrubbing
+                            if !scrubbing {
+                                // 手势松手落定：同步外部网格定位，并触发最终定稿大图的预热与相似匹配
+                                if let photo = currentPhoto, let index = browsePhotos.firstIndex(where: { $0.id == photo.id }) {
+                                    onActivePhotoChange?(photo, index)
+                                }
+                                prewarmNeighbors()
+                                Task {
+                                    await loadRelatedPhotos()
+                                }
                             }
                         }
                     )
@@ -386,21 +407,21 @@ struct FullscreenPhotoBrowser: View {
         onDelete?(photo)
     }
 
-    // 操作按钮栏：左侧[收藏 添加 分享 更多]横向排布，右侧独立[删除]；
-    // 尺寸对齐 Figma：50pt 按钮、10pt 间距、16pt 页边距、82pt 栏高（上下 16）
+    // 操作按钮栏：左侧[收藏 添加 更多]横向排布，右侧独立[删除]；
+    // 尺寸对齐 Figma：50pt 按钮、10pt 间距、16pt 页边距、66pt 栏高
     private var actionBar: some View {
         HStack {
             HStack(spacing: 10) {
                 favoriteButton
                 addToAlbumButton
-                shareButton
                 moreButton
             }
             Spacer()
             deleteButton
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.top, 0)
+        .padding(.bottom, 16)
     }
 
     private var isCurrentFavorite: Bool {
@@ -433,25 +454,15 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    // 分享：图片请求高清图、视频导出原文件后唤起系统分享面板
-    private var shareButton: some View {
-        glassActionButton {
-            if isPreparingShare {
-                ProgressView()
-                    .tint(.primary)
-            } else {
-                Image(systemName: "square.and.arrow.up")
-                    .foregroundColor(.primary)
-            }
-        } action: {
-            shareCurrentItem()
-        }
-        .disabled(isPreparingShare)
-    }
-
-    // 「更多」：照片信息 / 拷贝图片（仅图片类）/ 从相簿移除（仅相簿上下文）
+    // 「更多」：分享 / 照片信息 / 拷贝图片（仅图片类）/ 从相簿移除（仅相簿上下文）
     private var moreButton: some View {
         Menu {
+            Button {
+                shareCurrentItem()
+            } label: {
+                Label(String(localized: "Share"), systemImage: "square.and.arrow.up")
+            }
+
             Button {
                 showInfoSheet = true
             } label: {
@@ -478,10 +489,16 @@ struct FullscreenPhotoBrowser: View {
             }
         } label: {
             glassLabel(iconSize: 19) {
-                Image(systemName: "ellipsis")
-                    .foregroundColor(.primary)
+                if isPreparingShare {
+                    ProgressView()
+                        .tint(.primary)
+                } else {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.primary)
+                }
             }
         }
+        .disabled(isPreparingShare)
     }
 
     /// 从当前相簿移除当前素材：移除业务经相簿上下文回调交还调用方执行
@@ -762,18 +779,35 @@ struct FullscreenPhotoBrowser: View {
     /// 预热相邻素材的数据缓存（包括地理位置地址、相似照片快照与卡片图片），
     /// 保证用户左右滑动切换到相邻照片时，卡片能瞬间（0ms）显示，彻底消除白屏与二次加载跳动。
     private func prewarmNeighbors() {
+        guard !isFilmStripDragging else { return }
         guard let currentIndex = browsePhotos.firstIndex(where: { $0.id == currentPhotoID }) else { return }
         // 预热前后各 2 张，保证快速连续左右滑动时也能无缝命中内存缓存
         let neighborIndices = [currentIndex - 2, currentIndex - 1, currentIndex + 1, currentIndex + 2]
         let neighbors = neighborIndices.compactMap { idx in
             browsePhotos.indices.contains(idx) ? browsePhotos[idx] : nil
         }
+
+        let highResSize = ScreenSizeHelper.screenPhysicalSize
+        let neighborAssets = neighbors.map(\.asset)
+
+        // 停止已经移出邻居窗口的旧素材缓存，防止后台全尺寸大图无节制堆积引起内存暴涨
+        let toStop = prewarmedAssets.filter { oldAsset in
+            !neighborAssets.contains(where: { $0.localIdentifier == oldAsset.localIdentifier })
+        }
+        if !toStop.isEmpty {
+            PhotoAssetImageManager.shared.stopCachingImages(
+                for: toStop,
+                targetSize: highResSize,
+                contentMode: .aspectFit,
+                options: nil
+            )
+        }
+        prewarmedAssets = neighborAssets
+
         for neighbor in neighbors {
             PhotoCaptionResolver.shared.resolveAddress(of: neighbor.asset) { _ in }
         }
         // 1. 预热相邻素材的高清大图缓存，保证切图后迅速获得最高画质
-        let highResSize = ScreenSizeHelper.screenPhysicalSize
-        let neighborAssets = neighbors.map(\.asset)
         let imageOptions = PHImageRequestOptions()
         imageOptions.deliveryMode = .opportunistic
         imageOptions.isNetworkAccessAllowed = true

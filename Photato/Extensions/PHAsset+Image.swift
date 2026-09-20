@@ -24,14 +24,14 @@ final class PhotoImageCache: @unchecked Sendable {
     private let placeholderMap = NSCache<NSString, UIImage>()
 
     init() {
-        thumbnailCache.countLimit = 500
-        thumbnailCache.totalCostLimit = 200 * 1024 * 1024
+        thumbnailCache.countLimit = 200
+        thumbnailCache.totalCostLimit = 60 * 1024 * 1024
 
-        highResCache.countLimit = 20
-        highResCache.totalCostLimit = 150 * 1024 * 1024
+        highResCache.countLimit = 10
+        highResCache.totalCostLimit = 80 * 1024 * 1024
 
-        placeholderMap.countLimit = 500
-        placeholderMap.totalCostLimit = 120 * 1024 * 1024
+        placeholderMap.countLimit = 200
+        placeholderMap.totalCostLimit = 40 * 1024 * 1024
 
         // 监听系统内存告警，及时释放内存压力
         NotificationCenter.default.addObserver(
@@ -338,8 +338,9 @@ struct AssetImage: View {
 
         let requestedAssetID = asset.localIdentifier
 
-        // 1. 快速通道 (Fast-Path, 1~2ms)：若当前完全无图垫底，以 .fastFormat 极速索取系统已就绪的预渲染缩略图（无需解码原图 HEIC，直接从磁盘缓存 1ms 直出，瞬间消灭灰块！）
-        if image == nil && placeholderImage == nil {
+        // 1. 快速通道 (Fast-Path, 1~2ms)：仅在目标尺寸较大（例如大图预览）且完全无图垫底时，
+        // 索取 320x320 预渲染缩略图垫底；对于缩略图条等小尺寸素材（<= 160pt），直接请求目标尺寸，避免双倍请求与内存浪费
+        if image == nil && placeholderImage == nil && (targetSize.width > 160 || targetSize.height > 160) {
             let thumbOptions = PHImageRequestOptions()
             thumbOptions.deliveryMode = .fastFormat
             thumbOptions.resizeMode = .fast
