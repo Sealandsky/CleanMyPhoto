@@ -274,18 +274,17 @@ struct FullscreenPhotoBrowser: View {
     // MARK: - 垂直流式版式（对齐 Figma 639-3025）
     /// 操作栏布局高度（50pt 按钮 + 底部 16pt padding，顶部间距由缩略图底边距等距提供）
     private static let actionBarHeight: CGFloat = 66
-    /// 相似照片首屏恒定露出量：卡片圆角顶部弧线，作为「下方还有内容」的滚动暗示
-    private static let relatedPeekHeight: CGFloat = 48
     /// 照片区最小高度兜底（iPad 分屏等极端小可视区域）
     private static let minPhotoHeight: CGFloat = 240
 
     /// 顶部使用系统原生 Inline 导航栏与主副标题，其下为可滚动内容：
     /// 大图预览区域 → 缩略图条 → 操作按钮栏 → 相关图片列表推荐。
-    /// 大图区高度动态填充可视区剩余空间（参考系统相册）：可视高度减去
-    /// 缩略条/操作栏/首屏相似区露出量，各尺寸设备下相似卡片恒定露出一点
+    /// 大图区高度动态填充可视区空间（参考系统相册）：最大化大图展示区域，
+    /// 缩略条与操作栏自然置于底部，上滑查看相关照片推荐
     private var verticalDetailLayout: some View {
         GeometryReader { proxy in
-            ScrollView(showsIndicators: false) {                VStack(spacing: 0) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
                     // 大图预览区域：左右滑动切换素材，上下滑动由页面滚动接管。
                     // 视频播放与加载 loading 逻辑不变；单击进入沉浸全屏、
                     // 双指/双击缩放（缩放态禁用本页滚动）
@@ -327,11 +326,11 @@ struct FullscreenPhotoBrowser: View {
                     )
                     .frame(height: max(
                         Self.minPhotoHeight,
-                        proxy.size.height - 8 - PhotoFilmStrip.layoutHeight
-                            - Self.actionBarHeight - Self.relatedPeekHeight
+                        proxy.size.height - 4 - PhotoFilmStrip.layoutHeight
+                            - Self.actionBarHeight
                     ))
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                     // 展开时照片区置顶（图要盖过缩略条/操作栏铺满全屏）
                     .zIndex(expandProgress > 0.01 ? 2 : 0)
 
@@ -408,14 +407,13 @@ struct FullscreenPhotoBrowser: View {
         onDelete?(photo)
     }
 
-    // 操作按钮栏：左侧[收藏 添加 分享 更多]横向排布，右侧独立[删除]；
-    // 尺寸对齐 Figma：50pt 按钮、10pt 间距、16pt 页边距、82pt 栏高（上下 16）
+    // 操作按钮栏：左侧[收藏 添加 更多]横向排布，右侧独立[删除]；
+    // 尺寸对齐 Figma：50pt 按钮、10pt 间距、16pt 页边距、66pt 栏高
     private var actionBar: some View {
         HStack {
             HStack(spacing: 10) {
                 favoriteButton
                 addToAlbumButton
-                shareButton
                 moreButton
             }
             Spacer()
@@ -456,25 +454,15 @@ struct FullscreenPhotoBrowser: View {
         }
     }
 
-    // 分享：图片请求高清图、视频导出原文件后唤起系统分享面板
-    private var shareButton: some View {
-        glassActionButton {
-            if isPreparingShare {
-                ProgressView()
-                    .tint(.primary)
-            } else {
-                Image(systemName: "square.and.arrow.up")
-                    .foregroundColor(.primary)
-            }
-        } action: {
-            shareCurrentItem()
-        }
-        .disabled(isPreparingShare)
-    }
-
-    // 「更多」：照片信息 / 拷贝图片（仅图片类）/ 从相簿移除（仅相簿上下文）
+    // 「更多」：分享 / 照片信息 / 拷贝图片（仅图片类）/ 从相簿移除（仅相簿上下文）
     private var moreButton: some View {
         Menu {
+            Button {
+                shareCurrentItem()
+            } label: {
+                Label(String(localized: "Share"), systemImage: "square.and.arrow.up")
+            }
+
             Button {
                 showInfoSheet = true
             } label: {
@@ -501,10 +489,16 @@ struct FullscreenPhotoBrowser: View {
             }
         } label: {
             glassLabel(iconSize: 19) {
-                Image(systemName: "ellipsis")
-                    .foregroundColor(.primary)
+                if isPreparingShare {
+                    ProgressView()
+                        .tint(.primary)
+                } else {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.primary)
+                }
             }
         }
+        .disabled(isPreparingShare)
     }
 
     /// 从当前相簿移除当前素材：移除业务经相簿上下文回调交还调用方执行
