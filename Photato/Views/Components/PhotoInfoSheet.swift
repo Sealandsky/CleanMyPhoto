@@ -3,17 +3,28 @@ import Photos
 import ImageIO
 import CoreLocation
 
+// MARK: - Info Row Item
+struct InfoRowItem: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let value: String
+}
+
 // MARK: - Photo Info Sheet
 /// 详情页「信息」半屏面板：展示当前素材的元数据。
 /// 同步项（日期时间/地点/分辨率/媒体类型/时长）首帧直出；
-/// 文件大小与拍摄参数（机型/ISO/光圈/快门/焦距）异步补齐，
+/// 文件大小与拍摄参数（机型/焦距/光圈/快门/ISO）异步补齐，
 /// 取不到的行整体不显示（不留空行占位）。
 struct PhotoInfoSheet: View {
     let photo: PhotoAsset
 
     @State private var fileSizeText: String?
     @State private var addressText: String?
-    @State private var exifRows: [(label: String, value: String)] = []
+    @State private var exifRows: [InfoRowItem] = []
+
+    private var allRows: [InfoRowItem] {
+        baseRows + exifRows
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -25,11 +36,8 @@ struct PhotoInfoSheet: View {
                     .padding(.top, 14)
                     .padding(.bottom, 16)
 
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(baseRows.enumerated()), id: \.offset) { index, row in
-                        infoRow(row.label, value: row.value)
-                    }
-                    ForEach(Array(exifRows.enumerated()), id: \.offset) { _, row in
+                VStack(spacing: 8) {
+                    ForEach(allRows) { row in
                         infoRow(row.label, value: row.value)
                     }
                 }
@@ -37,7 +45,8 @@ struct PhotoInfoSheet: View {
                 .padding(.bottom, 24)
             }
         }
-        .presentationDetents([.medium])
+        .animation(.easeInOut(duration: 0.25), value: allRows)
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .background(Color(UIColor.systemGroupedBackground))
         .task {
@@ -62,40 +71,39 @@ struct PhotoInfoSheet: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .padding(.bottom, 8)
     }
 
     /// 同步基础信息（元数据直读，零 IO）
-    private var baseRows: [(label: String, value: String)] {
-        var rows: [(String, String)] = []
+    private var baseRows: [InfoRowItem] {
+        var rows: [InfoRowItem] = []
         let asset = photo.asset
 
         // 拍摄日期时间（与详情页标题同源）
         let date = PhotoCaptionResolver.shared.shootingDate(of: asset)
         let time = PhotoCaptionResolver.shared.shootingTime(of: asset)
         if let date {
-            rows.append((String(localized: "Date Taken"), time.map { "\(date) \($0)" } ?? date))
+            rows.append(InfoRowItem(id: "date", label: String(localized: "Date Taken"), value: time.map { "\(date) \($0)" } ?? date))
         }
 
         // 地点：优先已解析地址，未就绪时先以经纬度垫底（异步地址完成后平滑替换）
         if let location = asset.location {
-            rows.append((String(localized: "Location"), addressText ?? Self.coordinateText(location)))
+            rows.append(InfoRowItem(id: "location", label: String(localized: "Location"), value: addressText ?? Self.coordinateText(location)))
         }
 
         // 分辨率
         if asset.pixelWidth > 0, asset.pixelHeight > 0 {
-            rows.append((String(localized: "Dimensions"), "\(asset.pixelWidth) × \(asset.pixelHeight)"))
+            rows.append(InfoRowItem(id: "dimensions", label: String(localized: "Dimensions"), value: "\(asset.pixelWidth) × \(asset.pixelHeight)"))
         }
 
         // 媒体类型 + 时长
-        rows.append((String(localized: "Media Type"), mediaTypeText))
+        rows.append(InfoRowItem(id: "mediaType", label: String(localized: "Media Type"), value: mediaTypeText))
         if let duration = photo.videoDuration {
-            rows.append((String(localized: "Duration"), duration))
+            rows.append(InfoRowItem(id: "duration", label: String(localized: "Duration"), value: duration))
         }
 
         // 文件大小（异步，未就绪时暂不占位）
         if let size = fileSizeText {
-            rows.append((String(localized: "File Size"), size))
+            rows.append(InfoRowItem(id: "fileSize", label: String(localized: "File Size"), value: size))
         }
 
         return rows
@@ -146,7 +154,7 @@ struct PhotoInfoSheet: View {
 
     /// 读取图片 EXIF 拍摄参数：requestImageDataAndOrientation 拿原始数据 →
     /// CIImage 属性字典；任一参数缺失则跳过该行
-    private static func loadExifRows(for asset: PHAsset) async -> [(label: String, value: String)] {
+    private static func loadExifRows(for asset: PHAsset) async -> [InfoRowItem] {
         let data: Data? = await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = true
@@ -158,27 +166,27 @@ struct PhotoInfoSheet: View {
         guard let data,
               let properties = CIImage(data: data)?.properties else { return [] }
 
-        var rows: [(String, String)] = []
+        var rows: [InfoRowItem] = []
         let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
         let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any]
 
         if let model = (tiff?[kCGImagePropertyTIFFModel as String] as? String), !model.isEmpty {
-            rows.append((String(localized: "Camera"), model))
+            rows.append(InfoRowItem(id: "camera", label: String(localized: "Camera"), value: model))
+        }
+        if let focal = exif?[kCGImagePropertyExifFocalLength as String] as? Double {
+            rows.append(InfoRowItem(id: "focalLength", label: String(localized: "Focal Length"), value: String(format: "%.0f mm", focal)))
         }
         if let fNumber = exif?[kCGImagePropertyExifFNumber as String] as? Double {
-            rows.append((String(localized: "Aperture"), String(format: "ƒ/%.1f", fNumber)))
+            rows.append(InfoRowItem(id: "aperture", label: String(localized: "Aperture"), value: String(format: "ƒ/%.1f", fNumber)))
         }
         if let seconds = exif?[kCGImagePropertyExifExposureTime as String] as? Double, seconds > 0 {
             let text = seconds < 1
                 ? String(format: "1/%d s", Int((1 / seconds).rounded()))
                 : String(format: "%.1f s", seconds)
-            rows.append((String(localized: "Shutter"), text))
+            rows.append(InfoRowItem(id: "shutter", label: String(localized: "Shutter"), value: text))
         }
         if let iso = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [Int], let first = iso.first {
-            rows.append((String(localized: "ISO"), "\(first)"))
-        }
-        if let focal = exif?[kCGImagePropertyExifFocalLength as String] as? Double {
-            rows.append((String(localized: "Focal Length"), String(format: "%.0f mm", focal)))
+            rows.append(InfoRowItem(id: "iso", label: String(localized: "ISO"), value: "\(first)"))
         }
         return rows
     }
