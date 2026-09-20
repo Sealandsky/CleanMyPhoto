@@ -302,6 +302,8 @@ struct DraggablePhotoView: View {
                     expandProgress.wrappedValue = expandProgressValue(for: expandWidth ?? cardImageWidth)
                 }
                 if photos[idx].mediaType == .video {
+                    videoPlayerState.cleanup()
+                    videoPlayerState.loadVideo(for: photos[idx].asset)
                     revealVideoControls()
                 } else {
                     videoPlayerState.cleanup()
@@ -501,8 +503,8 @@ struct DraggablePhotoView: View {
         }
     }
 
-    /// 卡片外观修饰：全屏态（radius <= 0.001）完全移除圆角裁剪、边框和阴影；卡片态保留圆角与微质感
-    @ViewBuilder
+    /// 卡片外观修饰：全屏态（radius <= 0）完全无圆角裁剪（直角矩形）、边框和阴影；卡片态保留圆角与微质感。
+    /// 严禁使用 if-else 条件分支返回不同 View，防止全屏转场阈值处销毁/重构子树导致视频播放器中断。
     private func applyCardChrome<Content: View>(
         to content: Content,
         radius: CGFloat,
@@ -510,48 +512,41 @@ struct DraggablePhotoView: View {
         shadowOpacity: CGFloat,
         shadowRadius: CGFloat
     ) -> some View {
-        if radius > 0.001 {
-            content
-                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(strokeOpacity), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 4)
-        } else {
-            content
-        }
+        content
+            .clipShape(RoundedRectangle(cornerRadius: max(0, radius), style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: max(0, radius), style: .continuous)
+                    .strokeBorder(Color.white.opacity(max(0, strokeOpacity)), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(max(0, shadowOpacity)), radius: max(0, shadowRadius), x: 0, y: 4)
     }
 
     // MARK: - Video Controls Layer
-    /// 独立视频操作控件条：脱离视频缩放/平移容器，独立位于顶层。
-    /// 卡片态固定于卡片底端，全屏态固定于屏幕可视底端（安全区底边）。
+    /// 独立视频操作控件条：脱离视频缩放/平仪容器，独立位于顶层。
+    /// 卡片态固定于底部空白区（缩略图条上方），横屏/竖屏均不遮挡视频画面；
+    /// 全屏态固定于屏幕可视底端（安全区底边上方 20pt）。
     /// 在缩放与双轴平移视频画面时，控件条绝对不跟随移动或变形。
     @ViewBuilder
     private func videoControlsLayer(containerSize: CGSize, progress: CGFloat) -> some View {
-        let avail = CGSize(
-            width: max(0, containerSize.width - cardPadding * 2),
-            height: max(0, containerSize.height - effectiveCardTopPadding - effectiveCardBottomPadding)
-        )
-        let ratio = currentPhoto.pixelAspectRatio
-        let cardSize = Self.fittedSize(ratio: ratio, in: avail)
         let fullWidth = expandTargetFrame.width > 0 ? expandTargetFrame.width : containerSize.width
         let clampedProgress = min(max(progress, 0), 1)
 
-        // 宽度：卡片态对齐卡片宽度，全屏态对齐屏幕宽度（两侧由 VideoControlsOverlay 自带 12pt padding）
-        let targetWidth = cardSize.width + (fullWidth - cardSize.width) * clampedProgress
+        // 宽度：统一以容器全宽为基准，两侧由 VideoControlsOverlay 自带 12pt 内边距
+        let targetWidth = containerSize.width + (fullWidth - containerSize.width) * clampedProgress
 
-        // Y 轴锚定：卡片态固定于卡片底端（cardBottom - 20pt），全屏态固定于屏幕可视底端（screenBottom - 20pt）
-        // 关键：位置计算坚决不引入 zoomScale 与 zoomOffset，实现缩放/平移完全解耦！
-        let cardBottomY = containerSize.height / 2 + cardSize.height / 2
+        // Y 轴锚定：
+        // 卡片态固定于卡片区域最底端（缩略图条上方留出 8pt 呼吸间距），完全不遮挡上方横屏视频！
+        // 全屏态固定于屏幕可视底端（安全区底边上方 20pt）。
+        // 关键：位置计算坚决不引入 zoomScale 与 zoomOffset，实现画面缩放/平移完全解耦！
+        let cardModeBottomY = containerSize.height - 8
         let screenBottomY: CGFloat = {
             if expandTargetFrame.height > 0 {
-                return expandTargetFrame.maxY - containerGlobalFrame.minY
+                return expandTargetFrame.maxY - containerGlobalFrame.minY - 20
             } else {
-                return containerSize.height
+                return containerSize.height - 20
             }
         }()
-        let targetBottomY = (cardBottomY - 20) + ((screenBottomY - 20) - (cardBottomY - 20)) * clampedProgress
+        let targetBottomY = cardModeBottomY + (screenBottomY - cardModeBottomY) * clampedProgress
         let containerHeight = max(targetBottomY, 60)
 
         ZStack(alignment: .bottom) {
@@ -1002,6 +997,8 @@ struct DraggablePhotoView: View {
             isNavigating = false
             hasTriggeredHaptic = false
             if targetPhoto.mediaType == .video {
+                videoPlayerState.cleanup()
+                videoPlayerState.loadVideo(for: targetPhoto.asset)
                 revealVideoControls()
             } else {
                 videoPlayerState.cleanup()

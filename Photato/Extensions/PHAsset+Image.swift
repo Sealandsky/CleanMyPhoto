@@ -424,7 +424,21 @@ final class PlayerUIView: UIView {
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
     var player: AVPlayer? {
-        didSet { playerLayer.player = player }
+        didSet {
+            if oldValue !== player {
+                playerLayer.player = player
+            }
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        playerLayer.videoGravity = .resizeAspect
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        playerLayer.videoGravity = .resizeAspect
     }
 }
 
@@ -433,7 +447,9 @@ struct PlayerLayerView: UIViewRepresentable {
     let player: AVPlayer?
 
     func makeUIView(context: Context) -> PlayerUIView {
-        PlayerUIView()
+        let view = PlayerUIView()
+        view.player = player
+        return view
     }
 
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
@@ -441,7 +457,7 @@ struct PlayerLayerView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: PlayerUIView, context: Context) {
-        uiView.player = nil
+        // 不在此清空 uiView.player，防止 SwiftUI 动画重排 Representable 导致播放器意外中断
     }
 }
 
@@ -679,6 +695,7 @@ struct VideoPlayerView: View {
     var onAreaTap: (() -> Void)? = nil
     var showsControls: Bool = true
     @Environment(\.scenePhase) private var scenePhase
+    private let ownsState: Bool
 
     init(
         asset: PHAsset,
@@ -688,7 +705,13 @@ struct VideoPlayerView: View {
         showsControls: Bool = true
     ) {
         self.asset = asset
-        self._state = ObservedObject(wrappedValue: state ?? VideoPlayerState())
+        if let state {
+            self._state = ObservedObject(wrappedValue: state)
+            self.ownsState = false
+        } else {
+            self._state = ObservedObject(wrappedValue: VideoPlayerState())
+            self.ownsState = true
+        }
         self.isDragging = isDragging
         self.onAreaTap = onAreaTap
         self.showsControls = showsControls
@@ -716,16 +739,24 @@ struct VideoPlayerView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: state.isLoading)
         .onAppear {
-            state.loadVideo(for: asset)
-            revealControls()
+            if ownsState {
+                state.loadVideo(for: asset)
+                revealControls()
+            } else if state.player == nil {
+                state.loadVideo(for: asset)
+            }
         }
         .onChange(of: asset.localIdentifier) { _, _ in
-            state.cleanup()
-            state.loadVideo(for: asset)
-            revealControls()
+            if ownsState {
+                state.cleanup()
+                state.loadVideo(for: asset)
+                revealControls()
+            }
         }
         .onDisappear {
-            state.cleanup()
+            if ownsState {
+                state.cleanup()
+            }
         }
         // 拖动进度条期间保持控件常显（拖动开始即唤回），松手后若在播放则重新计时
         .onChange(of: state.isScrubbing) { _, scrubbing in
