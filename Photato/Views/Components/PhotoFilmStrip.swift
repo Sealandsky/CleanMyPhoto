@@ -57,6 +57,7 @@ struct PhotoFilmStrip: View {
                     let isCurrent = (i == c)
                     let isExpanded = isCurrent && !isCollapsed
                     let isCenterDuringDrag = isDragging && (i == currentCenter)
+                    let isSelectedCell = (i == (isDragging ? dragStartIndex : c))
 
                     stripCell(
                         photo,
@@ -66,7 +67,7 @@ struct PhotoFilmStrip: View {
                     .offset(x: itemBaseX(index: i, center: anchorIndex, isCollapsed: isCollapsed))
                     .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isCollapsed)
                     .offset(x: dragTranslation)
-                    .zIndex(isExpanded ? 1 : 0)
+                    .zIndex(isSelectedCell ? 1 : 0)
                     .onTapGesture {
                         selectIndex(i)
                     }
@@ -151,19 +152,19 @@ struct PhotoFilmStrip: View {
         }
     }
 
-    /// 滑动准备缓冲区阈值（12pt）：
-    /// 当用户滑动一点点时（0~12pt），当前选中图片首先顺畅缩小为 3:4 竖图并收拢呼吸间隙，
-    /// 此阶段缩略图条基本保持原位（仅产生 15% 微小阻尼蠕动），为后续滑动浏览做充分准备；
-    /// 超过 12pt 后，滑动位移无缝 1:1 跟手，开始平滑切换照片。
-    private static let prepDistance: CGFloat = 12.0
+    /// 滑动准备缓冲区阈值（26pt）：
+    /// 刚开始滑动一点点时（0~26pt），胶卷不平移、大图不切换；
+    /// 当前选中缩略图在此区间先平滑缩小为 3:4 竖图并收拢呼吸间隙，为后续滑动留出充分准备空间；
+    /// 当滑出 26pt 准备区后，胶卷开始 1:1 跟手滑动，并按 32.5pt 步长流畅切换照片。
+    private static let prepDistance: CGFloat = 26.0
 
     private func calculateEffectiveTranslation(_ translation: CGFloat) -> CGFloat {
         if translation > Self.prepDistance {
-            return (translation - Self.prepDistance) + Self.prepDistance * 0.15
+            return translation - Self.prepDistance
         } else if translation < -Self.prepDistance {
-            return (translation + Self.prepDistance) - Self.prepDistance * 0.15
+            return translation + Self.prepDistance
         } else {
-            return translation * 0.15
+            return 0
         }
     }
 
@@ -174,7 +175,9 @@ struct PhotoFilmStrip: View {
             dragStartIndex = activeIndex
             lastHapticIndex = dragStartIndex
             isDragging = true
-            isCollapsed = true
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                isCollapsed = true
+            }
             onScrubbingChanged?(true)
         }
 
@@ -201,6 +204,7 @@ struct PhotoFilmStrip: View {
         }
 
         // 纯线性无抖动步进：按有效移动距离推算中轴线索引
+        // 当处于 0~26pt 准备区内时，translation 恒为 0，targetIndex 恒等于 dragStartIndex（即 lastHapticIndex），绝不切图
         let indexDelta = Int(round(-translation / Self.stepNormal))
         let targetIndex = min(max(0, dragStartIndex + indexDelta), photos.count - 1)
 
@@ -226,10 +230,15 @@ struct PhotoFilmStrip: View {
             } else if velocityX > 450 && finalIndex > 0 {
                 finalIndex -= 1
             }
+        } else {
+            // 在准备区内放手：不发生切图，完全回归原位
+            finalIndex = dragStartIndex
         }
 
         internalIndex = finalIndex
-        onSelect(photos[finalIndex])
+        if photos[finalIndex].id != currentPhotoID {
+            onSelect(photos[finalIndex])
+        }
 
         // 放手动画：平滑恢复静止态（居中项放大为正方形、两侧展开留白、描边浮现）
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
