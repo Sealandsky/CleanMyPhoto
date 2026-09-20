@@ -45,20 +45,10 @@ struct PhotoInfoSheet: View {
                 .padding(.bottom, 24)
             }
         }
-        .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.25), value: allRows)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-        .presentationBackground {
-            if #available(iOS 26.0, *) {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .glassEffect(.regular)
-            } else {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            }
-        }
+        .presentationBackground(.ultraThinMaterial)
         .task {
             await loadAsyncInfo()
         }
@@ -80,18 +70,9 @@ struct PhotoInfoSheet: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background {
-            if #available(iOS 26.0, *) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(UIColor.secondarySystemFill).opacity(0.35))
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(UIColor.secondarySystemGroupedBackground).opacity(0.45))
-            }
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+        .background(
+            Color(UIColor.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
     }
 
@@ -175,41 +156,81 @@ struct PhotoInfoSheet: View {
     }
 
     /// 读取图片 EXIF 拍摄参数：requestImageDataAndOrientation 拿原始数据 →
-    /// CIImage 属性字典；任一参数缺失则跳过该行
+    /// CGImageSource 解析；任一参数缺失则跳过该行
     private static func loadExifRows(for asset: PHAsset) async -> [InfoRowItem] {
         let data: Data? = await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = true
             options.deliveryMode = .highQualityFormat
+            var hasResumed = false
             PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { imageData, _, _, _ in
+                guard !hasResumed else { return }
+                hasResumed = true
                 continuation.resume(returning: imageData)
             }
         }
         guard let data,
-              let properties = CIImage(data: data)?.properties else { return [] }
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return []
+        }
 
         var rows: [InfoRowItem] = []
         let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
         let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any]
 
-        if let model = (tiff?[kCGImagePropertyTIFFModel as String] as? String), !model.isEmpty {
-            rows.append(InfoRowItem(id: "camera", label: String(localized: "Camera"), value: model))
+        let make = (tiff?[kCGImagePropertyTIFFMake as String] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = (tiff?[kCGImagePropertyTIFFModel as String] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cameraDisplay: String? = {
+            if let model, !model.isEmpty {
+                if let make, !make.isEmpty, !model.localizedCaseInsensitiveContains(make) {
+                    return "\(make) \(model)"
+                }
+                return model
+            }
+            return make
+        }()
+        if let camera = cameraDisplay, !camera.isEmpty {
+            rows.append(InfoRowItem(id: "camera", label: String(localized: "Camera"), value: camera))
         }
-        if let focal = exif?[kCGImagePropertyExifFocalLength as String] as? Double {
+
+        let focal = (exif?[kCGImagePropertyExifFocalLength as String] as? NSNumber)?.doubleValue
+            ?? (exif?[kCGImagePropertyExifFocalLength as String] as? Double)
+        if let focal, focal > 0 {
             rows.append(InfoRowItem(id: "focalLength", label: String(localized: "Focal Length"), value: String(format: "%.0f mm", focal)))
         }
-        if let fNumber = exif?[kCGImagePropertyExifFNumber as String] as? Double {
+
+        let fNumber = (exif?[kCGImagePropertyExifFNumber as String] as? NSNumber)?.doubleValue
+            ?? (exif?[kCGImagePropertyExifFNumber as String] as? Double)
+        if let fNumber, fNumber > 0 {
             rows.append(InfoRowItem(id: "aperture", label: String(localized: "Aperture"), value: String(format: "ƒ/%.1f", fNumber)))
         }
-        if let seconds = exif?[kCGImagePropertyExifExposureTime as String] as? Double, seconds > 0 {
+
+        let seconds = (exif?[kCGImagePropertyExifExposureTime as String] as? NSNumber)?.doubleValue
+            ?? (exif?[kCGImagePropertyExifExposureTime as String] as? Double)
+        if let seconds, seconds > 0 {
             let text = seconds < 1
                 ? String(format: "1/%d s", Int((1 / seconds).rounded()))
                 : String(format: "%.1f s", seconds)
             rows.append(InfoRowItem(id: "shutter", label: String(localized: "Shutter"), value: text))
         }
-        if let iso = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [Int], let first = iso.first {
-            rows.append(InfoRowItem(id: "iso", label: String(localized: "ISO"), value: "\(first)"))
+
+        let isoValue: Int? = {
+            if let isoArray = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [NSNumber], let first = isoArray.first {
+                return first.intValue
+            }
+            if let isoArray = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? [Int], let first = isoArray.first {
+                return first
+            }
+            if let isoNum = exif?[kCGImagePropertyExifISOSpeedRatings as String] as? NSNumber {
+                return isoNum.intValue
+            }
+            return nil
+        }()
+        if let iso = isoValue, iso > 0 {
+            rows.append(InfoRowItem(id: "iso", label: String(localized: "ISO"), value: "\(iso)"))
         }
+
         return rows
     }
 }
