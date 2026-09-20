@@ -266,8 +266,8 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // MARK: - 垂直流式版式（对齐 Figma 639-3025）
-    /// 操作栏布局高度（50pt 按钮 + 上下 16pt padding）
-    private static let actionBarHeight: CGFloat = 82
+    /// 操作栏布局高度（50pt 按钮 + 底部 16pt padding，顶部间距由缩略图底边距等距提供）
+    private static let actionBarHeight: CGFloat = 66
     /// 相似照片首屏恒定露出量：卡片圆角顶部弧线，作为「下方还有内容」的滚动暗示
     private static let relatedPeekHeight: CGFloat = 48
     /// 照片区最小高度兜底（iPad 分屏等极端小可视区域）
@@ -400,7 +400,8 @@ struct FullscreenPhotoBrowser: View {
             deleteButton
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.top, 0)
+        .padding(.bottom, 16)
     }
 
     private var isCurrentFavorite: Bool {
