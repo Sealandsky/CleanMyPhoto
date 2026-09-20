@@ -15,11 +15,11 @@ struct PhotoFilmStrip: View {
     static let thumbHeight: CGFloat = 40
     /// 非选中项宽度（固定 3:4 竖图比例：40 * 0.75 = 30pt）
     static let unselectedWidth: CGFloat = 30
-    /// 选中项宽度（正方形 1:1 比例：40 * 1.0 = 40pt）
+    /// 选中项静止宽度（正方形 1:1 比例：40 * 1.0 = 40pt）
     static let selectedWidth: CGFloat = 40
     /// 缩略图条普通间距（紧凑胶卷风格）
     static let spacing: CGFloat = 2.5
-    /// 选中项两侧专属呼吸间隙（确保选中项两边有明显留白脱出）
+    /// 选中项两侧专属呼吸间隙（静止时留白 9pt，拖动时收起为 0）
     static let selectedMargin: CGFloat = 9.0
     /// 垂直内边距（上下各 14pt，确保上下板块间距绝对对称）
     static let verticalPadding: CGFloat = 14
@@ -27,11 +27,10 @@ struct PhotoFilmStrip: View {
     /// 布局总高度（40pt 缩略图 + 上下对称内边距 28pt = 68pt）
     static let layoutHeight: CGFloat = thumbHeight + verticalPadding * 2
 
-    // 选中项中轴到相邻项中轴距离：20 + 9 + 2.5 + 15 = 46.5pt
-    private static let stepFirst: CGFloat = selectedWidth / 2 + selectedMargin + spacing + unselectedWidth / 2
-    // 非选中相邻项中轴距离：30 + 2.5 = 32.5pt
+    // 默认步长（全收起 3:4 状态下各相邻项中心距：30 + 2.5 = 32.5pt）
     private static let stepNormal: CGFloat = unselectedWidth + spacing
 
+    @State private var isDragging: Bool = false
     @State private var dragOffset: CGFloat = 0
     @State private var accumulatedDrag: CGFloat = 0
     @State private var internalIndex: Int = 0
@@ -49,9 +48,9 @@ struct PhotoFilmStrip: View {
                 ForEach(visibleRange, id: \.self) { i in
                     let photo = photos[i]
                     let isCurrent = i == c
-                    let xOffset = xOffsetFor(index: i, activeIndex: c) + dragOffset
+                    let xOffset = xOffsetFor(index: i, activeIndex: c, isDragging: isDragging) + dragOffset
 
-                    stripCell(photo, isCurrent: isCurrent)
+                    stripCell(photo, isCurrent: isCurrent, isDragging: isDragging)
                         .offset(x: xOffset)
                         .zIndex(isCurrent ? 1 : 0)
                         .onTapGesture {
@@ -100,16 +99,26 @@ struct PhotoFilmStrip: View {
         return low <= high ? low...high : 0...0
     }
 
+    /// 选中项中心与相邻项中心的间距：
+    /// - 静止时：(40/2) + 9 + 2.5 + (30/2) = 46.5pt，两端展现 11.5pt 明显留白；
+    /// - 拖拽中：(30/2) + 0 + 2.5 + (30/2) = 32.5pt，完全收起与普通间距无异。
+    private func stepFirst(isDragging: Bool) -> CGFloat {
+        let currentWidth = isDragging ? Self.unselectedWidth : Self.selectedWidth
+        let currentMargin = isDragging ? 0 : Self.selectedMargin
+        return (currentWidth / 2) + currentMargin + Self.spacing + (Self.unselectedWidth / 2)
+    }
+
     /// 严格以屏幕中轴（offset 0）为基准计算各图片位置：
-    /// 当前项永远处于 offset 0（屏幕正中）；
-    /// 相邻两侧项预留 stepFirst 距离，呈现自然的大留白；其后项按 stepNormal 紧密排列
-    private func xOffsetFor(index: Int, activeIndex: Int) -> CGFloat {
+    /// 无论静止还是拖拽，当前项永远处于 offset 0（屏幕正中）
+    private func xOffsetFor(index: Int, activeIndex: Int, isDragging: Bool) -> CGFloat {
         if index == activeIndex {
             return 0
-        } else if index > activeIndex {
-            return Self.stepFirst + CGFloat(index - (activeIndex + 1)) * Self.stepNormal
+        }
+        let first = stepFirst(isDragging: isDragging)
+        if index > activeIndex {
+            return first + CGFloat(index - (activeIndex + 1)) * Self.stepNormal
         } else {
-            return -(Self.stepFirst + CGFloat((activeIndex - 1) - index) * Self.stepNormal)
+            return -(first + CGFloat((activeIndex - 1) - index) * Self.stepNormal)
         }
     }
 
@@ -120,16 +129,22 @@ struct PhotoFilmStrip: View {
         guard photos.indices.contains(index) else { return }
         internalIndex = index
         feedback.selectionChanged()
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             dragOffset = 0
             accumulatedDrag = 0
             onSelect(photos[index])
         }
     }
 
-    /// 左右拖动底片：实时跟手拖拽，越过步长阈值即时步进切图，无惯性漂移
+    /// 左右拖动底片：开始拖拽时中间图片收起为 3:4，两边无间距无描边；滑动时实时跟手步进
     private func handleDragChanged(_ value: DragGesture.Value) {
         guard !photos.isEmpty else { return }
+        if !isDragging {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isDragging = true
+            }
+        }
+
         var currentDrag = value.translation.width - accumulatedDrag
         let step = Self.stepNormal
         let threshold = step * 0.7
@@ -159,13 +174,13 @@ struct PhotoFilmStrip: View {
         dragOffset = currentDrag
     }
 
-    /// 拖动释放：停止在当前已选中的图片，弹簧平滑吸附回中轴线，绝不乱切到其他图
+    /// 拖动释放：中间图片放大为 1:1 正方形，两边展开留白间距，描边淡入，吸附中轴
     private func handleDragEnded(_ value: DragGesture.Value) {
         accumulatedDrag = 0
         let velocityX = value.velocity.width
         let predictedX = value.predictedEndTranslation.width
 
-        // 仅在明确的高速轻扫划手势下，才额外步进 1 张
+        // 仅在明确的高速轻扫手势下，才额外步进 1 张
         if velocityX < -400 || predictedX < -60 {
             let nextIndex = min(activeIndex + 1, photos.count - 1)
             if nextIndex != activeIndex {
@@ -182,7 +197,8 @@ struct PhotoFilmStrip: View {
             }
         }
 
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.86)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            isDragging = false
             dragOffset = 0
         }
     }
@@ -195,9 +211,12 @@ struct PhotoFilmStrip: View {
 
     // MARK: - Cell
 
-    /// 单个缩略图：选中的用正方形（40x40），非选中的保持 3:4 竖照（30x40）
-    private func stripCell(_ photo: PhotoAsset, isCurrent: Bool) -> some View {
-        let width = isCurrent ? Self.selectedWidth : Self.unselectedWidth
+    /// 单个缩略图：
+    /// - 静止时：选中项为 1:1 正方形（40x40）带描边，非选中项为 3:4 竖照（30x40）无描边；
+    /// - 拖动时：全部收起为 3:4 竖照（30x40）且无描边，形成匀称胶卷连贯滑动。
+    private func stripCell(_ photo: PhotoAsset, isCurrent: Bool, isDragging: Bool) -> some View {
+        let width = (isCurrent && !isDragging) ? Self.selectedWidth : Self.unselectedWidth
+        let showBorder = isCurrent && !isDragging
 
         return AssetImage(
             asset: photo.asset,
@@ -209,12 +228,12 @@ struct PhotoFilmStrip: View {
         .overlay(alignment: .bottomTrailing) {
             mediaBadge(photo)
         }
-        // 当前项高亮描边：贴合 4pt 圆角的高对比度 2pt 主色描边
         .overlay(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .strokeBorder(isCurrent ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(showBorder ? Color.accentColor : Color.clear, lineWidth: 2)
         )
-        .opacity(isCurrent ? 1.0 : 0.88)
+        .opacity(isCurrent ? 1.0 : (isDragging ? 0.95 : 0.88))
+        .animation(.easeInOut(duration: 0.15), value: isDragging)
         .animation(.easeInOut(duration: 0.18), value: isCurrent)
     }
 
