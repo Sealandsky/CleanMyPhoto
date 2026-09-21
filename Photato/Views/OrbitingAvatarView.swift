@@ -398,7 +398,7 @@ private struct PhotoCardContentView: View {
         .overlay(
             // 3. 精致白边
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.85), lineWidth: 2)
+                .stroke(Color.white.opacity(0.85), lineWidth: 0)
         )
     }
 }

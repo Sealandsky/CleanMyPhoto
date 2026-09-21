@@ -633,6 +633,7 @@ class VideoPlayerState: ObservableObject {
         // 拖动开始时暂停播放，避免后台持续推进播放时间引发音画错位与松手回跳
         player?.pause()
         isPlaying = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     func updateScrub(_ progress: Double) {
@@ -647,6 +648,7 @@ class VideoPlayerState: ObservableObject {
         guard isScrubbing else { return }
         isScrubbing = false
         isSeeking = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if totalDuration > 0 {
             currentTime = scrubProgress * totalDuration
         }
@@ -713,6 +715,7 @@ struct VideoControlsOverlay: View {
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundColor(.white)
                     .frame(width: 38, alignment: .trailing)
+                    .allowsHitTesting(false)
 
                 VideoScrubber(state: state)
 
@@ -720,6 +723,7 @@ struct VideoControlsOverlay: View {
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundColor(.white.opacity(0.8))
                     .frame(width: 38, alignment: .leading)
+                    .allowsHitTesting(false)
             }
 
             Spacer(minLength: 0)
@@ -930,22 +934,29 @@ struct VideoScrubber: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
+            // 背景导轨
             Capsule()
                 .fill(Color.white.opacity(0.35))
-                .frame(height: 4)
+                .frame(height: state.isScrubbing ? 6 : 4)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
 
+            // 已播放高亮导轨
             Capsule()
                 .fill(Color.white)
-                .frame(width: max(0, scrubberWidth * progress), height: 4)
+                .frame(width: max(0, scrubberWidth * progress), height: state.isScrubbing ? 6 : 4)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
 
+            // 拖动手柄滑块：拖动中弹簧缩放放大至 1.35x，增强触控把握感
             Circle()
                 .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.35), radius: 3, x: 0, y: 1)
+                .shadow(color: Color.black.opacity(state.isScrubbing ? 0.45 : 0.25), radius: state.isScrubbing ? 5 : 3, x: 0, y: 1)
                 .frame(width: 16, height: 16)
+                .scaleEffect(state.isScrubbing ? 1.35 : 1.0)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
                 .offset(x: max(-8, min(scrubberWidth - 8, scrubberWidth * progress - 8)))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 32) // 扩大触控热区，方便手指轻松抓取拖拽
+        .frame(height: 44) // 苹果 HIG 标准 44pt 触控高热区，杜绝手指抓取失手
         .contentShape(Rectangle())
         .background(
             GeometryReader { geo in

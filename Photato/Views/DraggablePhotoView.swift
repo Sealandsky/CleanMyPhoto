@@ -156,6 +156,9 @@ struct DraggablePhotoView: View {
                         isTouchInControls: { point in
                             isPointInVideoControls(point)
                         },
+                        isScrubbing: {
+                            videoPlayerState.isScrubbing
+                        },
                         onChanged: { translation in
                             handleHorizontalPanChanged(translation: translation)
                         },
@@ -176,13 +179,13 @@ struct DraggablePhotoView: View {
                 .gesture(
                     ZoomPanGesture(
                         isZoomEnabled: {
-                            !videoPlayerState.isScrubbing && !videoPlayerState.isSeeking && (
+                            !videoPlayerState.isScrubbing && (
                                 (expandWidth ?? cardImageWidth) > fullImageWidth * 1.02
                                     || expandProgress.wrappedValue > 0.5
                             )
                         },
                         onChanged: { translation in
-                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
+                            guard !videoPlayerState.isScrubbing else { return }
                             if isExpandZoomed {
                                 handleZoomPanChanged(translation: CGSize(width: translation.x, height: translation.y))
                             } else {
@@ -190,7 +193,7 @@ struct DraggablePhotoView: View {
                             }
                         },
                         onEnded: { _, _ in
-                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
+                            guard !videoPlayerState.isScrubbing else { return }
                             if isExpandZoomed {
                                 handleZoomPanEnded()
                             } else {
@@ -602,7 +605,7 @@ struct DraggablePhotoView: View {
 
     /// 判定触摸点是否落在视频控件条交互响应区或当前正处于拖拽进度中
     private func isPointInVideoControls(_ point: CGPoint) -> Bool {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return true }
+        if videoPlayerState.isScrubbing { return true }
         guard currentPhoto.mediaType == .video,
               videoControlsVisible,
               videoPlayerState.player != nil,
@@ -619,10 +622,20 @@ struct DraggablePhotoView: View {
             }
         }()
         let targetBottomY = cardModeBottomY + (screenBottomY - cardModeBottomY) * clampedProgress
-        // 控件条高度约 52pt，上下扩展容差以覆盖手指边缘与外边距
-        let topY = targetBottomY - 70
-        let bottomY = targetBottomY + 15
-        return point.y >= topY && point.y <= bottomY
+
+        let fullWidth = expandTargetFrame.width > 0 ? expandTargetFrame.width : cardContainerSize.width
+        let targetWidth = cardContainerSize.width + (fullWidth - cardContainerSize.width) * clampedProgress
+        // VideoControlsOverlay 自带两侧 12pt 水平外边距，其内部胶囊实际宽度与高度约 52pt
+        let pillWidth = max(targetWidth, 100) - 24
+        let pillHeight: CGFloat = 52
+
+        // 精准矩形区域（附带 6pt 触控边缘容差，不再贯穿全屏全宽）：
+        let minX = (cardContainerSize.width - pillWidth) / 2 - 6
+        let maxX = minX + pillWidth + 12
+        let minY = targetBottomY - pillHeight - 6
+        let maxY = targetBottomY + 6
+
+        return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
     }
 
     // MARK: - Gesture Handlers
@@ -630,7 +643,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势位移回调：驱动卡片横向视差滑动（缩放态由 ZoomPan 接管，拖拽进度条期间彻底互斥）
     private func handleHorizontalPanChanged(translation: CGPoint) {
-        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
+        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing { return }
         isDragging = true
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
             offset = CGSize(width: translation.x, height: 0)
@@ -639,7 +652,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势结束回调：判定滑动距离与速度决定是否切图
     private func handleHorizontalPanEnded(translation: CGPoint, velocity: CGPoint) {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
+        if videoPlayerState.isScrubbing {
             resetPosition()
             return
         }
@@ -648,7 +661,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
-        if isNavigating || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
+        if isNavigating || videoPlayerState.isScrubbing { return }
 
         let translation = value.translation
 
@@ -679,7 +692,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragEnded(_ value: DragGesture.Value) {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
+        if videoPlayerState.isScrubbing {
             resetPosition()
             return
         }
@@ -1418,6 +1431,8 @@ struct SingleDoubleTapGesture: UIGestureRecognizerRepresentable {
 /// 4. cancelsTouchesInView = false 保留视频控制按钮（播放/暂停/静音）等子视图点击事件。
 final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
     var isTouchInControls: ((CGPoint) -> Bool)?
+    var isScrubbingProvider: (() -> Bool)?
+    private var initialTouchPoint: CGPoint? = nil
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
@@ -1438,6 +1453,7 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         if let touch = touches.first, let view = self.view {
             let loc = touch.location(in: view)
+            initialTouchPoint = loc
             if let isTouchInControls, isTouchInControls(loc) {
                 state = .failed
                 return
@@ -1451,13 +1467,6 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let touch = touches.first, let view = self.view {
-            let loc = touch.location(in: view)
-            if let isTouchInControls, isTouchInControls(loc) {
-                state = .failed
-                return
-            }
-        }
         if state == .possible {
             // 边缘保护：若手指在初始微移阶段落在屏幕最左边缘（< 22pt），立即失败让权
             if let touch = touches.first, touch.location(in: nil).x < 22 {
@@ -1468,10 +1477,10 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
             let translation = self.translation(in: view)
             let absX = abs(translation.x)
             let absY = abs(translation.y)
-            // 纵向滑动优先退出：只要检测到纵向趋势（absY >= absX 且产生微移 > 1pt），
-            // 在调用 super.touchesMoved 之前立即置为 .failed，
-            // 彻底杜绝手势进入 .began，将触摸控制权零延迟让渡给外层 ScrollView
-            if absY >= absX && absY > 1 {
+            // 纵向滑动优先退出：当检测到明确纵向趋势（absY >= absX 且产生微移 > 5pt）时，
+            // 立即置为 .failed，将触摸控制权零延迟让渡给外层 ScrollView；
+            // 5pt 容差杜绝初始触地轻微生理抖动误杀横滑手势
+            if absY >= absX && absY > 5 {
                 state = .failed
                 return
             }
@@ -1479,11 +1488,28 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
         super.touchesMoved(touches, with: event)
     }
 
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesEnded(touches, with: event)
+        initialTouchPoint = nil
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesCancelled(touches, with: event)
+        initialTouchPoint = nil
+    }
+
+    override func reset() {
+        super.reset()
+        initialTouchPoint = nil
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === self else { return true }
         guard let view = self.view else { return false }
-        let loc = location(in: view)
-        if let isTouchInControls, isTouchInControls(loc) {
+        if let initial = initialTouchPoint, let isTouchInControls, isTouchInControls(initial) {
+            return false
+        }
+        if let isScrubbing = isScrubbingProvider, isScrubbing() {
             return false
         }
 
@@ -1517,6 +1543,7 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
 @available(iOS 18.0, *)
 struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
     var isTouchInControls: ((CGPoint) -> Bool)?
+    var isScrubbing: (() -> Bool)? = nil
     var onChanged: ((CGPoint) -> Void)?
     var onEnded: ((CGPoint, CGPoint) -> Void)?
 
@@ -1527,11 +1554,13 @@ struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
     func makeUIGestureRecognizer(context: Context) -> DirectionalHorizontalPanGestureRecognizer {
         let recognizer = DirectionalHorizontalPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
         recognizer.isTouchInControls = isTouchInControls
+        recognizer.isScrubbingProvider = isScrubbing
         return recognizer
     }
 
     func updateUIGestureRecognizer(_ recognizer: DirectionalHorizontalPanGestureRecognizer, context: Context) {
         recognizer.isTouchInControls = isTouchInControls
+        recognizer.isScrubbingProvider = isScrubbing
         context.coordinator.onChanged = onChanged
         context.coordinator.onEnded = onEnded
     }
