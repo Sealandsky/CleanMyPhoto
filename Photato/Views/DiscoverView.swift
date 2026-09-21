@@ -218,6 +218,8 @@ struct DiscoverView: View {
     /// 定位到指定照片：详情页返回时传入最后浏览的照片 id，网格滚动对齐
     /// 该 cell（nil = 不定位；置位一次定位后由外部复位）
     var scrollToPhotoID: String? = nil
+    /// 丝滑转场命名空间：由 ContentView 提供，实现列表与详情页无缝连续缩放
+    var transitionNamespace: Namespace.ID? = nil
     @EnvironmentObject var photoManager: PhotoManager
     @Environment(GridSettings.self) private var gridSettings
 
@@ -398,19 +400,7 @@ struct DiscoverView: View {
             ScrollView {
             // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
                 AdaptivePhotoGrid(photos: manager.photos) { photo in
-                    PhotoCell(photo: photo)
-                        .id(photo.id)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            // 交由 ContentView 打开全屏详情（复用 DraggablePhotoView）
-                            onPhotoSelect(photo)
-                        }
-                        .onAppear {
-                            // 与图库页相同：滚到最后一张时加载下一批
-                            if photo.id == manager.photos.last?.id {
-                                Task { await manager.loadMorePhotos() }
-                            }
-                        }
+                    photoCellView(photo)
                 }
                 .padding(.horizontal, 4)
                 .padding(.bottom, 4)
@@ -461,6 +451,32 @@ struct DiscoverView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Photo Cell View
+    @ViewBuilder
+    private func photoCellView(_ photo: PhotoAsset) -> some View {
+        let cell = PhotoCell(photo: photo)
+            .id(photo.id)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // 交由 ContentView 打开全屏详情（复用 DraggablePhotoView）
+                onPhotoSelect(photo)
+            }
+            .onAppear {
+                // 与图库页相同：滚到最后一张时加载下一批
+                if photo.id == manager.photos.last?.id {
+                    Task { await manager.loadMorePhotos() }
+                }
+            }
+
+        if let transitionNamespace {
+            cell.matchedTransitionSource(id: photo.id, in: transitionNamespace) { source in
+                source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+        } else {
+            cell
         }
     }
 

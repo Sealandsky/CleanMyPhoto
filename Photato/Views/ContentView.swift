@@ -13,6 +13,7 @@ struct ContentView: View {
 
     @State private var currentPhotoID: String? = nil
     @State private var scrollToPhotoID: String? = nil
+    @Namespace private var photoTransitionNamespace
 
     @StateObject private var discoverManager = DiscoverManager()
     // 回忆页滚顶信号：递增驱动 DiscoverView 滚回顶部
@@ -120,7 +121,8 @@ struct ContentView: View {
                     isFullscreenMode = true
                 },
                 scrollToTopSignal: discoverScrollSignal,
-                scrollToPhotoID: scrollToPhotoID
+                scrollToPhotoID: scrollToPhotoID,
+                transitionNamespace: photoTransitionNamespace
             )
             .navigationTitle(String(localized: "Memories"))
             .navigationBarTitleDisplayMode(.large)
@@ -159,6 +161,7 @@ struct ContentView: View {
                             // 切图即请求网格定位：详情页仍盖着网格，滚动发生在
                             // 遮盖之下用户无感知，返回时已就位（不依赖 pop 信号——
                             // 侧滑返回时 onDismiss 与 binding 变化时机均不可靠）
+                            scrollToPhotoID = photo.id
                         },
                         onDismiss: {
                             // 内部退出路径（删空批次/下滑关闭）
@@ -166,6 +169,7 @@ struct ContentView: View {
                         }
                     )
                     .environmentObject(photoManager)
+                    .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
                     // 返回定位（转场开始时机）：binding 在 pop 转场开始的瞬间被
                     // 置 false——此刻立即定位，0.35s 转场窗口足够掩盖滚动（视觉
                     // 上网格随转场露出时已在目标位）。切图时的实时定位（上方

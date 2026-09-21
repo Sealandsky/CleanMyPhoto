@@ -13,6 +13,7 @@ struct AlbumPhotoListView: View {
     @State private var isFullscreenMode = false
     @State private var currentPhotoID: String? = nil
     @State private var targetScrollPhotoID: String? = nil
+    @Namespace private var photoTransitionNamespace
 
     private var photos: [PhotoAsset] { albumManager.displayedAlbumPhotos }
 
@@ -39,6 +40,9 @@ struct AlbumPhotoListView: View {
                             isSelectMode: selectionManager.isSelectMode
                         )
                         .id(photo.id)
+                        .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                            source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if selectionManager.isSelectMode {
@@ -87,6 +91,12 @@ struct AlbumPhotoListView: View {
                     }
                 }
                 calculateAlbumSize()
+            }
+            .onChange(of: targetScrollPhotoID) { _, newValue in
+                guard let photoID = newValue else { return }
+                withTransaction(Transaction(animation: nil)) {
+                    proxy.scrollTo(photoID, anchor: .center)
+                }
             }
             .onChange(of: isFullscreenMode) { oldValue, newValue in
                 if oldValue && !newValue, let photoID = targetScrollPhotoID ?? currentPhotoID {
@@ -142,6 +152,7 @@ struct AlbumPhotoListView: View {
                     }
                 )
                 .environmentObject(photoManager)
+                .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
             }
         }
         .toolbar {

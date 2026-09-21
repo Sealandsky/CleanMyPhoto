@@ -68,6 +68,7 @@ struct FullscreenPhotoBrowser: View {
     @State private var relatedBrowsePhotos: [PhotoAsset] = []
     @State private var relatedBrowseInitialID = ""
     @State private var isRelatedDetailActive = false
+    @Namespace private var relatedTransitionNamespace
 
     // 本实例内删除的素材：推入页的批次是构造期快照，不随外部数据源收缩，
     // 删除后需在此即时剔除才能让大图滑向下一张；外层实例同样受益
@@ -239,6 +240,7 @@ struct FullscreenPhotoBrowser: View {
                 onDismiss: { isRelatedDetailActive = false }
             )
             .environmentObject(photoManager)
+            .navigationTransition(.zoom(sourceID: relatedBrowseInitialID, in: relatedTransitionNamespace))
         }
         .onAppear {
             // 初始化当前照片：优先用外部指定的初始照片，异常时回退首张
@@ -371,7 +373,11 @@ struct FullscreenPhotoBrowser: View {
                     actionBar
                         .opacity(1 - expandProgress)
                         .allowsHitTesting(expandProgress < 0.5)
-                    RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
+                    RelatedPhotosSection(
+                        state: relatedState,
+                        transitionNamespace: relatedTransitionNamespace,
+                        onSelect: selectRelatedAsset
+                    )
                         .opacity(1 - expandProgress)
                         .allowsHitTesting(expandProgress < 0.5)
                 }
@@ -974,6 +980,7 @@ private enum RelatedPhotosState: Equatable {
 /// 批次外推入下一级详情页），本模块只上报被点素材
 private struct RelatedPhotosSection: View {
     let state: RelatedPhotosState
+    var transitionNamespace: Namespace.ID? = nil
     var onSelect: (PHAsset) -> Void = { _ in }
 
     /// 骨架屏列高：沿用占位期错落节奏
@@ -1032,11 +1039,18 @@ private struct RelatedPhotosSection: View {
                         Button {
                             onSelect(asset)
                         } label: {
-                            PhotoCell(
+                            let cell = PhotoCell(
                                 photo: PhotoAsset(asset: asset),
                                 forceOriginalRatio: true,
                                 cornerRadius: 24
                             )
+                            if let transitionNamespace {
+                                cell.matchedTransitionSource(id: asset.localIdentifier, in: transitionNamespace) { source in
+                                    source.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                }
+                            } else {
+                                cell
+                            }
                         }
                         .buttonStyle(RelatedPhotoCardStyle())
                     }

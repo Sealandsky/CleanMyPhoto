@@ -52,6 +52,7 @@ struct AlbumDetailView: View {
     @State private var isFullscreenMode = false
     @State private var fullscreenPhotos: [PhotoAsset] = []
     @State private var currentPhotoID: String? = nil
+    @Namespace private var photoTransitionNamespace
     @State private var selectedPickerItems: [PhotosPickerItem] = []
     @State private var isProcessingPickedPhotos = false
 
@@ -143,6 +144,7 @@ struct AlbumDetailView: View {
                     }
                 )
                 .environmentObject(photoManager)
+                .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
             }
         }
         .task {
@@ -224,6 +226,9 @@ struct AlbumDetailView: View {
                             yourPhotoCard(photo)
                                 .padding(.trailing, 10)
                                 .transition(.pushOpen)
+                                .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                                    source.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
                                 .onTapGesture {
                                     fullscreenPhotos = albumPhotos
                                     currentPhotoID = photo.id
@@ -336,6 +341,9 @@ struct AlbumDetailView: View {
                         }
                     )
                     .id(photo.id)
+                    .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                        source.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
                 }
                 .padding(.horizontal, 16)
             } else if !PhotoSimilarityMatcher.shared.isLibraryIndexed {
