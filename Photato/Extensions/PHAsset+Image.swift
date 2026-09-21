@@ -490,26 +490,53 @@ class VideoPlayerState: ObservableObject {
 
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
-    private var currentAssetID: String?
+    private(set) var currentAssetID: String?
+    private var currentRequestID: PHImageRequestID?
+
+    private func teardownCurrentPlayer() {
+        if let observer = timeObserver, let player {
+            player.removeTimeObserver(observer)
+        }
+        timeObserver = nil
+        if let observer = endObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        endObserver = nil
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+    }
 
     func loadVideo(for phAsset: PHAsset) {
         let assetID = phAsset.localIdentifier
-        guard currentAssetID != assetID else { return }
+        // 若当前已在播放该素材且播放器健康存活，坚决不重复请求，杜绝双播放器重叠发声
+        guard currentAssetID != assetID || player == nil else { return }
         cleanup()
         currentAssetID = assetID
         isLoading = true
 
         let options = PHVideoRequestOptions()
         options.isNetworkAccessAllowed = true
-        options.deliveryMode = .automatic
+        // 关键修复：指定为 highQualityFormat，强制 Photos 框架仅回调一次最终高质量视频资源，
+        // 彻底杜绝 .automatic 模式下系统分两次下发（先代理资源、后高清资源）引发的双播放器并发重叠发声问题
+        options.deliveryMode = .highQualityFormat
 
-        PHImageManager.default().requestAVAsset(forVideo: phAsset, options: options) { [weak self] avAsset, _, _ in
+        let requestID = PHImageManager.default().requestAVAsset(forVideo: phAsset, options: options) { [weak self] avAsset, _, info in
             guard let strongSelf = self else { return }
             Task { @MainActor in
-                // 快速切换视频时丢弃晚到的旧请求，防止旧播放器赋给新视频造成错乱
+                // 若请求已被取消或当前已切到其他素材，直接丢弃晚到的旧请求
+                if let cancelled = info?[PHImageCancelledKey] as? Bool, cancelled { return }
                 guard strongSelf.currentAssetID == assetID else { return }
 
+                // 幂等防护：若当前主线程已存在活跃播放器，丢弃重复生成
+                if strongSelf.player != nil {
+                    strongSelf.isLoading = false
+                    return
+                }
+
                 if let avAsset {
+                    strongSelf.teardownCurrentPlayer()
+
                     let item = AVPlayerItem(asset: avAsset)
                     let player = AVPlayer(playerItem: item)
 
@@ -551,8 +578,10 @@ class VideoPlayerState: ObservableObject {
                     // 加载失败：仅移除 loading，保留原有兜底 UI（底层静态首帧、无播放控件）
                     strongSelf.isLoading = false
                 }
+                strongSelf.currentRequestID = nil
             }
         }
+        currentRequestID = requestID
     }
 
     /// App 切后台/失活时暂停播放（保留播放进度与声音记忆，不销毁播放器）
@@ -604,6 +633,7 @@ class VideoPlayerState: ObservableObject {
         // 拖动开始时暂停播放，避免后台持续推进播放时间引发音画错位与松手回跳
         player?.pause()
         isPlaying = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     func updateScrub(_ progress: Double) {
@@ -618,6 +648,7 @@ class VideoPlayerState: ObservableObject {
         guard isScrubbing else { return }
         isScrubbing = false
         isSeeking = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if totalDuration > 0 {
             currentTime = scrubProgress * totalDuration
         }
@@ -639,21 +670,16 @@ class VideoPlayerState: ObservableObject {
     }
 
     func cleanup() {
+        if let reqID = currentRequestID {
+            PHImageManager.default().cancelImageRequest(reqID)
+            currentRequestID = nil
+        }
         seekToken += 1
         isSeeking = false
         isScrubbing = false
         wasPlayingBeforeScrub = false
-        if let observer = timeObserver, let player {
-            player.removeTimeObserver(observer)
-        }
-        timeObserver = nil
-        if let observer = endObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        endObserver = nil
+        teardownCurrentPlayer()
         currentAssetID = nil
-        player?.pause()
-        player = nil
         isPlaying = false
         currentTime = 0
         totalDuration = 0
@@ -689,6 +715,7 @@ struct VideoControlsOverlay: View {
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundColor(.white)
                     .frame(width: 38, alignment: .trailing)
+                    .allowsHitTesting(false)
 
                 VideoScrubber(state: state)
 
@@ -696,6 +723,7 @@ struct VideoControlsOverlay: View {
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundColor(.white.opacity(0.8))
                     .frame(width: 38, alignment: .leading)
+                    .allowsHitTesting(false)
             }
 
             Spacer(minLength: 0)
@@ -800,7 +828,7 @@ struct VideoPlayerView: View {
             if ownsState {
                 state.loadVideo(for: asset)
                 revealControls()
-            } else if state.player == nil {
+            } else if state.player == nil || state.currentAssetID != asset.localIdentifier {
                 state.loadVideo(for: asset)
             }
         }
@@ -906,22 +934,29 @@ struct VideoScrubber: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
+            // 背景导轨
             Capsule()
                 .fill(Color.white.opacity(0.35))
-                .frame(height: 4)
+                .frame(height: state.isScrubbing ? 6 : 4)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
 
+            // 已播放高亮导轨
             Capsule()
                 .fill(Color.white)
-                .frame(width: max(0, scrubberWidth * progress), height: 4)
+                .frame(width: max(0, scrubberWidth * progress), height: state.isScrubbing ? 6 : 4)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
 
+            // 拖动手柄滑块：拖动中弹簧缩放放大至 1.35x，增强触控把握感
             Circle()
                 .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.35), radius: 3, x: 0, y: 1)
+                .shadow(color: Color.black.opacity(state.isScrubbing ? 0.45 : 0.25), radius: state.isScrubbing ? 5 : 3, x: 0, y: 1)
                 .frame(width: 16, height: 16)
+                .scaleEffect(state.isScrubbing ? 1.35 : 1.0)
+                .animation(.spring(response: 0.22, dampingFraction: 0.7), value: state.isScrubbing)
                 .offset(x: max(-8, min(scrubberWidth - 8, scrubberWidth * progress - 8)))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 32) // 扩大触控热区，方便手指轻松抓取拖拽
+        .frame(height: 44) // 苹果 HIG 标准 44pt 触控高热区，杜绝手指抓取失手
         .contentShape(Rectangle())
         .background(
             GeometryReader { geo in

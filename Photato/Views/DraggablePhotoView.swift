@@ -71,6 +71,8 @@ struct DraggablePhotoView: View {
     @State private var expandWidth: CGFloat? = nil
     /// 捏合手势上一帧倍率（增量式计算，手势结束置 nil）
     @State private var lastMagnification: CGFloat?
+    /// 捏合手势起始图宽（用于松手时判定缩放意图）
+    @State private var gestureStartWidth: CGFloat? = nil
     /// 展开态（超过全屏宽）的双轴平移偏移
     @State private var zoomOffset: CGSize = .zero
     /// 平移手势起始时的偏移基准
@@ -153,8 +155,14 @@ struct DraggablePhotoView: View {
             cardStack
                 .gesture(
                     DirectionalHorizontalPanGesture(
+                        isEnabled: {
+                            !isExpandZoomed
+                        },
                         isTouchInControls: { point in
                             isPointInVideoControls(point)
+                        },
+                        isScrubbing: {
+                            videoPlayerState.isScrubbing
                         },
                         onChanged: { translation in
                             handleHorizontalPanChanged(translation: translation)
@@ -176,23 +184,25 @@ struct DraggablePhotoView: View {
                 .gesture(
                     ZoomPanGesture(
                         isZoomEnabled: {
-                            !videoPlayerState.isScrubbing && !videoPlayerState.isSeeking && (
-                                (expandWidth ?? cardImageWidth) > fullImageWidth * 1.02
-                                    || expandProgress.wrappedValue > 0.5
+                            !videoPlayerState.isScrubbing && (
+                                isExpandZoomed || expandProgress.wrappedValue > 0.5
                             )
                         },
+                        isZoomed: {
+                            isExpandZoomed
+                        },
                         onChanged: { translation in
-                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
+                            guard !videoPlayerState.isScrubbing else { return }
                             if isExpandZoomed {
                                 handleZoomPanChanged(translation: CGSize(width: translation.x, height: translation.y))
                             } else {
                                 handleCollapseDragChanged(translation: CGSize(width: translation.x, height: translation.y))
                             }
                         },
-                        onEnded: { _, _ in
-                            guard !videoPlayerState.isScrubbing, !videoPlayerState.isSeeking else { return }
+                        onEnded: { _, velocity in
+                            guard !videoPlayerState.isScrubbing else { return }
                             if isExpandZoomed {
-                                handleZoomPanEnded()
+                                handleZoomPanEnded(velocity: velocity)
                             } else {
                                 handleCollapseDragEnded()
                             }
@@ -222,7 +232,11 @@ struct DraggablePhotoView: View {
 
             ZStack {
                 backgroundLayer
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(
+                        width: geometry.size.width,
+                        height: geometry.size.height + (expandTargetFrame.height > geometry.size.height ? (expandTargetFrame.height - geometry.size.height) * currentProgress : 0),
+                        alignment: .top
+                    )
                     .contentShape(Rectangle())
 
                 // 仅在手指拖拽或切图动画中渲染相邻卡片；静止闲置时只有当前照片存在，彻底杜绝矮宽图背后透出相邻图片
@@ -602,7 +616,7 @@ struct DraggablePhotoView: View {
 
     /// 判定触摸点是否落在视频控件条交互响应区或当前正处于拖拽进度中
     private func isPointInVideoControls(_ point: CGPoint) -> Bool {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return true }
+        if videoPlayerState.isScrubbing { return true }
         guard currentPhoto.mediaType == .video,
               videoControlsVisible,
               videoPlayerState.player != nil,
@@ -619,10 +633,20 @@ struct DraggablePhotoView: View {
             }
         }()
         let targetBottomY = cardModeBottomY + (screenBottomY - cardModeBottomY) * clampedProgress
-        // 控件条高度约 52pt，上下扩展容差以覆盖手指边缘与外边距
-        let topY = targetBottomY - 70
-        let bottomY = targetBottomY + 15
-        return point.y >= topY && point.y <= bottomY
+
+        let fullWidth = expandTargetFrame.width > 0 ? expandTargetFrame.width : cardContainerSize.width
+        let targetWidth = cardContainerSize.width + (fullWidth - cardContainerSize.width) * clampedProgress
+        // VideoControlsOverlay 自带两侧 12pt 水平外边距，其内部胶囊实际宽度与高度约 52pt
+        let pillWidth = max(targetWidth, 100) - 24
+        let pillHeight: CGFloat = 52
+
+        // 精准矩形区域（附带 6pt 触控边缘容差，不再贯穿全屏全宽）：
+        let minX = (cardContainerSize.width - pillWidth) / 2 - 6
+        let maxX = minX + pillWidth + 12
+        let minY = targetBottomY - pillHeight - 6
+        let maxY = targetBottomY + 6
+
+        return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
     }
 
     // MARK: - Gesture Handlers
@@ -630,7 +654,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势位移回调：驱动卡片横向视差滑动（缩放态由 ZoomPan 接管，拖拽进度条期间彻底互斥）
     private func handleHorizontalPanChanged(translation: CGPoint) {
-        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
+        if isNavigating || isExpandZoomed || videoPlayerState.isScrubbing { return }
         isDragging = true
         withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.85)) {
             offset = CGSize(width: translation.x, height: 0)
@@ -639,7 +663,7 @@ struct DraggablePhotoView: View {
 
     /// 水平单向手势结束回调：判定滑动距离与速度决定是否切图
     private func handleHorizontalPanEnded(translation: CGPoint, velocity: CGPoint) {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
+        if videoPlayerState.isScrubbing {
             resetPosition()
             return
         }
@@ -648,7 +672,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
-        if isNavigating || videoPlayerState.isScrubbing || videoPlayerState.isSeeking { return }
+        if isNavigating || videoPlayerState.isScrubbing { return }
 
         let translation = value.translation
 
@@ -679,7 +703,7 @@ struct DraggablePhotoView: View {
     }
 
     private func handleDragEnded(_ value: DragGesture.Value) {
-        if videoPlayerState.isScrubbing || videoPlayerState.isSeeking {
+        if videoPlayerState.isScrubbing {
             resetPosition()
             return
         }
@@ -786,7 +810,8 @@ struct DraggablePhotoView: View {
         let currentWidth = cardSize.width + (fullSize.width - cardSize.width) * progress
         let currentHeight = cardSize.height + (fullSize.height - cardSize.height) * progress
         let zoomScale = max(1.0, w / max(fullSize.width, 1.0))
-        let size = CGSize(width: currentWidth * zoomScale, height: currentHeight * zoomScale)
+        let cardScale = w < cardSize.width ? max(0.85, w / max(cardSize.width, 1.0)) : 1.0
+        let size = CGSize(width: currentWidth * zoomScale * cardScale, height: currentHeight * zoomScale * cardScale)
 
         // 中心从卡片容器中心插值到全屏目标区中心（global 差值即局部平移量）
         let offset = CGSize(
@@ -821,7 +846,7 @@ struct DraggablePhotoView: View {
     }
 
     /// 双指捏合：跟手逐帧更新展开宽度（系统规则——手指张合直接映射图宽，
-    /// 无「触发转场」），松手按半程阈值吸附
+    /// 无「触发转场」），松手按缩放意图吸附
     private var zoomMagnifyGesture: some Gesture {
         MagnifyGesture()
             .onChanged { value in
@@ -830,6 +855,7 @@ struct DraggablePhotoView: View {
                     ratioInc = value.magnification / max(last, 0.001)
                 } else {
                     ratioInc = 1
+                    gestureStartWidth = expandWidth ?? cardImageWidth
                 }
                 lastMagnification = value.magnification
                 guard expandEnabled else { return }
@@ -842,19 +868,67 @@ struct DraggablePhotoView: View {
                 expandWidth = target
                 expandProgress.wrappedValue = expandProgressValue(for: target)
             }
-            .onEnded { _ in
+            .onEnded { value in
                 lastMagnification = nil
+                let startW = gestureStartWidth ?? (expandWidth ?? cardImageWidth)
+                gestureStartWidth = nil
                 guard expandEnabled, let w = expandWidth else { return }
-                snapExpand(from: w)
+                snapExpand(from: w, startWidth: startW, velocity: value.velocity)
             }
     }
 
-    /// 松手吸附：低于半程弹回卡片、半程以上继续到全屏、已达放大态（超全屏宽）保留
-    private func snapExpand(from width: CGFloat) {
+    /// 松手吸附：根据起始状态（全屏/卡片/放大态）与手势意图进行平滑吸附
+    private func snapExpand(from width: CGFloat, startWidth: CGFloat? = nil, velocity: CGFloat = 0) {
         let cardW = cardImageWidth
         let fullW = fullImageWidth
         guard fullW > cardW else { return }
-        if width >= fullW { return }  // 放大态跟手保留
+
+        let start = startWidth ?? width
+
+        // 1. 放大态处理（当前宽度大于全屏基准）：
+        // 双指放大后松手，保持放大态，同时校准平移边界与最大缩放倍率
+        if width > fullW * 1.02 {
+            let maxW = fullW * maxZoomScale
+            if width > maxW {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                    expandWidth = maxW
+                    expandProgress.wrappedValue = 1.0
+                    zoomOffset = clampZoomOffset(zoomOffset)
+                }
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    zoomOffset = clampZoomOffset(zoomOffset)
+                }
+            }
+            return
+        }
+
+        // 2. 从全屏态（或接近全屏/放大态）发起的双指捏合缩小（当前宽度小于全屏）：
+        if start >= fullW * 0.95 {
+            // 只要产生向内捏合缩小趋势（缩放宽度减小超过 8%，或带有向内的收拢速度），立即平滑收拢回详情页卡片
+            if width < fullW * 0.92 || velocity < -0.1 {
+                collapseToCard()
+                return
+            } else {
+                // 仅轻微捏合未达收拢阈值：吸附回到标准全屏 1x
+                animateExpand(to: fullW)
+                return
+            }
+        }
+
+        // 3. 从卡片态（或接近卡片）发起的放大手势：
+        // 放大超过 8% 或有向外放大速度，顺势展开至全屏
+        if start <= cardW * 1.05 {
+            if width > cardW * 1.08 || velocity > 0.1 {
+                animateExpand(to: fullW)
+                return
+            } else {
+                collapseToCard()
+                return
+            }
+        }
+
+        // 4. 其他中间状态：半程吸附
         let mid = (cardW + fullW) / 2
         if width < mid {
             collapseToCard()
@@ -866,10 +940,11 @@ struct DraggablePhotoView: View {
     /// 动画驱动展开（单击/双击/吸附路径；进度 binding 随同一动画事务联动页面级视觉）
     private func animateExpand(to target: CGFloat, completion: (() -> Void)? = nil) {
         let isCollapsing = target <= cardImageWidth + 0.5
+        let isReturningToFull = abs(target - fullImageWidth) < 1.0
         withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
             expandWidth = target
             expandProgress.wrappedValue = expandProgressValue(for: target)
-            if isCollapsing {
+            if isCollapsing || isReturningToFull {
                 zoomOffset = .zero
             }
         } completion: {
@@ -893,7 +968,7 @@ struct DraggablePhotoView: View {
         }
     }
 
-    /// 单击：详情态 → 展开到全屏；全屏态 → 收拢回卡片（系统查看器语义）
+    /// 单击：详情态 → 展开到全屏；全屏放大态 → 还原 1x；全屏态 → 收拢回卡片（系统查看器语义）
     private func handleSingleTap() {
         guard expandEnabled else { return }
         // 视频不经过卡片层 recognizer（点控件条按钮会误触发）；
@@ -901,6 +976,8 @@ struct DraggablePhotoView: View {
         guard currentPhoto.mediaType != .video else { return }
         let w = expandWidth ?? cardImageWidth
         if w <= cardImageWidth * 1.02 {
+            animateExpand(to: fullImageWidth)
+        } else if w > fullImageWidth * 1.05 {
             animateExpand(to: fullImageWidth)
         } else if w >= fullImageWidth * 0.98 {
             collapseToCard()
@@ -919,6 +996,8 @@ struct DraggablePhotoView: View {
         let w = expandWidth ?? cardImageWidth
         if w <= cardImageWidth * 1.02 {
             animateExpand(to: fullImageWidth)
+        } else if w > fullImageWidth * 1.05 {
+            animateExpand(to: fullImageWidth)
         } else if w >= fullImageWidth * 0.98 {
             collapseToCard()
         }
@@ -936,36 +1015,77 @@ struct DraggablePhotoView: View {
         }
     }
 
-    /// 放大态（超全屏宽）双轴平移：实时钳制在放大可视范围内
+    /// 获取当前放大尺寸下的安全平移范围 (maxX, maxY)
+    private var maxPanBounds: (maxX: CGFloat, maxY: CGFloat) {
+        let ratio = currentPhoto.pixelAspectRatio
+        let fullSize = Self.fittedSize(ratio: ratio, in: expandTargetFrame.size)
+        guard fullSize.width > 0, fullSize.height > 0 else { return (0, 0) }
+
+        let z = max(1.0, (expandWidth ?? fullImageWidth) / max(fullImageWidth, 1))
+        let currentWidth = fullSize.width * z
+        let currentHeight = fullSize.height * z
+
+        let maxX = max(0, (currentWidth - expandTargetFrame.width) / 2)
+        let maxY = max(0, (currentHeight - expandTargetFrame.height) / 2)
+        return (maxX, maxY)
+    }
+
+    /// iOS 标准橡皮筋阻尼算法：在边界内 1:1 跟手，超出边界产生弹性阻尼阻力
+    private func rubberBand(value: CGFloat, min: CGFloat, max: CGFloat, factor: CGFloat = 0.38) -> CGFloat {
+        if value < min {
+            let overshoot = min - value
+            let damped = overshoot * factor / (1.0 + overshoot * 0.002)
+            return min - damped
+        } else if value > max {
+            let overshoot = value - max
+            let damped = overshoot * factor / (1.0 + overshoot * 0.002)
+            return max + damped
+        } else {
+            return value
+        }
+    }
+
+    /// 放大态（超全屏宽）双轴平移：1:1 实时跟手，超边界橡皮筋阻尼
     private func handleZoomPanChanged(translation: CGSize) {
         guard isExpandZoomed else { return }
         if !isZoomPanning {
             isZoomPanning = true
             zoomPanBase = zoomOffset
         }
-        zoomOffset = clampZoomOffset(CGSize(
-            width: zoomPanBase.width + translation.width,
-            height: zoomPanBase.height + translation.height
-        ))
+        let bounds = maxPanBounds
+        let rawX = zoomPanBase.width + translation.width
+        let rawY = zoomPanBase.height + translation.height
+
+        let appliedX = rubberBand(value: rawX, min: -bounds.maxX, max: bounds.maxX)
+        let appliedY = rubberBand(value: rawY, min: -bounds.maxY, max: bounds.maxY)
+
+        zoomOffset = CGSize(width: appliedX, height: appliedY)
     }
 
-    private func handleZoomPanEnded() {
+    /// 放大态平移手势结束：惯性滑行与弹性吸附回边界（与系统相册完全一致）
+    private func handleZoomPanEnded(velocity: CGPoint) {
         guard isExpandZoomed else { return }
         isZoomPanning = false
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            zoomOffset = clampZoomOffset(zoomOffset)
+
+        let bounds = maxPanBounds
+        // 惯性与边界回弹：考虑微量滑动手势初速度（平滑惯性），并弹簧吸附回最近的屏幕边缘
+        let projectedX = zoomOffset.width + velocity.x * 0.06
+        let projectedY = zoomOffset.height + velocity.y * 0.06
+
+        let targetX = min(max(projectedX, -bounds.maxX), bounds.maxX)
+        let targetY = min(max(projectedY, -bounds.maxY), bounds.maxY)
+
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            zoomOffset = CGSize(width: targetX, height: targetY)
         }
     }
 
-    /// 平移边界：超全屏的部分可移动（每侧 (z-1)×目标区尺寸/2）
+    /// 平移边界：超全屏的部分可移动
     private func clampZoomOffset(_ target: CGSize) -> CGSize {
-        let z = (expandWidth ?? fullImageWidth) / max(fullImageWidth, 1)
-        guard z > 1 else { return .zero }
-        let maxX = (z - 1) * expandTargetFrame.width / 2
-        let maxY = (z - 1) * expandTargetFrame.height / 2
+        let bounds = maxPanBounds
         return CGSize(
-            width: min(max(target.width, -maxX), maxX),
-            height: min(max(target.height, -maxY), maxY)
+            width: min(max(target.width, -bounds.maxX), bounds.maxX),
+            height: min(max(target.height, -bounds.maxY), bounds.maxY)
         )
     }
 
@@ -989,9 +1109,10 @@ struct DraggablePhotoView: View {
 
     private func handleCollapseDragEnded() {
         isZoomPanning = false
+        let base = collapseDragBase ?? fullImageWidth
         collapseDragBase = nil
         guard expandEnabled, let w = expandWidth else { return }
-        snapExpand(from: w)
+        snapExpand(from: w, startWidth: base, velocity: 0)
     }
 
     private func resetZoomStates() {
@@ -999,6 +1120,7 @@ struct DraggablePhotoView: View {
         zoomPanBase = .zero
         isZoomPanning = false
         lastMagnification = nil
+        gestureStartWidth = nil
     }
 
     /// 水平滑动切换素材（速度 + 距离双阈值），未达阈值回弹复位
@@ -1039,6 +1161,9 @@ struct DraggablePhotoView: View {
 
         // 切页时复位缩放态（滑走的卡不保留放大）
         resetZoomStates()
+
+        // 切换手势确立的第 0 毫秒立即暂停当前视频的声音，消除滑走卡片的背景声泄露
+        videoPlayerState.pausePlayback()
 
         let currentNavID = navigationID + 1
         navigationID = currentNavID
@@ -1208,16 +1333,24 @@ struct DraggablePhotoView: View {
 }
 
 // MARK: - Zoom Pan Gesture
-/// 放大态平移 / 全屏态下拉收拢共用的双轴手势：isZoomEnabled 为 false 时
-/// 立即失败，零干扰让权给外层切图手势与 ScrollView（让权策略与
-/// DirectionalHorizontalPanGesture 互补）
+/// 放大态平移 / 全屏态下拉收拢共用的双轴手势：
+/// 1. 放大态：任意方向 2D 漫游平移（1:1 跟手，超边界橡皮筋回弹）
+/// 2. 1x 全屏态：仅在手指明确向下纵向下拉时触发收拢回卡片，与横向切图手势完全互补解耦
+/// 3. maximumNumberOfTouches = 1 确保双指捏合手势不与单指平移冲突
 final class ZoomablePanGestureRecognizer: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
     var isEnabledProvider: (() -> Bool)?
+    var isZoomedProvider: (() -> Bool)?
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
         delegate = self
+        maximumNumberOfTouches = 1
         cancelsTouchesInView = false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer === self else { return true }
+        return isEnabledProvider?() ?? false
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
@@ -1230,13 +1363,28 @@ final class ZoomablePanGestureRecognizer: UIPanGestureRecognizer, UIGestureRecog
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === self else { return true }
-        return isEnabledProvider?() ?? false
+        guard let isEnabled = isEnabledProvider, isEnabled() else { return false }
+
+        // 放大态下：任意方向均可平移（2D 自由漫游）
+        if isZoomedProvider?() ?? false {
+            return true
+        }
+
+        // 非放大态（如 1x 全屏下拉收拢）：仅在手指明确向下纵向拖拽时触发，避免与横向切图手势冲突
+        guard let view = self.view else { return false }
+        let v = velocity(in: view)
+        let t = translation(in: view)
+        if v.y > 0 && abs(v.y) > abs(v.x) && t.y >= 0 {
+            return true
+        }
+        return false
     }
 }
 
 @available(iOS 18.0, *)
 struct ZoomPanGesture: UIGestureRecognizerRepresentable {
     var isZoomEnabled: () -> Bool
+    var isZoomed: (() -> Bool)? = nil
     var onChanged: ((CGPoint) -> Void)?
     var onEnded: ((CGPoint, CGPoint) -> Void)?
 
@@ -1250,11 +1398,13 @@ struct ZoomPanGesture: UIGestureRecognizerRepresentable {
             action: #selector(Coordinator.handlePan(_:))
         )
         recognizer.isEnabledProvider = isZoomEnabled
+        recognizer.isZoomedProvider = isZoomed
         return recognizer
     }
 
     func updateUIGestureRecognizer(_ recognizer: ZoomablePanGestureRecognizer, context: Context) {
         recognizer.isEnabledProvider = isZoomEnabled
+        recognizer.isZoomedProvider = isZoomed
         context.coordinator.onChanged = onChanged
         context.coordinator.onEnded = onEnded
     }
@@ -1270,14 +1420,19 @@ struct ZoomPanGesture: UIGestureRecognizerRepresentable {
 
         @objc func handlePan(_ recognizer: ZoomablePanGestureRecognizer) {
             guard let view = recognizer.view else { return }
-            let translation = recognizer.translation(in: view)
             let velocity = recognizer.velocity(in: view)
             switch recognizer.state {
-            case .began, .changed:
+            case .began:
+                recognizer.setTranslation(.zero, in: view)
+                onChanged?(.zero)
+            case .changed:
+                let translation = recognizer.translation(in: view)
                 onChanged?(translation)
             case .ended:
+                let translation = recognizer.translation(in: view)
                 onEnded?(translation, velocity)
             case .cancelled, .failed:
+                let translation = recognizer.translation(in: view)
                 onEnded?(translation, .zero)
             default:
                 break
@@ -1414,7 +1569,10 @@ struct SingleDoubleTapGesture: UIGestureRecognizerRepresentable {
 /// 3. 控件保护：严禁接收视频控制条区域内（进度条、按钮）的触摸，杜绝拖拽时间误触左右翻页。
 /// 4. cancelsTouchesInView = false 保留视频控制按钮（播放/暂停/静音）等子视图点击事件。
 final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
+    var isEnabledProvider: (() -> Bool)?
     var isTouchInControls: ((CGPoint) -> Bool)?
+    var isScrubbingProvider: (() -> Bool)?
+    private var initialTouchPoint: CGPoint? = nil
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
@@ -1424,6 +1582,9 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard gestureRecognizer === self else { return true }
+        if let isEnabled = isEnabledProvider, !isEnabled() {
+            return false
+        }
         guard let view = self.view else { return true }
         let loc = touch.location(in: view)
         if let isTouchInControls, isTouchInControls(loc) {
@@ -1433,8 +1594,13 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let isEnabled = isEnabledProvider, !isEnabled() {
+            state = .failed
+            return
+        }
         if let touch = touches.first, let view = self.view {
             let loc = touch.location(in: view)
+            initialTouchPoint = loc
             if let isTouchInControls, isTouchInControls(loc) {
                 state = .failed
                 return
@@ -1448,14 +1614,11 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let touch = touches.first, let view = self.view {
-            let loc = touch.location(in: view)
-            if let isTouchInControls, isTouchInControls(loc) {
+        if state == .possible {
+            if let isEnabled = isEnabledProvider, !isEnabled() {
                 state = .failed
                 return
             }
-        }
-        if state == .possible {
             // 边缘保护：若手指在初始微移阶段落在屏幕最左边缘（< 22pt），立即失败让权
             if let touch = touches.first, touch.location(in: nil).x < 22 {
                 state = .failed
@@ -1465,10 +1628,10 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
             let translation = self.translation(in: view)
             let absX = abs(translation.x)
             let absY = abs(translation.y)
-            // 纵向滑动优先退出：只要检测到纵向趋势（absY >= absX 且产生微移 > 1pt），
-            // 在调用 super.touchesMoved 之前立即置为 .failed，
-            // 彻底杜绝手势进入 .began，将触摸控制权零延迟让渡给外层 ScrollView
-            if absY >= absX && absY > 1 {
+            // 纵向滑动优先退出：当检测到明确纵向趋势（absY >= absX 且产生微移 > 5pt）时，
+            // 立即置为 .failed，将触摸控制权零延迟让渡给外层 ScrollView；
+            // 5pt 容差杜绝初始触地轻微生理抖动误杀横滑手势
+            if absY >= absX && absY > 5 {
                 state = .failed
                 return
             }
@@ -1476,11 +1639,31 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
         super.touchesMoved(touches, with: event)
     }
 
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesEnded(touches, with: event)
+        initialTouchPoint = nil
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesCancelled(touches, with: event)
+        initialTouchPoint = nil
+    }
+
+    override func reset() {
+        super.reset()
+        initialTouchPoint = nil
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === self else { return true }
+        if let isEnabled = isEnabledProvider, !isEnabled() {
+            return false
+        }
         guard let view = self.view else { return false }
-        let loc = location(in: view)
-        if let isTouchInControls, isTouchInControls(loc) {
+        if let initial = initialTouchPoint, let isTouchInControls, isTouchInControls(initial) {
+            return false
+        }
+        if let isScrubbing = isScrubbingProvider, isScrubbing() {
             return false
         }
 
@@ -1513,7 +1696,9 @@ final class DirectionalHorizontalPanGestureRecognizer: UIPanGestureRecognizer, U
 
 @available(iOS 18.0, *)
 struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
+    var isEnabled: (() -> Bool)? = nil
     var isTouchInControls: ((CGPoint) -> Bool)?
+    var isScrubbing: (() -> Bool)? = nil
     var onChanged: ((CGPoint) -> Void)?
     var onEnded: ((CGPoint, CGPoint) -> Void)?
 
@@ -1523,12 +1708,16 @@ struct DirectionalHorizontalPanGesture: UIGestureRecognizerRepresentable {
 
     func makeUIGestureRecognizer(context: Context) -> DirectionalHorizontalPanGestureRecognizer {
         let recognizer = DirectionalHorizontalPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+        recognizer.isEnabledProvider = isEnabled
         recognizer.isTouchInControls = isTouchInControls
+        recognizer.isScrubbingProvider = isScrubbing
         return recognizer
     }
 
     func updateUIGestureRecognizer(_ recognizer: DirectionalHorizontalPanGestureRecognizer, context: Context) {
+        recognizer.isEnabledProvider = isEnabled
         recognizer.isTouchInControls = isTouchInControls
+        recognizer.isScrubbingProvider = isScrubbing
         context.coordinator.onChanged = onChanged
         context.coordinator.onEnded = onEnded
     }

@@ -34,6 +34,7 @@ struct FullscreenPhotoBrowser: View {
     @State private var showFavoriteDeleteAlert = false
     @State private var isFilmStripDragging = false
     @State private var prewarmedAssets: [PHAsset] = []
+    @State private var tabBarVisibility: Visibility = .hidden
 
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
@@ -53,6 +54,8 @@ struct FullscreenPhotoBrowser: View {
     @State private var expandTargetFrame: CGRect = .zero
     /// 视频时间进度条拖拽中状态（用于禁用整个外层 ScrollView 纵向滚动，彻底杜绝误触上下翻页）
     @State private var isVideoScrubbing = false
+    /// 详情页纵向滚动偏移（带 contentInsets.top 归一化：<= 0 为顶栏，> 0 为已下滑查看推荐图片）
+    @State private var scrollOffsetY: CGFloat = 0
 
     // 标题（地址/拍摄日期时间）
     private var captionResolver: PhotoCaptionResolver { .shared }
@@ -68,6 +71,7 @@ struct FullscreenPhotoBrowser: View {
     @State private var relatedBrowsePhotos: [PhotoAsset] = []
     @State private var relatedBrowseInitialID = ""
     @State private var isRelatedDetailActive = false
+    @Namespace private var relatedTransitionNamespace
 
     // 本实例内删除的素材：推入页的批次是构造期快照，不随外部数据源收缩，
     // 删除后需在此即时剔除才能让大图滑向下一张；外层实例同样受益
@@ -131,6 +135,8 @@ struct FullscreenPhotoBrowser: View {
         }
         // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        // 联动控制 iOS 18 原生 Zoom 转场返回手势（边缘侧滑放行、捏合禁用、顶栏下拉放行、浏览相似照片下拉回滚）
+        .background(ZoomInteractiveDismissConfigurator(isFullScreen: expandProgress > 0.01, scrollOffsetY: scrollOffsetY))
         // 操作结果反馈 toast：覆盖在详情页上，自动消失，高对比度深色胶囊，不拦截触摸
         .overlay(alignment: .bottom) {
             if let toast = shareToast {
@@ -207,7 +213,8 @@ struct FullscreenPhotoBrowser: View {
                 PendingPhotosEntryButton()
             }
         }
-        .toolbar(.hidden, for: .tabBar)
+        .toolbar(tabBarVisibility, for: .tabBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
         .sheet(isPresented: $showAddToAlbum) {
             if let photo = currentPhoto {
@@ -239,8 +246,10 @@ struct FullscreenPhotoBrowser: View {
                 onDismiss: { isRelatedDetailActive = false }
             )
             .environmentObject(photoManager)
+            .navigationTransition(.zoom(sourceID: relatedBrowseInitialID, in: relatedTransitionNamespace))
         }
         .onAppear {
+            tabBarVisibility = .hidden
             // 初始化当前照片：优先用外部指定的初始照片，异常时回退首张
             if currentPhotoID.isEmpty || !browsePhotos.contains(where: { $0.id == currentPhotoID }) {
                 currentPhotoID = browsePhotos.first(where: { $0.id == initialPhotoID })?.id
@@ -259,6 +268,7 @@ struct FullscreenPhotoBrowser: View {
             await loadRelatedPhotos()
         }
         .onDisappear {
+            tabBarVisibility = .visible
             PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
@@ -371,13 +381,22 @@ struct FullscreenPhotoBrowser: View {
                     actionBar
                         .opacity(1 - expandProgress)
                         .allowsHitTesting(expandProgress < 0.5)
-                    RelatedPhotosSection(state: relatedState, onSelect: selectRelatedAsset)
+                    RelatedPhotosSection(
+                        state: relatedState,
+                        transitionNamespace: relatedTransitionNamespace,
+                        onSelect: selectRelatedAsset
+                    )
                         .opacity(1 - expandProgress)
                         .allowsHitTesting(expandProgress < 0.5)
                 }
             }
             // 展开时或拖拽视频进度条时禁用页面垂直滚动（杜绝拖拽时间进度误触上下翻页/页面滚动抖动）；黑底随进度淡入
             .scrollDisabled(expandProgress > 0.01 || isVideoScrubbing)
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { oldValue, newValue in
+                scrollOffsetY = newValue
+            }
             .background(
                 Color.black
                     .opacity(expandProgress)
@@ -974,6 +993,7 @@ private enum RelatedPhotosState: Equatable {
 /// 批次外推入下一级详情页），本模块只上报被点素材
 private struct RelatedPhotosSection: View {
     let state: RelatedPhotosState
+    var transitionNamespace: Namespace.ID? = nil
     var onSelect: (PHAsset) -> Void = { _ in }
 
     /// 骨架屏列高：沿用占位期错落节奏
@@ -1032,11 +1052,18 @@ private struct RelatedPhotosSection: View {
                         Button {
                             onSelect(asset)
                         } label: {
-                            PhotoCell(
+                            let cell = PhotoCell(
                                 photo: PhotoAsset(asset: asset),
                                 forceOriginalRatio: true,
                                 cornerRadius: 24
                             )
+                            if let transitionNamespace {
+                                cell.matchedTransitionSource(id: asset.localIdentifier, in: transitionNamespace) { source in
+                                    source.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                }
+                            } else {
+                                cell
+                            }
                         }
                         .buttonStyle(RelatedPhotoCardStyle())
                     }

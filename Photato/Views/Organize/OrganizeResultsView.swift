@@ -27,7 +27,9 @@ struct OrganizeResultsView: View {
 
     // 详情页（大图浏览：复用共享组件 FullscreenPhotoBrowser）
     @State private var isFullscreenMode = false
+    @State private var canSelectPhoto = true
     @State private var currentPhotoID: String? = nil
+    @Namespace private var photoTransitionNamespace
 
     init(organizeManager: PhotoOrganizeManager, category: OrganizeCategory, photoManager: PhotoManager) {
         self.organizeManager = organizeManager
@@ -104,6 +106,7 @@ struct OrganizeResultsView: View {
                     flatBody
                 }
             }
+            .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
 
             deleteFloatingButton
                 .offset(y: isDeleteButtonVisible ? 0 : 130)
@@ -143,7 +146,7 @@ struct OrganizeResultsView: View {
             }
         }
         .navigationTitle(category.localizedText)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
         .scrollEdgeEffectStyle(.soft, for: .top)
@@ -195,6 +198,13 @@ struct OrganizeResultsView: View {
         }
         .onChange(of: selectionManager.count) { _, _ in
             updateSelectedSize()
+        }
+        .onChange(of: isFullscreenMode) { oldValue, newValue in
+            if oldValue && !newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    canSelectPhoto = true
+                }
+            }
         }
     }
 
@@ -407,6 +417,9 @@ struct OrganizeResultsView: View {
     /// 分类单元格（1:1）：点图片进详情页，点右上勾选区切换选中，超大图片右下角显示文件大小，滑动动态预热
     private func organizePhotoCell(_ photo: PhotoAsset) -> some View {
         PhotoCell(photo: photo, usesSquareRatio: true)
+            .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
             .overlay(alignment: .bottomTrailing) {
                 if category == .largeFiles {
                     FileSizeBadge(asset: photo.asset)
@@ -905,6 +918,8 @@ struct OrganizeResultsView: View {
     }
 
     private func openFullscreen(_ photo: PhotoAsset) {
+        guard canSelectPhoto && !isFullscreenMode else { return }
+        canSelectPhoto = false
         currentPhotoID = photo.id
         isFullscreenMode = true
     }
@@ -924,11 +939,21 @@ struct OrganizeResultsView: View {
                 onFavoriteToggled: { photo, isFavorite in
                     organizeManager.updateFavorite(photoID: photo.id, isFavorite: isFavorite)
                 },
+                onActivePhotoChange: { photo, _ in
+                    currentPhotoID = photo.id
+                },
                 onDismiss: {
                     isFullscreenMode = false
                 }
             )
             .environmentObject(photoManager)
+            .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
+            .onDisappear {
+                isFullscreenMode = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    canSelectPhoto = true
+                }
+            }
         }
     }
 }
