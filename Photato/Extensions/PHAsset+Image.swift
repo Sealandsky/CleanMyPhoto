@@ -490,26 +490,53 @@ class VideoPlayerState: ObservableObject {
 
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
-    private var currentAssetID: String?
+    private(set) var currentAssetID: String?
+    private var currentRequestID: PHImageRequestID?
+
+    private func teardownCurrentPlayer() {
+        if let observer = timeObserver, let player {
+            player.removeTimeObserver(observer)
+        }
+        timeObserver = nil
+        if let observer = endObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        endObserver = nil
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+    }
 
     func loadVideo(for phAsset: PHAsset) {
         let assetID = phAsset.localIdentifier
-        guard currentAssetID != assetID else { return }
+        // 若当前已在播放该素材且播放器健康存活，坚决不重复请求，杜绝双播放器重叠发声
+        guard currentAssetID != assetID || player == nil else { return }
         cleanup()
         currentAssetID = assetID
         isLoading = true
 
         let options = PHVideoRequestOptions()
         options.isNetworkAccessAllowed = true
-        options.deliveryMode = .automatic
+        // 关键修复：指定为 highQualityFormat，强制 Photos 框架仅回调一次最终高质量视频资源，
+        // 彻底杜绝 .automatic 模式下系统分两次下发（先代理资源、后高清资源）引发的双播放器并发重叠发声问题
+        options.deliveryMode = .highQualityFormat
 
-        PHImageManager.default().requestAVAsset(forVideo: phAsset, options: options) { [weak self] avAsset, _, _ in
+        let requestID = PHImageManager.default().requestAVAsset(forVideo: phAsset, options: options) { [weak self] avAsset, _, info in
             guard let strongSelf = self else { return }
             Task { @MainActor in
-                // 快速切换视频时丢弃晚到的旧请求，防止旧播放器赋给新视频造成错乱
+                // 若请求已被取消或当前已切到其他素材，直接丢弃晚到的旧请求
+                if let cancelled = info?[PHImageCancelledKey] as? Bool, cancelled { return }
                 guard strongSelf.currentAssetID == assetID else { return }
 
+                // 幂等防护：若当前主线程已存在活跃播放器，丢弃重复生成
+                if strongSelf.player != nil {
+                    strongSelf.isLoading = false
+                    return
+                }
+
                 if let avAsset {
+                    strongSelf.teardownCurrentPlayer()
+
                     let item = AVPlayerItem(asset: avAsset)
                     let player = AVPlayer(playerItem: item)
 
@@ -551,8 +578,10 @@ class VideoPlayerState: ObservableObject {
                     // 加载失败：仅移除 loading，保留原有兜底 UI（底层静态首帧、无播放控件）
                     strongSelf.isLoading = false
                 }
+                strongSelf.currentRequestID = nil
             }
         }
+        currentRequestID = requestID
     }
 
     /// App 切后台/失活时暂停播放（保留播放进度与声音记忆，不销毁播放器）
@@ -639,21 +668,16 @@ class VideoPlayerState: ObservableObject {
     }
 
     func cleanup() {
+        if let reqID = currentRequestID {
+            PHImageManager.default().cancelImageRequest(reqID)
+            currentRequestID = nil
+        }
         seekToken += 1
         isSeeking = false
         isScrubbing = false
         wasPlayingBeforeScrub = false
-        if let observer = timeObserver, let player {
-            player.removeTimeObserver(observer)
-        }
-        timeObserver = nil
-        if let observer = endObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        endObserver = nil
+        teardownCurrentPlayer()
         currentAssetID = nil
-        player?.pause()
-        player = nil
         isPlaying = false
         currentTime = 0
         totalDuration = 0
@@ -800,7 +824,7 @@ struct VideoPlayerView: View {
             if ownsState {
                 state.loadVideo(for: asset)
                 revealControls()
-            } else if state.player == nil {
+            } else if state.player == nil || state.currentAssetID != asset.localIdentifier {
                 state.loadVideo(for: asset)
             }
         }

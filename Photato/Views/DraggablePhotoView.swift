@@ -1040,6 +1040,9 @@ struct DraggablePhotoView: View {
         // 切页时复位缩放态（滑走的卡不保留放大）
         resetZoomStates()
 
+        // 切换手势确立的第 0 毫秒立即暂停当前视频的声音，消除滑走卡片的背景声泄露
+        videoPlayerState.pausePlayback()
+
         let currentNavID = navigationID + 1
         navigationID = currentNavID
         isNavigating = true
