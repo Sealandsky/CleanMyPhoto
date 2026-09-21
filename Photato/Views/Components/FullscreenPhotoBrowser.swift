@@ -54,6 +54,8 @@ struct FullscreenPhotoBrowser: View {
     @State private var expandTargetFrame: CGRect = .zero
     /// 视频时间进度条拖拽中状态（用于禁用整个外层 ScrollView 纵向滚动，彻底杜绝误触上下翻页）
     @State private var isVideoScrubbing = false
+    /// 详情页纵向滚动偏移（带 contentInsets.top 归一化：<= 0 为顶栏，> 0 为已下滑查看推荐图片）
+    @State private var scrollOffsetY: CGFloat = 0
 
     // 标题（地址/拍摄日期时间）
     private var captionResolver: PhotoCaptionResolver { .shared }
@@ -133,6 +135,8 @@ struct FullscreenPhotoBrowser: View {
         }
         // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        // 联动控制 iOS 18 原生 Zoom 转场返回手势（边缘侧滑放行、捏合禁用、顶栏下拉放行、浏览相似照片下拉回滚）
+        .background(ZoomInteractiveDismissConfigurator(isFullScreen: expandProgress > 0.01, scrollOffsetY: scrollOffsetY))
         // 操作结果反馈 toast：覆盖在详情页上，自动消失，高对比度深色胶囊，不拦截触摸
         .overlay(alignment: .bottom) {
             if let toast = shareToast {
@@ -388,7 +392,11 @@ struct FullscreenPhotoBrowser: View {
             }
             // 展开时或拖拽视频进度条时禁用页面垂直滚动（杜绝拖拽时间进度误触上下翻页/页面滚动抖动）；黑底随进度淡入
             .scrollDisabled(expandProgress > 0.01 || isVideoScrubbing)
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { oldValue, newValue in
+                scrollOffsetY = newValue
+            }
             .background(
                 Color.black
                     .opacity(expandProgress)
