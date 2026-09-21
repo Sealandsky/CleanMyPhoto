@@ -11,6 +11,7 @@ struct AlbumPhotoListView: View {
     @State private var selectionManager = SelectionManager()
     @State private var albumSizeText: String = ""
     @State private var isFullscreenMode = false
+    @State private var canSelectPhoto = true
     @State private var currentPhotoID: String? = nil
     @State private var targetScrollPhotoID: String? = nil
     @Namespace private var photoTransitionNamespace
@@ -50,8 +51,10 @@ struct AlbumPhotoListView: View {
                                     selectionManager.toggle(photo.id)
                                 }
                             } else {
+                                guard canSelectPhoto && !isFullscreenMode else { return }
+                                canSelectPhoto = false
                                 currentPhotoID = photo.id
-                                targetScrollPhotoID = photo.id
+                                targetScrollPhotoID = nil
                                 isFullscreenMode = true
                                 onPhotoSelect(photo)
                             }
@@ -69,6 +72,7 @@ struct AlbumPhotoListView: View {
                 }
             }
             .background(Color(UIColor.systemGroupedBackground))
+            .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
                 let photoExists = photos.contains(where: { $0.id == photoID })
@@ -99,10 +103,15 @@ struct AlbumPhotoListView: View {
                 }
             }
             .onChange(of: isFullscreenMode) { oldValue, newValue in
-                if oldValue && !newValue, let photoID = targetScrollPhotoID ?? currentPhotoID {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withTransaction(Transaction(animation: nil)) {
-                            proxy.scrollTo(photoID, anchor: .center)
+                if oldValue && !newValue {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        canSelectPhoto = true
+                    }
+                    if let photoID = targetScrollPhotoID {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            withTransaction(Transaction(animation: nil)) {
+                                proxy.scrollTo(photoID, anchor: .center)
+                            }
                         }
                     }
                 }
@@ -115,12 +124,10 @@ struct AlbumPhotoListView: View {
             photoManager.isSelectMode = newValue
         }
         .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
-        .navigationBarTitleDisplayMode(selectionManager.isSelectMode ? .inline : .large)
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(selectionManager.isSelectMode ? .visible : .hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
                 FullscreenPhotoBrowser(
@@ -147,12 +154,17 @@ struct AlbumPhotoListView: View {
                         }
                     ),
                     onDismiss: {
-                        targetScrollPhotoID = currentPhotoID
                         isFullscreenMode = false
                     }
                 )
                 .environmentObject(photoManager)
                 .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
+                .onDisappear {
+                    isFullscreenMode = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        canSelectPhoto = true
+                    }
+                }
             }
         }
         .toolbar {

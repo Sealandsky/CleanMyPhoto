@@ -385,7 +385,7 @@ struct DiscoverView: View {
                 gridView
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         // 首次采样由 ContentView 切换到「发现」Tab 时触发，
         // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
         // 否则 app 启动即会执行全库枚举

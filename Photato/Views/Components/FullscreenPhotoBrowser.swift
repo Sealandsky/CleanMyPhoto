@@ -34,6 +34,7 @@ struct FullscreenPhotoBrowser: View {
     @State private var showFavoriteDeleteAlert = false
     @State private var isFilmStripDragging = false
     @State private var prewarmedAssets: [PHAsset] = []
+    @State private var tabBarVisibility: Visibility = .hidden
 
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
@@ -208,7 +209,8 @@ struct FullscreenPhotoBrowser: View {
                 PendingPhotosEntryButton()
             }
         }
-        .toolbar(.hidden, for: .tabBar)
+        .toolbar(tabBarVisibility, for: .tabBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
         .sheet(isPresented: $showAddToAlbum) {
             if let photo = currentPhoto {
@@ -243,6 +245,7 @@ struct FullscreenPhotoBrowser: View {
             .navigationTransition(.zoom(sourceID: relatedBrowseInitialID, in: relatedTransitionNamespace))
         }
         .onAppear {
+            tabBarVisibility = .hidden
             // 初始化当前照片：优先用外部指定的初始照片，异常时回退首张
             if currentPhotoID.isEmpty || !browsePhotos.contains(where: { $0.id == currentPhotoID }) {
                 currentPhotoID = browsePhotos.first(where: { $0.id == initialPhotoID })?.id
@@ -261,6 +264,7 @@ struct FullscreenPhotoBrowser: View {
             await loadRelatedPhotos()
         }
         .onDisappear {
+            tabBarVisibility = .visible
             PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
@@ -384,6 +388,7 @@ struct FullscreenPhotoBrowser: View {
             }
             // 展开时或拖拽视频进度条时禁用页面垂直滚动（杜绝拖拽时间进度误触上下翻页/页面滚动抖动）；黑底随进度淡入
             .scrollDisabled(expandProgress > 0.01 || isVideoScrubbing)
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .background(
                 Color.black
                     .opacity(expandProgress)

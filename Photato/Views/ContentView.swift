@@ -1,5 +1,6 @@
 import SwiftUI
 import Photos
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var photoManager: PhotoManager
@@ -12,7 +13,9 @@ struct ContentView: View {
     var discoverScrollToTop: Int = 0
 
     @State private var currentPhotoID: String? = nil
+    @State private var initialPhotoID: String? = nil
     @State private var scrollToPhotoID: String? = nil
+    @State private var canSelectPhoto = true
     @Namespace private var photoTransitionNamespace
 
     @StateObject private var discoverManager = DiscoverManager()
@@ -116,7 +119,10 @@ struct ContentView: View {
             DiscoverView(
                 manager: discoverManager,
                 onPhotoSelect: { photo in
+                    guard canSelectPhoto && !isFullscreenMode else { return }
+                    canSelectPhoto = false
                     currentPhotoID = photo.id
+                    initialPhotoID = photo.id
                     scrollToPhotoID = nil
                     isFullscreenMode = true
                 },
@@ -124,10 +130,11 @@ struct ContentView: View {
                 scrollToPhotoID: scrollToPhotoID,
                 transitionNamespace: photoTransitionNamespace
             )
+            .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
             .navigationTitle(String(localized: "Memories"))
-            .navigationBarTitleDisplayMode(.large)
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(.visible, for: .tabBar)
             .toolbar {
                 // 第一组：筛选菜单，独立胶囊
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -158,10 +165,10 @@ struct ContentView: View {
                         },
                         onActivePhotoChange: { photo, _ in
                             currentPhotoID = photo.id
-                            // 切图即请求网格定位：详情页仍盖着网格，滚动发生在
-                            // 遮盖之下用户无感知，返回时已就位（不依赖 pop 信号——
-                            // 侧滑返回时 onDismiss 与 binding 变化时机均不可靠）
-                            scrollToPhotoID = photo.id
+                            // 仅当用户在详情页实际左右滑动切换到其他素材时，才更新网格定位
+                            if photo.id != initialPhotoID {
+                                scrollToPhotoID = photo.id
+                            }
                         },
                         onDismiss: {
                             // 内部退出路径（删空批次/下滑关闭）
@@ -170,25 +177,33 @@ struct ContentView: View {
                     )
                     .environmentObject(photoManager)
                     .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
-                    // 返回定位（转场开始时机）：binding 在 pop 转场开始的瞬间被
-                    // 置 false——此刻立即定位，0.35s 转场窗口足够掩盖滚动（视觉
-                    // 上网格随转场露出时已在目标位）。切图时的实时定位（上方
-                    // onActivePhotoChange）与销毁兜底（onDisappear）多路覆盖同一
-                    // 目标，谁先生效用谁
+                    .background(PopCompletionObserver {
+                        isFullscreenMode = false
+                    })
                     .onDisappear {
-                        scrollToPhotoID = currentPhotoID
+                        isFullscreenMode = false
+                        if let current = currentPhotoID, current != initialPhotoID {
+                            scrollToPhotoID = current
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            canSelectPhoto = true
+                        }
                     }
                 }
             }
-            // pop 转场开始即定位：比 onDisappear（转场结束）早 0.35s，
-            // 与切图时的实时定位、销毁兜底共同多路覆盖
+            // pop 转场开始即定位：仅当用户实际切图才触发网格滚动
             .onChange(of: isFullscreenMode) { oldValue, newValue in
                 if oldValue && !newValue {
-                    scrollToPhotoID = currentPhotoID
+                    if let current = currentPhotoID, current != initialPhotoID {
+                        scrollToPhotoID = current
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        canSelectPhoto = true
+                    }
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
     }
 
     // MARK: - 页面右上角格式筛选器（原生系统下拉菜单）
@@ -246,3 +261,60 @@ struct ContentView: View {
     .environmentObject(PhotoManager())
     .environmentObject(StatisticsManager())
 }
+
+// MARK: - PopCompletionObserver
+/// 监听返回转场确立时机（解决手势侧滑返回松手后底栏滞后 0.3s 才显示的体验问题）：
+/// - 点击返回按钮（非交互式）：在转场启动瞬间立刻复位全屏态，使底栏并联淡入就位；
+/// - 边缘侧滑手势（交互式）：在用户松手且判定返回成功的瞬间（notifyWhenInteractionChanges），
+///   在剩余的 0.25s~0.3s 缩放收尾动画期间同频拉起底栏，消除页面落地后的等待时差。
+struct PopCompletionObserver: UIViewControllerRepresentable {
+    let onPopCommitted: () -> Void
+
+    func makeUIViewController(context: Context) -> PopObserverVC {
+        let vc = PopObserverVC()
+        vc.onPopCommitted = onPopCommitted
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: PopObserverVC, context: Context) {
+        uiViewController.onPopCommitted = onPopCommitted
+    }
+}
+
+final class PopObserverVC: UIViewController {
+    var onPopCommitted: (() -> Void)?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        guard isMovingFromParent else { return }
+
+        if let coordinator = transitionCoordinator {
+            if coordinator.isInteractive {
+                // 交互式侧滑：在手指松手且判定返回成功的瞬间通知（非中途取消）
+                coordinator.notifyWhenInteractionChanges { [weak self] context in
+                    if !context.isCancelled {
+                        DispatchQueue.main.async {
+                            self?.onPopCommitted?()
+                        }
+                    }
+                }
+            } else {
+                // 点击返回按钮：立即并联通知
+                DispatchQueue.main.async { [weak self] in
+                    self?.onPopCommitted?()
+                }
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.onPopCommitted?()
+            }
+        }
+    }
+}
+

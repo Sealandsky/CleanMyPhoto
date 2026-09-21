@@ -64,6 +64,7 @@ struct MainTabView: View {
             ContentView(
                 isFullscreenMode: $isFullscreenMode
             )
+            .toolbar(isFullscreenMode ? .hidden : .visible, for: .tabBar)
             .tabItem {
                 Label(AppTab.photos.localizedText, systemImage: AppTab.photos.systemImage)
             }

@@ -50,6 +50,7 @@ struct AlbumDetailView: View {
     @State private var addingPhotoIDs = Set<String>()
     @State private var addedPhotoIDs = Set<String>()
     @State private var isFullscreenMode = false
+    @State private var canSelectPhoto = true
     @State private var fullscreenPhotos: [PhotoAsset] = []
     @State private var currentPhotoID: String? = nil
     @Namespace private var photoTransitionNamespace
@@ -102,6 +103,7 @@ struct AlbumDetailView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
         .refreshable {
             await loadRecommendations(force: true)
         }
@@ -110,9 +112,7 @@ struct AlbumDetailView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
-        .navigationBarTitleDisplayMode(.large)
-        .scrollEdgeEffectStyle(.soft, for: .top)
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
@@ -145,6 +145,19 @@ struct AlbumDetailView: View {
                 )
                 .environmentObject(photoManager)
                 .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
+                .onDisappear {
+                    isFullscreenMode = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        canSelectPhoto = true
+                    }
+                }
+            }
+        }
+        .onChange(of: isFullscreenMode) { oldValue, newValue in
+            if oldValue && !newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    canSelectPhoto = true
+                }
             }
         }
         .task {
@@ -230,6 +243,8 @@ struct AlbumDetailView: View {
                                     source.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
                                 .onTapGesture {
+                                    guard canSelectPhoto && !isFullscreenMode else { return }
+                                    canSelectPhoto = false
                                     fullscreenPhotos = albumPhotos
                                     currentPhotoID = photo.id
                                     isFullscreenMode = true
@@ -335,6 +350,8 @@ struct AlbumDetailView: View {
                             addPhotoToAlbum(photo)
                         },
                         onTap: {
+                            guard canSelectPhoto && !isFullscreenMode else { return }
+                            canSelectPhoto = false
                             fullscreenPhotos = recommendedPhotos
                             currentPhotoID = photo.id
                             isFullscreenMode = true
