@@ -213,28 +213,7 @@ struct AlbumPhotoListView: View {
         let albumAssets = photos.map(\.asset)
         Task {
             let totalSize = await Task.detached(priority: .utility) {
-                await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-                    let maxConcurrent = 16
-                    var running = 0
-                    var total: Int64 = 0
-
-                    for asset in albumAssets {
-                        if running >= maxConcurrent {
-                            if let size = await group.next() {
-                                total += size
-                                running -= 1
-                            }
-                        }
-                        group.addTask {
-                            await PHAssetSizeHelper.getAssetSize(asset)
-                        }
-                        running += 1
-                    }
-                    for await size in group {
-                        total += size
-                    }
-                    return total
-                }
+                await PHAssetSizeHelper.calculateTotalSize(for: albumAssets)
             }.value
             SizeCache.save("album_\(album.id)", size: totalSize)
             let newText = ByteFormatter.format(totalSize)

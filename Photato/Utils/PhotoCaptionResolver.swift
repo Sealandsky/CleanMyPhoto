@@ -1,5 +1,19 @@
 import CoreLocation
 import Photos
+import UIKit
+
+// MARK: - Address Cache Entry
+/// 地址缓存条目（引用类型包装，供 NSCache 使用，支持负缓存）
+final class AddressCacheEntry: NSObject {
+    let place: String?
+    let full: String?
+
+    init(place: String?, full: String?) {
+        self.place = place
+        self.full = full
+        super.init()
+    }
+}
 
 // MARK: - Photo Caption Resolver
 /// 详情页标题信息解析：拍摄日期/时间格式化 + 反地理编码地址（带缓存）。
@@ -16,10 +30,35 @@ final class PhotoCaptionResolver {
     static let shared = PhotoCaptionResolver()
 
     private let geocoder = CLGeocoder()
-    /// 地址缓存：localIdentifier → (精简地名, 完整地址)；nil 表示已查询且无地址（负缓存）
-    private var addressCache: [String: (place: String?, full: String?)] = [:]
+    /// 地址缓存：localIdentifier → AddressCacheEntry；nil 属性表示已查询且无地址（负缓存）
+    private let addressCache = NSCache<NSString, AddressCacheEntry>()
+    private var memoryWarningObserver: (any NSObjectProtocol)?
 
-    private init() {}
+    private init() {
+        addressCache.countLimit = 500
+
+        // 注册内存警告通知，收到时自动清空地址缓存
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.clearCache()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    /// 清除所有地址缓存
+    func clearCache() {
+        addressCache.removeAllObjects()
+    }
 
     // MARK: - 拍摄日期 / 时间
 
@@ -40,7 +79,7 @@ final class PhotoCaptionResolver {
 
     /// 同步查询已缓存的精简地名（含负缓存），用于即时渲染避免闪烁
     func cachedAddress(of asset: PHAsset) -> (isCached: Bool, address: String?) {
-        if let entry = addressCache[asset.localIdentifier] {
+        if let entry = addressCache.object(forKey: asset.localIdentifier as NSString) {
             return (true, entry.place)
         }
         return (false, nil)
@@ -48,7 +87,7 @@ final class PhotoCaptionResolver {
 
     /// 同步查询已缓存的完整地址（信息面板用）
     func cachedFullAddress(of asset: PHAsset) -> String? {
-        addressCache[asset.localIdentifier]?.full
+        addressCache.object(forKey: asset.localIdentifier as NSString)?.full
     }
 
     /// 异步解析精简地名（导航栏标题用，反向地理编码）。
@@ -73,16 +112,18 @@ final class PhotoCaptionResolver {
         completion: @escaping @MainActor ((place: String?, full: String?)?) -> Void
     ) {
         let id = asset.localIdentifier
+        let key = id as NSString
 
         // 命中缓存（含负缓存）直接返回，不重复请求 CLGeocoder
-        if let cached = addressCache[id] {
-            completion(cached)
+        if let cached = addressCache.object(forKey: key) {
+            completion((cached.place, cached.full))
             return
         }
 
         // 无 GPS 元数据：直接走无地址规则并记入负缓存
         guard let location = asset.location else {
-            addressCache[id] = (nil, nil)
+            let negativeEntry = AddressCacheEntry(place: nil, full: nil)
+            addressCache.setObject(negativeEntry, forKey: key)
             completion((nil, nil))
             return
         }
@@ -90,12 +131,11 @@ final class PhotoCaptionResolver {
         Task {
             let placemarks = try? await geocoder.reverseGeocodeLocation(location)
             let placemark = placemarks?.first
-            let entry = (
-                place: Self.semanticPlaceName(from: placemark),
-                full: Self.fullAddress(from: placemark)
-            )
-            self.addressCache[id] = entry
-            completion(entry)
+            let place = Self.semanticPlaceName(from: placemark)
+            let full = Self.fullAddress(from: placemark)
+            let entry = AddressCacheEntry(place: place, full: full)
+            self.addressCache.setObject(entry, forKey: key)
+            completion((place, full))
         }
     }
 

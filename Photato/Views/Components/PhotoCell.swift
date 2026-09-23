@@ -13,6 +13,8 @@ struct PhotoCell: View {
     var cornerRadius: CGFloat = 16
     /// 是否展示角标（视频时长、收藏心标等），默认 true
     var showBadges: Bool = true
+    /// 可选显式传入缩略图尺寸（如未指定则根据列数自动计算标准物理像素尺寸）
+    var thumbnailSize: CGSize? = nil
 
     /// 浮动添加按钮相关（相簿推荐等场景）
     var isAdding: Bool = false
@@ -35,34 +37,25 @@ struct PhotoCell: View {
         return photo.pixelAspectRatio
     }
 
-    var body: some View {
-        GeometryReader { geometry in
-            // 缩略图基准尺寸：采用统一的标准物理像素尺寸，
-            // 消除不同卡片间的浮点微差，并防御 GeometryReader 初始测量为 0 的抖动，与后台预热 100% 咬合
-            let thumbnailSize: CGSize = {
-                let columns = usesSquareRatio ? 3 : (gridSettings?.columnCount ?? 2)
-                if geometry.size.width > 20 {
-                    let rawWidth = geometry.size.width * displayScale
-                    let rawHeight = geometry.size.height * displayScale
-                    let quantizedWidth = (rawWidth / 20.0).rounded(.up) * 20.0
-                    let quantizedHeight = (rawHeight / 20.0).rounded(.up) * 20.0
-                    let widthEdge = min(max(quantizedWidth, GridColumnHelper.minPixelEdge), GridColumnHelper.maxPixelEdge)
-                    let heightEdge = min(max(quantizedHeight, GridColumnHelper.minPixelEdge), GridColumnHelper.maxPixelEdge)
-                    let edge = max(widthEdge, heightEdge)
-                    return CGSize(width: edge, height: edge)
-                } else {
-                    return GridColumnHelper.thumbnailPixelSize(columnCount: columns)
-                }
-            }()
-
-            cardContainer(geometry: geometry, thumbnailSize: thumbnailSize)
+    /// 缩略图基准尺寸：采用统一的标准物理像素尺寸，
+    /// 消除不同卡片间的浮点微差，与后台预热 100% 咬合
+    private var resolvedThumbnailSize: CGSize {
+        if let thumbnailSize = thumbnailSize {
+            return thumbnailSize
         }
-        .aspectRatio(cardAspectRatio, contentMode: .fit)
+        let columns = usesSquareRatio ? 3 : (gridSettings?.columnCount ?? 2)
+        let scale = displayScale > 0 ? displayScale : ScreenSizeHelper.screenScale
+        return GridColumnHelper.thumbnailPixelSize(columnCount: columns, scale: scale)
+    }
+
+    var body: some View {
+        cardContainer(thumbnailSize: resolvedThumbnailSize)
+            .aspectRatio(cardAspectRatio, contentMode: .fit)
     }
 
     @ViewBuilder
-    private func cardContainer(geometry: GeometryProxy, thumbnailSize: CGSize) -> some View {
-        let content = cardContent(geometry: geometry, thumbnailSize: thumbnailSize)
+    private func cardContainer(thumbnailSize: CGSize) -> some View {
+        let content = cardContent(thumbnailSize: thumbnailSize)
         if let onTap = onTap {
             content
                 .contentShape(Rectangle())
@@ -74,7 +67,7 @@ struct PhotoCell: View {
         }
     }
 
-    private func cardContent(geometry: GeometryProxy, thumbnailSize: CGSize) -> some View {
+    private func cardContent(thumbnailSize: CGSize) -> some View {
         ZStack(alignment: .topTrailing) {
             // 卡片主体
             ZStack(alignment: .bottomTrailing) {
@@ -88,22 +81,24 @@ struct PhotoCell: View {
                         .transition(.opacity)
                 }
 
-                AssetImage(
-                    asset: photo.asset,
-                    targetSize: thumbnailSize,
-                    contentMode: .fill,
-                    placeholderColor: Color.clear,
-                    onLoad: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            imageLoaded = true
-                        }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.clear)
+                    .overlay {
+                        AssetImage(
+                            asset: photo.asset,
+                            targetSize: thumbnailSize,
+                            contentMode: .fill,
+                            placeholderColor: Color.clear,
+                            onLoad: {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    imageLoaded = true
+                                }
+                            }
+                        )
+                        .scaledToFill()
+                        .opacity(imageLoaded ? 1 : 0)
                     }
-                )
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .contentShape(Rectangle())
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .opacity(imageLoaded ? 1 : 0)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
                 if showBadges {
                     mediaBadge
@@ -115,6 +110,7 @@ struct PhotoCell: View {
                     Color.black.opacity(0.2)
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(alignment: .topLeading) {
                 if isSelectMode {
                     selectionIndicator

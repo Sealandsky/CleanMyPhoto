@@ -8,9 +8,9 @@ import UIKit
 /// 1. 屏幕边缘侧滑返回（Screen Edge Pop）：永远放行！
 ///    无论处于全屏大图态还是卡片态，无论滚动到最顶部还是相似图片底部，
 ///    只要是从屏幕左边缘（< 50pt）向右侧滑，一律 100% 允许系统原生侧滑交互式返回。
-/// 2. 捏合缩放退出（_UITransformGestureRecognizer）：全程坚决禁用！
+/// 2. 捏合缩放退出手势（Transform 手势识别器）：全程坚决禁用！
 ///    用户在全屏模式下的双指捏合仅用于缩小回详情页卡片；在详情页卡片下的双指捏合仅作为弹性阻尼回弹，杜绝误退回列表页。
-/// 3. 下拉退出（_UISwipeDownGestureRecognizer）：
+/// 3. 下拉退出手势（SwipeDown 下拉识别器）：
 ///    - 全屏大图态（isFullScreen = true）：拦截系统转场下拉，将纵向下拖手势归大图状态机平滑收拢回卡片；
 ///    - 相似图片浏览态（ScrollView 已向下滚动）：拦截系统转场下拉，将手势完全归属于 ScrollView 用于向上回滚内容；
 ///    - 顶栏状态（ScrollView 位于最顶部）：完全放行系统原生带指尖跟随、缩放动效与物理弹簧回弹的交互式转场下拉退出！
@@ -96,11 +96,15 @@ struct ZoomInteractiveDismissConfigurator: UIViewControllerRepresentable {
 
         private func configureTransition(_ transition: UIViewController.Transition) {
             guard #available(iOS 18.0, *) else { return }
-            if let options = (transition as AnyObject).value(forKey: "options") as? UIViewController.Transition.ZoomOptions {
-                options.interactiveDismissShouldBegin = { [weak self] context in
-                    guard let self = self else { return true }
-                    return self.shouldBeginInteractiveDismiss(context: context)
-                }
+            let transitionObj = transition as AnyObject
+            let optionsSelector = NSSelectorFromString("options")
+            guard transitionObj.responds(to: optionsSelector) else { return }
+            guard let options = transitionObj.value(forKey: "options") as? UIViewController.Transition.ZoomOptions else {
+                return
+            }
+            options.interactiveDismissShouldBegin = { [weak self] context in
+                guard let self = self else { return true }
+                return self.shouldBeginInteractiveDismiss(context: context)
             }
         }
 
@@ -162,15 +166,16 @@ struct ZoomInteractiveDismissConfigurator: UIViewControllerRepresentable {
             guard let recognizers = vc.view.gestureRecognizers else { return }
             for recognizer in recognizers {
                 let className = NSStringFromClass(type(of: recognizer))
-                // 转场双指捏合手势（_UITransformGestureRecognizer）：
+                // 转场双指捏合手势（Transform 识别器）：
                 // 在进入详情页后坚决禁用！
                 // 用户在详情页或全屏下的任何双指捏合仅作为图片缩放/展开收拢交互，绝对禁止退回列表页。
+                // 若未来系统版本手势类名发生变动，识别器过滤安全跳过并回退至默认手势，绝不阻塞触摸或闪退。
                 if className.contains("Transform") {
                     if recognizer.isEnabled {
                         recognizer.isEnabled = false
                     }
                 }
-                // 注意：_UISwipeDownGestureRecognizer 保持 isEnabled = true！
+                // 注意：SwipeDown 下拉识别器保持 isEnabled = true！
                 // 它的触发由上面的 options.interactiveDismissShouldBegin 动态接管：
                 // 顶栏时放行原生交互转场退出，向下滚动浏览相似照片时动态拦截让权给 ScrollView。
                 else if className.contains("SwipeDown") {
