@@ -19,6 +19,62 @@ public class PhotoQuality: NSManagedObject {
     }
 }
 
+// MARK: - Thread-Safe Batch Processing Helpers
+
+private nonisolated struct QualityData: Sendable {
+    let localIdentifier: String
+    let blurScore: Double
+    let faceQuality: Double
+}
+
+private nonisolated final class BatchCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _cancelled = false
+
+    nonisolated var isCancelled: Bool {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _cancelled
+        }
+        set {
+            lock.lock()
+            _cancelled = newValue
+            lock.unlock()
+        }
+    }
+
+    nonisolated func cancel() {
+        lock.lock()
+        _cancelled = true
+        lock.unlock()
+    }
+}
+
+private nonisolated final class BatchAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _output: [QualityData] = []
+    private var _doneInBatch: Int = 0
+
+    init(capacity: Int) {
+        _output.reserveCapacity(capacity)
+    }
+
+    nonisolated func record(data: QualityData) -> (done: Int, totalInBatch: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        _output.append(data)
+        _doneInBatch += 1
+        return (_doneInBatch, _output.count)
+    }
+
+    nonisolated var results: [QualityData] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _output
+    }
+}
+
 // MARK: - PhotoQualityAnalyzer
 //
 // AI-based bad-photo detection, fully on-device (no upload, no server).
@@ -160,49 +216,54 @@ final class PhotoQualityAnalyzer {
             let batchEnd = min(batchStart + batchSize, total)
             let batch = Array(newAssets[batchStart..<batchEnd])
 
-            let results = await withCheckedContinuation { (continuation: CheckedContinuation<[QualityData], Never>) in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let group = DispatchGroup()
-                    let semaphore = DispatchSemaphore(value: maxConcurrency)
-                    let lock = NSLock()
-                    var output: [QualityData] = []
-                    output.reserveCapacity(batch.count)
-                    var doneInBatch = 0
+            let batchCancellation = BatchCancellation()
 
-                    for asset in batch {
-                        semaphore.wait()
-                        group.enter()
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            let (blur, face) = Self.analyze(for: asset)
+            let results = await withTaskCancellationHandler {
+                await withCheckedContinuation { (continuation: CheckedContinuation<[QualityData], Never>) in
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        let group = DispatchGroup()
+                        let semaphore = DispatchSemaphore(value: maxConcurrency)
+                        let accumulator = BatchAccumulator(capacity: batch.count)
 
-                            lock.lock()
-                            output.append(QualityData(
-                                localIdentifier: asset.localIdentifier,
-                                blurScore: blur,
-                                faceQuality: face
-                            ))
-                            doneInBatch += 1
-                            let done = doneInBatch
-                            let currentTotal = batchStart + done
-                            let shouldUpdate = (currentTotal % 10 == 0) || (currentTotal == total) || (done == batch.count)
-                            lock.unlock()
+                        for asset in batch {
+                            guard !Task.isCancelled && !batchCancellation.isCancelled else { break }
+                            semaphore.wait()
+                            group.enter()
+                            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                                defer {
+                                    semaphore.signal()
+                                    group.leave()
+                                }
 
-                            // Throttled progress update to keep UI responsive and avoid main thread starvation
-                            if shouldUpdate {
-                                DispatchQueue.main.async {
-                                    self.computingProgress = Double(currentTotal) / Double(total)
-                                    self.currentStep = String(localized: "Analyzing \(currentTotal)/\(total)...")
+                                guard !Task.isCancelled && !batchCancellation.isCancelled else { return }
+
+                                let (blur, face) = PhotoQualityAnalyzer.analyze(for: asset)
+
+                                let (done, _) = accumulator.record(data: QualityData(
+                                    localIdentifier: asset.localIdentifier,
+                                    blurScore: blur,
+                                    faceQuality: face
+                                ))
+                                let currentTotal = batchStart + done
+                                let shouldUpdate = (currentTotal % 10 == 0) || (currentTotal == total) || (done == batch.count)
+
+                                // Throttled progress update to keep UI responsive and avoid main thread starvation
+                                if shouldUpdate {
+                                    DispatchQueue.main.async { [weak self] in
+                                        guard let self = self else { return }
+                                        self.computingProgress = Double(currentTotal) / Double(total)
+                                        self.currentStep = String(localized: "Analyzing \(currentTotal)/\(total)...")
+                                    }
                                 }
                             }
-
-                            semaphore.signal()
-                            group.leave()
                         }
-                    }
 
-                    group.wait()
-                    continuation.resume(returning: output)
+                        group.wait()
+                        continuation.resume(returning: accumulator.results)
+                    }
                 }
+            } onCancel: {
+                batchCancellation.cancel()
             }
 
             saveQuality(results)
@@ -258,12 +319,6 @@ final class PhotoQualityAnalyzer {
     }
 
     // MARK: - Private: Core Data Helpers
-
-    private struct QualityData {
-        let localIdentifier: String
-        let blurScore: Double
-        let faceQuality: Double
-    }
 
     private func loadCachedIdentifiers() -> Set<String> {
         let request = PhotoQuality.fetchRequest()

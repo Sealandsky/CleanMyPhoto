@@ -24,6 +24,7 @@ struct OrganizeResultsView: View {
     @State private var cachedAllPhotos: [PhotoAsset] = []
     @State private var photoIndexMap: [String: Int] = [:]
     @State private var sizeCalculationTask: Task<Void, Never>? = nil
+    @State private var rebuildTask: Task<Void, Never>? = nil
 
     // 详情页（大图浏览：复用共享组件 FullscreenPhotoBrowser）
     @State private var isFullscreenMode = false
@@ -183,15 +184,16 @@ struct OrganizeResultsView: View {
         }
         .onDisappear {
             sectionSizesTask?.cancel()
+            rebuildTask?.cancel()
         }
         .onChange(of: displayedPhotos.count) { _, _ in
-            rebuildDateSections()
+            scheduleFullRebuild(debounceNanoseconds: 50_000_000)
         }
         .onChange(of: displayedGroups.count) { _, _ in
-            rebuildDateSections()
+            scheduleFullRebuild(debounceNanoseconds: 50_000_000)
         }
-        .onChange(of: photoManager.pendingDeletionIDs) { _, _ in
-            rebuildDateSections()
+        .onChange(of: photoManager.pendingDeletionIDs) { oldIDs, newIDs in
+            handlePendingDeletionIDsChange(oldIDs: oldIDs, newIDs: newIDs)
             if cachedAllPhotos.isEmpty && isFullscreenMode {
                 isFullscreenMode = false
             }
@@ -240,7 +242,6 @@ struct OrganizeResultsView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .task {
                                 await organizeManager.loadMoreGroups(for: category)
-                                rebuildDateSections()
                             }
                     }
                 }
@@ -316,7 +317,6 @@ struct OrganizeResultsView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .task {
                                 await organizeManager.loadMorePhotos(for: category)
-                                rebuildDateSections()
                             }
                     }
                 }
@@ -489,6 +489,7 @@ struct OrganizeResultsView: View {
     /// 相似/重复：按拍摄日期归类聚合分节（日期倒序，不带组标号）；
     /// 平铺分类：全部照片按拍摄年月归类分节（日期倒序）
     private func rebuildDateSections() {
+        rebuildTask?.cancel()
         var newSections = Self.buildDateSections(
             category: category,
             groups: displayedGroups,
@@ -518,6 +519,88 @@ struct OrganizeResultsView: View {
             indexMap[p.id] = idx
         }
         photoIndexMap = indexMap
+
+        computeSectionSizes()
+    }
+
+    /// 带协作式防抖节流的全量分节重建任务（默认 50ms 防抖，杜绝高频级联重排）
+    private func scheduleFullRebuild(debounceNanoseconds: UInt64 = 50_000_000) {
+        rebuildTask?.cancel()
+        rebuildTask = Task { @MainActor in
+            if debounceNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+            }
+            guard !Task.isCancelled else { return }
+            rebuildDateSections()
+        }
+    }
+
+    private func handlePendingDeletionIDsChange(oldIDs: Set<String>, newIDs: Set<String>) {
+        guard oldIDs != newIDs else { return }
+        if newIDs.isSuperset(of: oldIDs) {
+            let addedDeletedIDs = newIDs.subtracting(oldIDs)
+            removeDeletedPhotos(ids: addedDeletedIDs)
+        } else {
+            scheduleFullRebuild(debounceNanoseconds: 50_000_000)
+        }
+    }
+
+    /// 针对删除操作的按需增量分节更新：
+    /// 避免在单张照片选择或单张删除时对数百个分组执行全量重构、排序与日期格式化重算
+    private func removeDeletedPhotos(ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+
+        if isGroupedMode {
+            var updatedSections: [DateSection] = []
+            updatedSections.reserveCapacity(dateSections.count)
+
+            for var section in dateSections {
+                let originalCount = section.photos.count
+                section.photos.removeAll { ids.contains($0.id) }
+                // 相似/重复照片必须至少 2 张才能构成一组，绝不展示单张孤立照片
+                if section.photos.count >= 2 {
+                    if section.photos.count != originalCount {
+                        let key = "\(section.id)_\(section.photos.count)"
+                        if let size = sectionSizes[key] {
+                            section.totalSize = size
+                        } else {
+                            section.totalSize = 0
+                        }
+                    }
+                    updatedSections.append(section)
+                }
+            }
+            dateSections = updatedSections
+            cachedAllPhotos = updatedSections.flatMap { $0.photos }
+        } else {
+            var updatedSections: [DateSection] = []
+            updatedSections.reserveCapacity(dateSections.count)
+
+            for var section in dateSections {
+                let originalCount = section.photos.count
+                section.photos.removeAll { ids.contains($0.id) }
+                if !section.photos.isEmpty {
+                    if section.photos.count != originalCount {
+                        let key = "\(section.id)_\(section.photos.count)"
+                        if let size = sectionSizes[key] {
+                            section.totalSize = size
+                        } else {
+                            section.totalSize = 0
+                        }
+                    }
+                    updatedSections.append(section)
+                }
+            }
+            dateSections = updatedSections
+            cachedAllPhotos = displayedPhotos
+        }
+
+        var map: [String: Int] = [:]
+        map.reserveCapacity(cachedAllPhotos.count)
+        for (i, p) in cachedAllPhotos.enumerated() {
+            map[p.id] = i
+        }
+        photoIndexMap = map
 
         computeSectionSizes()
     }
@@ -652,11 +735,8 @@ struct OrganizeResultsView: View {
                 if Task.isCancelled { return }
                 let key = "\(section.id)_\(section.photos.count)"
                 guard sectionSizes[key] == nil else { continue }
-                var total: Int64 = 0
-                for photo in section.photos {
-                    if Task.isCancelled { return }
-                    total += await PHAssetSizeHelper.getAssetSize(photo.asset)
-                }
+                let sectionAssets = section.photos.map(\.asset)
+                let total = await PHAssetSizeHelper.calculateTotalSize(for: sectionAssets)
                 newSizes[key] = total
             }
 
@@ -816,44 +896,7 @@ struct OrganizeResultsView: View {
             guard !Task.isCancelled else { return }
 
             let total = await Task.detached(priority: .userInitiated) {
-                var uncachedAssets: [PHAsset] = []
-                var sum: Int64 = 0
-
-                for asset in selectedAssets {
-                    if let cached = PHAssetSizeHelper.getCachedSize(for: asset) {
-                        sum += cached
-                    } else {
-                        uncachedAssets.append(asset)
-                    }
-                }
-
-                guard !uncachedAssets.isEmpty else { return sum }
-
-                let uncachedSum = await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-                    let maxConcurrent = 16
-                    var running = 0
-                    var groupTotal: Int64 = 0
-
-                    for asset in uncachedAssets {
-                        if running >= maxConcurrent {
-                            if let s = await group.next() {
-                                groupTotal += s
-                                running -= 1
-                            }
-                        }
-                        group.addTask {
-                            PHAssetSizeHelper.getFileSize(asset)
-                        }
-                        running += 1
-                    }
-
-                    for await s in group {
-                        groupTotal += s
-                    }
-                    return groupTotal
-                }
-
-                return sum + uncachedSum
+                await PHAssetSizeHelper.calculateTotalSize(for: selectedAssets)
             }.value
 
             guard !Task.isCancelled else { return }
@@ -884,31 +927,11 @@ struct OrganizeResultsView: View {
         let totalSize = await Task.detached(priority: .utility) {
             let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: allIds, options: nil)
             var assets: [PHAsset] = []
+            assets.reserveCapacity(fetchResult.count)
             fetchResult.enumerateObjects { asset, _, _ in
                 assets.append(asset)
             }
-            return await withTaskGroup(of: Int64.self, returning: Int64.self) { group in
-                let maxConcurrent = 16
-                var running = 0
-                var total: Int64 = 0
-
-                for asset in assets {
-                    if running >= maxConcurrent {
-                        if let size = await group.next() {
-                            total += size
-                            running -= 1
-                        }
-                    }
-                    group.addTask {
-                        await PHAssetSizeHelper.getAssetSize(asset)
-                    }
-                    running += 1
-                }
-                for await size in group {
-                    total += size
-                }
-                return total
-            }
+            return await PHAssetSizeHelper.calculateTotalSize(for: assets)
         }.value
 
         guard totalSize > 0 else { return }
@@ -978,6 +1001,13 @@ private struct FileSizeBadge: View {
     let asset: PHAsset
     @State private var sizeText: String = ""
 
+    init(asset: PHAsset) {
+        self.asset = asset
+        if let cached = PHAssetSizeHelper.getCachedSize(for: asset), cached > 0 {
+            _sizeText = State(initialValue: ByteFormatter.format(cached))
+        }
+    }
+
     var body: some View {
         Group {
             if !sizeText.isEmpty {
@@ -991,14 +1021,10 @@ private struct FileSizeBadge: View {
             }
         }
         .task {
-            let fastSize = PHAssetSizeHelper.getFileSize(asset)
-            if fastSize > 0 {
-                sizeText = ByteFormatter.format(fastSize)
-            } else {
-                let asyncSize = await PHAssetSizeHelper.getAssetSize(asset)
-                if asyncSize > 0 {
-                    sizeText = ByteFormatter.format(asyncSize)
-                }
+            guard sizeText.isEmpty else { return }
+            let size = await PHAssetSizeHelper.getAssetSize(asset)
+            if size > 0 {
+                sizeText = ByteFormatter.format(size)
             }
         }
     }

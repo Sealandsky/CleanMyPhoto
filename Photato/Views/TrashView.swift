@@ -14,7 +14,7 @@ struct TrashView: View {
     private var trashedPhotos: [PhotoAsset] { photoManager.getTrashedAssets() }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if photoManager.trashCount == 0 {
                     emptyTrashView
@@ -91,10 +91,11 @@ struct TrashView: View {
             HStack(spacing: 12) {
                 if selectionManager.isSelectMode {
                     liquidGlassCapsule(tint: .green, prominent: false) {
-                        for id in selectionManager.selectedIDs {
-                            photoManager.restoreFromTrash(id)
+                        let selected = Array(selectionManager.selectedIDs)
+                        withAnimation {
+                            photoManager.restoreFromTrash(selected)
+                            selectionManager.clearSelection()
                         }
-                        selectionManager.clearSelection()
                     } label: {
                         Label(String(localized: "Restore \(selectionManager.count) Photos"),
                               systemImage: "arrow.uturn.backward")

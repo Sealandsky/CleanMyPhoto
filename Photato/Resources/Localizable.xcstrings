@@ -476,16 +476,6 @@
         }
       }
     },
-    "%lld%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld%2$@"
-          }
-        }
-      }
-    },
     "%lld%%" : {
 
     },
@@ -8148,6 +8138,7 @@
       }
     },
     "No photos found. Make sure you have photos in your photo library." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9528,6 +9519,7 @@
       }
     },
     "photos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

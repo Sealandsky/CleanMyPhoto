@@ -83,7 +83,6 @@ struct MainTabView: View {
                 .tag(AppTab.organize)
 
             SettingsView(
-                organizeManager: organizeManager,
                 onNavigateToOrganize: {
                     selectedTab = .organize
                 }

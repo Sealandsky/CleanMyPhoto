@@ -7,13 +7,8 @@ struct SettingsView: View {
     @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
-    @Environment(PhotoOrganizeManager.self) private var environmentOrganizeManager: PhotoOrganizeManager?
-    var organizeManager: PhotoOrganizeManager?
+    @Environment(PhotoOrganizeManager.self) private var organizeManager: PhotoOrganizeManager?
     var onNavigateToOrganize: (() -> Void)? = nil
-
-    private var activeOrganizeManager: PhotoOrganizeManager? {
-        organizeManager ?? environmentOrganizeManager
-    }
 
     @State private var totalLibraryCount = 0
     @State private var showMembership = false
@@ -225,6 +220,9 @@ struct SettingsView: View {
 
                 #if DEBUG
                 Section("Debug") {
+                    NavigationLink("Orbiting Avatar Preview") {
+                        OrbitingAvatarView()
+                    }
                     Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
                     Button("Reset Free Quota (100 left)") {
                         membershipManager.resetFreeQuotaForTesting()
@@ -293,7 +291,7 @@ struct SettingsView: View {
 
                 Spacer()
 
-                if let manager = activeOrganizeManager, manager.hasCompletedFullScan {
+                if let manager = organizeManager, manager.hasCompletedFullScan {
                     HStack(spacing: 4) {
                         Text(cleanablePhotosDisplayText)
                             .foregroundColor(.secondary)
@@ -301,7 +299,7 @@ struct SettingsView: View {
                             .font(.system(.caption, design: .rounded))
                             .foregroundColor(.secondary.opacity(0.6))
                     }
-                } else if let manager = activeOrganizeManager, manager.isAnalyzing {
+                } else if let manager = organizeManager, manager.isAnalyzing {
                     HStack(spacing: 4) {
                         Text(String(localized: "Scanning..."))
                             .foregroundColor(.blue)
@@ -325,7 +323,7 @@ struct SettingsView: View {
 
     /// 可清理照片显示文案（复用 PhotoOrganizeManager 数据，单位为“张”）
     private var cleanablePhotosDisplayText: String {
-        guard let manager = activeOrganizeManager else {
+        guard let manager = organizeManager else {
             return String(localized: "To Scan")
         }
         let count = manager.cleanablePhotoCount
