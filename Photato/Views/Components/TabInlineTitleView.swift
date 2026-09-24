@@ -65,40 +65,45 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
             }
     }
 
-    /// 渐变高斯模糊背景：
-    /// 1. 主体区域（状态栏 + 54pt 标题栏）：以系统原生 .ultraThinMaterial 毛玻璃为基底，
-    ///    使用 .colorMultiply(Color.pageBackground.opacity(0.35)) 色调校准对齐 App #F3F3F3 底色，
-    ///    主体区域不添加遮罩，确保大标题与操作按钮的高可读性；
-    /// 2. 下方额外延伸 16pt 渐变过渡区：仅对此 16pt 区域添加自上而下的 LinearGradient 遮罩
-    ///    [0: 1.0, 0.72: 1.0, 1.0: 0.0]，消除底部硬分割线，内容上滑时毛玻璃平滑淡出。
-    private var headerGradientBlurBackground: some View {
-        ZStack(alignment: .bottom) {
-            // 向上覆盖状态栏并覆盖 54pt 标题栏主体（无遮罩）
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .colorMultiply(Color.pageBackground.opacity(0.35))
-                .ignoresSafeArea(edges: .top)
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-            // 向下额外延伸 16pt 渐变过渡区（仅此 16pt 添加遮罩）
+    /// 单层渐变毛玻璃背景：
+    /// 1. 现代系统（iOS 15+）且未开启降低透明度：
+    ///    使用单层系统原生 .ultraThinMaterial 毛玻璃作为基底，
+    ///    通过 .colorMultiply(Color.pageBackground.opacity(0.35)) 色调校准对齐 App #F3F3F3 底色（无任何纯色 overlay 叠加）；
+    ///    仅使用单层材质向上覆盖状态栏并向下延伸 16pt；
+    ///    对单层材质整体施加渐变遮罩（状态栏 + 54pt 标题栏主体为 100% 不透明黑，下方 16pt 为平滑淡出渐变），
+    ///    彻底避免多层毛玻璃材质在接缝处产生的双层叠影与硬切线；
+    /// 2. 低版本兼容性 / 开启降低透明度：回退纯色 Color.pageBackground 背景。
+    @ViewBuilder
+    private var headerGradientBlurBackground: some View {
+        if #available(iOS 15.0, *), !reduceTransparency {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .colorMultiply(Color.pageBackground.opacity(0.35))
-                .frame(height: 16)
                 .mask {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0.0),
-                            .init(color: .black, location: 0.72),
-                            .init(color: .black.opacity(0), location: 1.0),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: 0.72),
+                                .init(color: .clear, location: 1.0),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 16)
+                    }
                 }
-                .offset(y: 16)
+                .padding(.bottom, -16)
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+        } else {
+            Color.pageBackground
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
         }
-        .ignoresSafeArea(edges: .top)
-        .allowsHitTesting(false)
     }
 }
 
