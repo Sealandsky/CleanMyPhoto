@@ -160,12 +160,6 @@ struct AlbumPhotoListView: View {
                 )
                 .environmentObject(photoManager)
                 .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
-                .onDisappear {
-                    isFullscreenMode = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        canSelectPhoto = true
-                    }
-                }
             }
         }
         .toolbar {

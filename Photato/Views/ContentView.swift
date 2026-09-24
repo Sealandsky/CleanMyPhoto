@@ -167,15 +167,6 @@ struct ContentView: View {
                     .background(PopCompletionObserver {
                         isFullscreenMode = false
                     })
-                    .onDisappear {
-                        isFullscreenMode = false
-                        if let current = currentPhotoID, current != initialPhotoID {
-                            scrollToPhotoID = current
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            canSelectPhoto = true
-                        }
-                    }
                 }
             }
             // pop 转场开始即定位：仅当用户实际切图才触发网格滚动
