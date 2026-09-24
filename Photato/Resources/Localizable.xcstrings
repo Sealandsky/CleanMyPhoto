@@ -1372,6 +1372,7 @@
       }
     },
     "AI Index" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3831,6 +3832,7 @@
       }
     },
     "Completed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10208,6 +10210,7 @@
       }
     },
     "Ready" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

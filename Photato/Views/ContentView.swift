@@ -134,7 +134,7 @@ struct ContentView: View {
             .tabInlineNavigationTitle(String(localized: "Memories")) {
                 HStack(spacing: 8) {
                     formatFilterMenu
-                    PendingPhotosEntryButton()
+                    PendingPhotosEntryButton(isLiquidGlass: true)
                 }
             }
             .toolbar(.visible, for: .tabBar)
@@ -213,21 +213,26 @@ struct ContentView: View {
     @ViewBuilder
     private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下：纯图标排版，系统原生菜单颜色
+            // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
-                .frame(width: 32, height: 32)
+                .frame(width: 36, height: 36)
+                .modifier(HeaderLiquidGlassModifier())
+                .contentShape(Circle())
         } else {
-            // 选中某个分类：系统原生颜色，文本+图标排版（文字大一点，图标与默认态保持一致为 15pt）
+            // 选中某个分类：系统原生颜色，文本+图标排版与 Liquid Glass 胶囊底
             HStack(spacing: 4) {
                 Text(discoverManager.selectedFilter.localizedText)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
             }
             .foregroundColor(.primary)
-            .frame(height: 32)
+            .padding(.horizontal, 10)
+            .frame(height: 36)
+            .modifier(HeaderLiquidGlassModifier())
+            .contentShape(Capsule())
         }
     }
 }

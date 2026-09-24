@@ -138,7 +138,7 @@ struct MainTabView: View {
                 }
             }
             .tabInlineNavigationTitle(String(localized: "Albums")) {
-                PendingPhotosEntryButton()
+                PendingPhotosEntryButton(isLiquidGlass: true)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
@@ -194,7 +194,7 @@ struct MainTabView: View {
                 }
             )
             .tabInlineNavigationTitle(String(localized: "Organize")) {
-                PendingPhotosEntryButton()
+                PendingPhotosEntryButton(isLiquidGlass: true)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
