@@ -103,10 +103,6 @@ struct SettingsView: View {
                     StatRow(icon: "externaldrive",
                             title: String(localized: "Space Saved"),
                             value: statisticsManager.storageSpaceSavedText)
-
-                    StatRow(icon: "sparkles",
-                            title: String(localized: "AI Index", defaultValue: "AI Index"),
-                            value: aiIndexStatusDisplayText)
                 }
                 .listRowBackground(Color.cardBackground)
 
@@ -334,19 +330,6 @@ struct SettingsView: View {
         formatter.numberStyle = .decimal
         let formatted = formatter.string(from: NSNumber(value: count)) ?? "\(count)"
         return String(localized: "Photo Count Unit \(formatted)")
-    }
-
-    /// 全图库 AI 索引状态文案
-    private var aiIndexStatusDisplayText: String {
-        let matcher = PhotoSimilarityMatcher.shared
-        if matcher.isLibraryIndexed {
-            return String(localized: "Completed", defaultValue: "Completed")
-        } else if matcher.totalImagesCount > 0 {
-            let percent = Int(matcher.indexingProgress * 100)
-            return "\(percent)%"
-        } else {
-            return String(localized: "Ready", defaultValue: "Ready")
-        }
     }
 
     private var membershipCardSubtitle: String {
