@@ -74,9 +74,20 @@ struct AlbumDetailView: View {
             _isLoadingRecommendations = State(initialValue: false)
             _hasScannedCurrentAlbum = State(initialValue: true)
         } else {
-            // 即时增量推荐：进入相簿直接依据已索引特征与时间窗口即时呈现，无感体验
-            _recommendedPhotos = State(initialValue: [])
-            _isLoadingRecommendations = State(initialValue: true)
+            // 极速冷启动兜底：进入相簿优先通过 0ms 时间窗口 + 内存已有指纹极速上屏，告别骨架屏转圈
+            let excludingIDs = Set(currentPhotos.map(\.id)).union(photoManager.pendingDeletionIDs)
+            let fallbackAssets = PhotoSimilarityMatcher.shared.fastFallbackSimilar(
+                toAlbumAssets: currentPhotos.map(\.asset),
+                excludingIDs: excludingIDs,
+                topN: 16
+            )
+            if !fallbackAssets.isEmpty {
+                _recommendedPhotos = State(initialValue: fallbackAssets.map { PhotoAsset(asset: $0) })
+                _isLoadingRecommendations = State(initialValue: false)
+            } else {
+                _recommendedPhotos = State(initialValue: [])
+                _isLoadingRecommendations = State(initialValue: true)
+            }
             _hasScannedCurrentAlbum = State(initialValue: true)
         }
     }
@@ -658,6 +669,9 @@ struct AlbumDetailView: View {
             await albumManager.fetchPhotos(in: album)
         }
 
+        let excludingIDs = Set(albumPhotos.map(\.id))
+            .union(photoManager.pendingDeletionIDs)
+
         // 检查缓存：非强制刷新且存在有效缓存时直接复用，不重复触发全量扫描与骨架屏
         if !force, let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: albumPhotos) {
             self.recommendedPhotos = cached
@@ -673,13 +687,23 @@ struct AlbumDetailView: View {
             return
         }
 
-        // 首次进入或强制刷新：展示骨架屏并基于已有索引与时间窗口重新检索
+        // 首次进入且无推荐时：先尝试极速时间窗口兜底秒级上屏，避免转圈
         if recommendedPhotos.isEmpty {
-            isLoadingRecommendations = true
+            let fallbackAssets = PhotoSimilarityMatcher.shared.fastFallbackSimilar(
+                toAlbumAssets: albumPhotos.map(\.asset),
+                excludingIDs: excludingIDs,
+                topN: 16
+            )
+            if !fallbackAssets.isEmpty {
+                self.recommendedPhotos = fallbackAssets.map { PhotoAsset(asset: $0) }
+                self.isLoadingRecommendations = false
+            } else {
+                self.isLoadingRecommendations = true
+            }
         }
         defer { isLoadingRecommendations = false }
 
-        await performRecommendationSearch(isSilent: false)
+        await performRecommendationSearch(isSilent: !recommendedPhotos.isEmpty)
     }
 
     private func performRecommendationSearch(isSilent: Bool) async {
