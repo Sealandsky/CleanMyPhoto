@@ -25,7 +25,6 @@ struct TrashView: View {
             .background(Color.pageBackground)
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -54,8 +53,7 @@ struct TrashView: View {
                     }
                 }
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .dynamicSecondaryNavigationBar()
             .safeAreaInset(edge: .bottom) {
                 bottomFloatingBar
             }
@@ -246,7 +244,6 @@ struct TrashView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 

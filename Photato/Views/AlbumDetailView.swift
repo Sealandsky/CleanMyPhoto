@@ -114,7 +114,6 @@ struct AlbumDetailView: View {
         }
         .background(Color.pageBackground)
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -127,9 +126,7 @@ struct AlbumDetailView: View {
                     .minimumScaleFactor(0.75)
             }
         }
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {

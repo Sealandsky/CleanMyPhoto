@@ -64,7 +64,6 @@ struct MembershipView: View {
             .padding(.horizontal, 20)
         }
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .safeAreaInset(edge: .bottom) {
             bottomActionBar

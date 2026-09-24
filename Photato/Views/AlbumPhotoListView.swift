@@ -117,7 +117,6 @@ struct AlbumPhotoListView: View {
                 }
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
@@ -136,9 +135,7 @@ struct AlbumPhotoListView: View {
                     .minimumScaleFactor(0.75)
             }
         }
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {

@@ -160,12 +160,9 @@ struct OrganizeResultsView: View {
         }
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationDestination(isPresented: $isFullscreenMode) {
             fullscreenBrowserDestination
@@ -266,7 +263,6 @@ struct OrganizeResultsView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
@@ -341,7 +337,6 @@ struct OrganizeResultsView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
