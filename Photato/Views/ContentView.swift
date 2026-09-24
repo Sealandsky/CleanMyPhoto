@@ -215,7 +215,7 @@ struct ContentView: View {
         if discoverManager.selectedFilter == .all {
             // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 24, weight: .regular, design: .rounded))
+                .font(.system(size: 18, weight: .regular, design: .rounded))
                 .foregroundColor(.primary)
                 .frame(width: 44, height: 44)
                 .modifier(HeaderLiquidGlassModifier())
@@ -226,7 +226,7 @@ struct ContentView: View {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 24, weight: .regular, design: .rounded))
+                    .font(.system(size: 18, weight: .regular, design: .rounded))
             }
             .foregroundColor(.primary)
             .padding(.horizontal, 12)

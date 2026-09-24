@@ -25,8 +25,7 @@ struct PendingPhotosEntryButton: View {
                 photoManager.showTrash = true
             } label: {
                 buttonContent
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                    .foregroundColor(.primary)
             }
         }
     }
@@ -34,10 +33,10 @@ struct PendingPhotosEntryButton: View {
     private var buttonContent: some View {
         HStack(spacing: 4) {
             Image(systemName: "trash")
-                .font(.system(size: 24, weight: .regular, design: .rounded))
+                .font(.system(size: 18, weight: .regular, design: .rounded))
             if photoManager.trashCount > 0 {
                 Text("\(photoManager.trashCount)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .monospacedDigit()
             }
         }

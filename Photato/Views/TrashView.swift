@@ -47,7 +47,7 @@ struct TrashView: View {
                         }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 24, weight: .regular, design: .rounded))
+                            .font(.system(size: 18, weight: .regular, design: .rounded))
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())

@@ -133,7 +133,7 @@ struct OrganizeResultsView: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "sparkles")
-                                .font(.system(size: 24, weight: .regular, design: .rounded))
+                                .font(.system(size: 18, weight: .regular, design: .rounded))
                             Text(String(localized: "AI Select"))
                                 .font(.system(size: 15))
                         }

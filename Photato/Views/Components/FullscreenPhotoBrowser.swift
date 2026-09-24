@@ -197,8 +197,8 @@ struct FullscreenPhotoBrowser: View {
                 .buttonStyle(.plain)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                // 待处理照片入口：Liquid Glass 效果
-                PendingPhotosEntryButton(isLiquidGlass: true)
+                // 待处理照片入口：在系统导航栏由原生 ToolbarItem 承载，避免多层 Liquid Glass 嵌套
+                PendingPhotosEntryButton(isLiquidGlass: false)
             }
         }
         .toolbar(.hidden, for: .tabBar)

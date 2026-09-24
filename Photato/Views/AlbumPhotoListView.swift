@@ -194,7 +194,7 @@ struct AlbumPhotoListView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "trash.fill")
-                                .font(.system(size: 24, weight: .regular, design: .rounded))
+                                .font(.system(size: 18, weight: .regular, design: .rounded))
                             Text(String(localized: "Delete"))
                         }
                         .frame(minWidth: 44, minHeight: 44)
