@@ -25,217 +25,29 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var gridSettings = gridSettings
         NavigationStack {
-            List {
-                // 会员卡片（独立展示）
-                Section {
-                    Button {
-                        showMembership = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.system(.title, design: .rounded))
-                                .foregroundColor(.white)
-                                .opacity(0.85)
+            ScrollView {
+                VStack(spacing: 24) {
+                    // 会员卡片（独立展示）
+                    membershipCard
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(String(localized: "Photato Pro"))
-                                    .font(.system(.title3, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
+                    // 使用统计
+                    statisticsSection
 
-                                Text(membershipCardSubtitle)
-                                    .font(.system(.subheadline, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
+                    // 排列方式设置
+                    layoutSection(gridSettings: gridSettings)
 
-                            Spacer()
+                    // 关于
+                    aboutSection
 
-                            if membershipManager.membershipStatus.currentTier != .lifetime {
-                                HStack(spacing: 2) {
-                                    Image(systemName: "arrow.up.circle.fill")
-                                        .font(.system(.title3, design: .rounded))
-                                        .fontWeight(.semibold)
-                                    Text(String(localized: "Upgrade"))
-                                        .font(.system(.subheadline, design: .rounded))
-                                        .fontWeight(.semibold)
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .overlay(
-                                    Capsule()
-                                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                                )
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.vertical, 28)
-                        .padding(.horizontal, 16)
-                        .background(.accentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
+                    #if DEBUG
+                    debugSection
+                    #endif
                 }
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                // 使用统计
-                Section(String(localized: "Statistics")) {
-                    // 免费删除额度（置于首位）：会员（含试用期）不受额度约束显示「无限」，
-                    // 免费用户显示剩余/总额，用尽引导升级
-                    StatRow(icon: "checkmark.seal",
-                            title: String(localized: "Free Deletion Quota"),
-                            value: quotaDisplayText)
-
-                    StatRow(icon: "square.on.square",
-                            title: String(localized: "Total Photos"),
-                            value: totalPhotosDisplayText)
-
-                    // 可清理照片：数据来源于清理页；无数据时显示「待扫描」可点击跳转至清理页
-                    cleanablePhotosRow
-
-                    StatRow(icon: "trash",
-                            title: String(localized: "Deleted Photos"),
-                            value: statisticsManager.deletedPhotosText)
-
-                    StatRow(icon: "externaldrive",
-                            title: String(localized: "Space Saved"),
-                            value: statisticsManager.storageSpaceSavedText)
-                }
-                .listRowBackground(Color.cardBackground)
-
-                // 排列方式设置
-                Section(String(localized: "Layout")) {
-                    HStack {
-                        Image(systemName: "square.grid.2x2")
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-
-                        Text(String(localized: "Grid Layout"))
-
-                        Spacer()
-
-                        Menu {
-                            Button { gridSettings.columnCount = 2 } label: {
-                                Label("2", systemImage: "square.grid.2x2.fill")
-                            }
-                            Button { gridSettings.columnCount = 3 } label: {
-                                Label("3", systemImage: "square.grid.3x2.fill")
-                            }
-                            Button { gridSettings.columnCount = 4 } label: {
-                                Label("4", systemImage: "square.grid.3x2.fill")
-                            }
-                        } label: {
-                            Text("\(gridSettings.columnCount)")
-                                .foregroundColor(.secondary)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(.caption2, design: .rounded))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-
-                    HStack {
-                        Image(systemName: "rectangle.split.3x1")
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-
-                        Text(String(localized: "Photo Ratio"))
-
-                        Spacer()
-
-                        Menu {
-                            // 原比例：瀑布流按图片真实宽高比展示
-                            Button { gridSettings.isOriginalRatio = true } label: {
-                                Label(String(localized: "Original"), systemImage: "rectangle.on.rectangle")
-                            }
-                            Button {
-                                gridSettings.isOriginalRatio = false
-                                gridSettings.aspectRatio = 1.0
-                            } label: {
-                                Label("1:1", systemImage: "square")
-                            }
-                            Button {
-                                gridSettings.isOriginalRatio = false
-                                gridSettings.aspectRatio = 3.0 / 4.0
-                            } label: {
-                                Label("3:4", systemImage: "rectangle.portrait")
-                            }
-                        } label: {
-                            Text(ratioDisplayText)
-                                .foregroundColor(.secondary)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(.caption2, design: .rounded))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .listRowBackground(Color.cardBackground)
-
-                // 关于
-                Section(String(localized: "About")) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-
-                        Text(String(localized: "Version"))
-                        Spacer()
-                        Text(appVersion)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Link(destination: privacyPolicyURL) {
-                        HStack {
-                            Image(systemName: "hand.raised")
-                                .foregroundColor(.blue)
-                                .frame(width: 30)
-
-                            Text(String(localized: "Privacy Policy"))
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .foregroundColor(.primary)
-
-                    Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
-                        HStack {
-                            Image(systemName: "doc.text")
-                                .foregroundColor(.blue)
-                                .frame(width: 30)
-
-                            Text(String(localized: "Terms of Use"))
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .foregroundColor(.primary)
-                }
-                .listRowBackground(Color.cardBackground)
-
-                #if DEBUG
-                Section("Debug") {
-                    NavigationLink("Orbiting Avatar Preview") {
-                        OrbitingAvatarView()
-                    }
-                    Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
-                    Button("Reset Free Quota (100 left)") {
-                        membershipManager.resetFreeQuotaForTesting()
-                    }
-                    Button("Exhaust Free Quota (0 left)") {
-                        membershipManager.exhaustFreeQuotaForTesting()
-                    }
-                }
-                .listRowBackground(Color.cardBackground)
-                #endif
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
-            .scrollContentBackground(.hidden)
             .background(Color.pageBackground)
             .tabInlineNavigationTitle(String(localized: "Settings"))
             .scrollEdgeEffectStyle(.soft, for: .top)
@@ -248,6 +60,289 @@ struct SettingsView: View {
             MembershipView(isMandatory: false)
         }
     }
+
+    // MARK: - Sections
+
+    private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundColor(Color(.systemGray))
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(Color.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    private var membershipCard: some View {
+        Button {
+            showMembership = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(.title, design: .rounded))
+                    .foregroundColor(.white)
+                    .opacity(0.85)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Photato Pro"))
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+
+                    Text(membershipCardSubtitle)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                Spacer()
+
+                if membershipManager.membershipStatus.currentTier != .lifetime {
+                    HStack(spacing: 2) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                        Text(String(localized: "Upgrade"))
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                    )
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+            }
+            .padding(.vertical, 28)
+            .padding(.horizontal, 16)
+            .background(.accentGradient)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var statisticsSection: some View {
+        sectionCard(title: String(localized: "Statistics")) {
+            StatRow(icon: "checkmark.seal",
+                    title: String(localized: "Free Deletion Quota"),
+                    value: quotaDisplayText)
+
+            Divider().padding(.leading, 54)
+
+            StatRow(icon: "square.on.square",
+                    title: String(localized: "Total Photos"),
+                    value: totalPhotosDisplayText)
+
+            Divider().padding(.leading, 54)
+
+            cleanablePhotosRow
+
+            Divider().padding(.leading, 54)
+
+            StatRow(icon: "trash",
+                    title: String(localized: "Deleted Photos"),
+                    value: statisticsManager.deletedPhotosText)
+
+            Divider().padding(.leading, 54)
+
+            StatRow(icon: "externaldrive",
+                    title: String(localized: "Space Saved"),
+                    value: statisticsManager.storageSpaceSavedText)
+        }
+    }
+
+    private func layoutSection(gridSettings: GridSettings) -> some View {
+        sectionCard(title: String(localized: "Layout")) {
+            HStack {
+                Image(systemName: "square.grid.2x2")
+                    .foregroundColor(.blue)
+                    .frame(width: 30)
+
+                Text(String(localized: "Grid Layout"))
+
+                Spacer()
+
+                Menu {
+                    Button { gridSettings.columnCount = 2 } label: {
+                        Label("2", systemImage: "square.grid.2x2.fill")
+                    }
+                    Button { gridSettings.columnCount = 3 } label: {
+                        Label("3", systemImage: "square.grid.3x2.fill")
+                    }
+                    Button { gridSettings.columnCount = 4 } label: {
+                        Label("4", systemImage: "square.grid.3x2.fill")
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("\(gridSettings.columnCount)")
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+
+            Divider().padding(.leading, 54)
+
+            HStack {
+                Image(systemName: "rectangle.split.3x1")
+                    .foregroundColor(.blue)
+                    .frame(width: 30)
+
+                Text(String(localized: "Photo Ratio"))
+
+                Spacer()
+
+                Menu {
+                    Button { gridSettings.isOriginalRatio = true } label: {
+                        Label(String(localized: "Original"), systemImage: "rectangle.on.rectangle")
+                    }
+                    Button {
+                        gridSettings.isOriginalRatio = false
+                        gridSettings.aspectRatio = 1.0
+                    } label: {
+                        Label("1:1", systemImage: "square")
+                    }
+                    Button {
+                        gridSettings.isOriginalRatio = false
+                        gridSettings.aspectRatio = 3.0 / 4.0
+                    } label: {
+                        Label("3:4", systemImage: "rectangle.portrait")
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(ratioDisplayText)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+        }
+    }
+
+    private var aboutSection: some View {
+        sectionCard(title: String(localized: "About")) {
+            HStack {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.blue)
+                    .frame(width: 30)
+
+                Text(String(localized: "Version"))
+                Spacer()
+                Text(appVersion)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+
+            Divider().padding(.leading, 54)
+
+            Link(destination: privacyPolicyURL) {
+                HStack {
+                    Image(systemName: "hand.raised")
+                        .foregroundColor(.blue)
+                        .frame(width: 30)
+
+                    Text(String(localized: "Privacy Policy"))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .foregroundColor(.primary)
+
+            Divider().padding(.leading, 54)
+
+            Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
+                HStack {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(.blue)
+                        .frame(width: 30)
+
+                    Text(String(localized: "Terms of Use"))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .foregroundColor(.primary)
+        }
+    }
+
+    #if DEBUG
+    private var debugSection: some View {
+        sectionCard(title: "Debug") {
+            NavigationLink {
+                OrbitingAvatarView()
+            } label: {
+                HStack {
+                    Text("Orbiting Avatar Preview")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+
+            Divider().padding(.leading, 16)
+
+            Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+
+            Divider().padding(.leading, 16)
+
+            Button {
+                membershipManager.resetFreeQuotaForTesting()
+            } label: {
+                Text("Reset Free Quota (100 left)")
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+
+            Divider().padding(.leading, 16)
+
+            Button {
+                membershipManager.exhaustFreeQuotaForTesting()
+            } label: {
+                Text("Exhaust Free Quota (0 left)")
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+        }
+    }
+    #endif
 
     // MARK: - 计算属性
 
@@ -318,6 +413,9 @@ struct SettingsView: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -391,5 +489,7 @@ struct StatRow: View {
             Text(value)
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
     }
 }
