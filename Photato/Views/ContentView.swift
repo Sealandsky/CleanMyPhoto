@@ -181,7 +181,7 @@ struct ContentView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .background(Color.pageBackground.ignoresSafeArea())
     }
 
     // MARK: - 页面右上角格式筛选器（原生系统下拉菜单）

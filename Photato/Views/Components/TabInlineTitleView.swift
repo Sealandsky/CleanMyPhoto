@@ -60,30 +60,10 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
                 .padding(.vertical, 4)
                 .frame(minHeight: 52)
                 .background {
-                    headerGradientBlurBackground
+                    Color.pageBackground
+                        .ignoresSafeArea(edges: .top)
                 }
             }
-    }
-
-    /// 渐变毛玻璃背景：以系统 ultraThinMaterial 为材质基底，
-    /// 顶部与主体区域全强效模糊，底部向下 20pt 柔和渐隐过渡，杜绝硬切边缘。
-    private var headerGradientBlurBackground: some View {
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            .mask {
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.72),
-                        .init(color: .black.opacity(0), location: 1.0),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .padding(.bottom, -20)
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
     }
 }
 

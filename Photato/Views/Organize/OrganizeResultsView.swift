@@ -116,8 +116,16 @@ struct OrganizeResultsView: View {
                 .animation(.spring(response: 0.36, dampingFraction: 0.82), value: isDeleteButtonVisible)
         }
         .overlay(alignment: .top) { deleteToast }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(category.localizedText)
+                    .font(.title1)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+
             if isGroupedMode {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -149,6 +157,8 @@ struct OrganizeResultsView: View {
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
         .scrollEdgeEffectStyle(.soft, for: .top)

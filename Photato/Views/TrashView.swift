@@ -22,11 +22,19 @@ struct TrashView: View {
                     trashContent
                 }
             }
+            .background(Color.pageBackground)
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
+                        .font(.title1)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
                     Button {
@@ -43,6 +51,8 @@ struct TrashView: View {
                     }
                 }
             }
+            .toolbarBackground(Color.pageBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
                 bottomFloatingBar
             }

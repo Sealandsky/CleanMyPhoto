@@ -91,7 +91,7 @@ struct AddToAlbumSheet: View {
         .animation(.easeInOut(duration: 0.25), value: sheetToast)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .task { await loadAlbums() }
         .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
             TextField(String(localized: "Album Name"), text: $newAlbumName)

@@ -180,7 +180,7 @@ struct MainTabView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
     }
 
     // MARK: - Organize Tab
@@ -209,7 +209,7 @@ struct MainTabView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
     }
 
     // MARK: - Loading View（相簿管理器初始化中的占位）
@@ -224,7 +224,7 @@ struct MainTabView: View {
                 .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .ignoresSafeArea()
     }
 }

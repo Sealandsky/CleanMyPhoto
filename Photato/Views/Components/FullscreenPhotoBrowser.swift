@@ -140,8 +140,8 @@ struct FullscreenPhotoBrowser: View {
                 emptyStateView
             }
         }
-        // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        // 页面底色铺满全屏（含安全区）：统一使用 #F3F3F3
+        .background(Color.pageBackground.ignoresSafeArea())
         // 联动控制 iOS 18 原生 Zoom 转场返回手势（边缘侧滑放行、捏合禁用、顶栏下拉放行、浏览相似照片下拉回滚）
         .background(ZoomInteractiveDismissConfigurator(isFullScreen: expandProgress > 0.01, scrollOffsetY: scrollOffsetY))
         // 操作结果反馈 toast：覆盖在详情页上，自动消失，高对比度深色胶囊，不拦截触摸
@@ -184,45 +184,27 @@ struct FullscreenPhotoBrowser: View {
         // （颜色/热区/侧滑返回全系统行为，不做自定义替代）
         .toolbar {
             ToolbarItem(placement: .principal) {
-                // 标题按钮（参考系统图库）：Liquid Glass 胶囊样式，点击弹出照片信息面板
+                // 标题文字使用 .title1，点击弹出照片信息面板
                 Button {
                     showInfoSheet = true
                 } label: {
-                    VStack(spacing: 1) {
-                        Text(captionTitle)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        if !captionSubtitle.isEmpty {
-                            Text(captionSubtitle)
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                    }
-                    // 刻意不加 .animation(value:)：文本内容变化伴随宽度变化，
-                    // 动画会把文字横向拉伸变形（切页时方向不一、超出的根源）；
-                    // 允许水平压缩（fixedSize false）保证长文本在胶囊内截断不溢出
-                    .fixedSize(horizontal: false, vertical: false)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 5)
-                    // iOS 26 Liquid Glass 胶囊（interactive 支持按压高光）；
-                    // iOS 18 回退半透明材质
-                    .modifier(TitleGlassCapsule())
-                    .contentShape(Capsule())
+                    Text(captionTitle)
+                        .font(.title1)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 .buttonStyle(.plain)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                // 待处理照片入口：数量以文本实时展示，删除后立即增加
-                PendingPhotosEntryButton()
+                // 待处理照片入口：Liquid Glass 效果
+                PendingPhotosEntryButton(isLiquidGlass: true)
             }
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
         .sheet(isPresented: $showAddToAlbum) {
             if let photo = currentPhoto {

@@ -71,7 +71,7 @@ struct AlbumPhotoListView: View {
                     .padding(.horizontal, 4)
                 }
             }
-            .background(Color(UIColor.systemGroupedBackground))
+            .background(Color.pageBackground)
             .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
@@ -123,11 +123,22 @@ struct AlbumPhotoListView: View {
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue
         }
+        .background(Color.pageBackground)
         .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
+                    .font(.title1)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(selectionManager.isSelectMode ? .visible : .hidden, for: .navigationBar)
+        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {

@@ -180,7 +180,7 @@ struct DiscoverView: View {
                 gridView
             }
         }
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .background(Color.pageBackground.ignoresSafeArea())
         // 首次采样由 ContentView 切换到「发现」Tab 时触发，
         // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
         // 否则 app 启动即会执行全库枚举
@@ -198,6 +198,7 @@ struct DiscoverView: View {
                     photoCellView(photo)
                 }
                 .padding(.horizontal, 4)
+                .padding(.top, 4)
                 .padding(.bottom, 4)
             }
             // 滚动位置绑定：支持按边缘滚到真正的顶部（offset 0）
@@ -334,6 +335,7 @@ struct DiscoverView: View {
                 }
             }
             .padding(.horizontal, 4)
+            .padding(.top, 4)
             .padding(.bottom, 4)
         }
         .scrollDisabled(true)

@@ -105,20 +105,31 @@ struct AlbumDetailView: View {
                 // 模块二：【更多适合这个相簿的照片】
                 morePhotosSection
             }
-            .padding(.top, 12)
+            .padding(.top, 4)
             .padding(.bottom, 24)
         }
         .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
         .refreshable {
             await loadRecommendations(force: true)
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(album.title)
+                    .font(.title1)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
         .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
