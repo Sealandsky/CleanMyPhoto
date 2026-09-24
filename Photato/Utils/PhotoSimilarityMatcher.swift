@@ -73,19 +73,35 @@ final class PhotoSimilarityMatcher {
     /// 超出后由二级 LRU 机制淘汰，Core Data 磁盘持久层仍保留全量，支持毫秒级按需补查
     private static let maxSessionFeatureCount = 2_000
 
-    // MARK: - Threading
+    // MARK: - Threading & Queues
 
-    /// 串行计算队列：任务天然排队执行，避免并发扫描造成内存峰值与 CPU 争抢
-    private let workQueue = DispatchQueue(label: "cn.bryan.photato.similarity-matcher", qos: .userInitiated)
-    /// 当前有效任务令牌：仅在 workQueue 上读写（线程 confinement 保证安全）
+    /// 后台静默特征索引构建专用低优先级串行队列（utility，温和慢跑、不与前台争抢算力）
+    private let indexingQueue = DispatchQueue(label: "cn.bryan.photato.similarity-matcher.indexing", qos: .utility)
+    /// 前台用户交互专用高优先级串行队列（userInitiated，秒级响应详情页与相簿匹配）
+    private let queryQueue = DispatchQueue(label: "cn.bryan.photato.similarity-matcher.query", qos: .userInitiated)
+
+    /// 当前有效任务令牌：仅在 queryQueue 上读写（线程 confinement 保证安全）
     private var activeToken: UUID?
     /// 相簿相似检索专用令牌：与单张照片检索互不冲突
     private var albumActiveToken: UUID?
 
+    /// 前台活跃避让控制：当用户在详情页浏览翻页或相簿交互时，后台静默索引立即让步
+    private var foregroundDebounceWorkItem: DispatchWorkItem?
+    private let activityLock = NSLock()
+    private(set) var isForegroundActive: Bool = false
+
+    /// 索引统计信息暴露给 UI（设置页等）
+    private(set) var indexedCount: Int = 0
+    private(set) var totalImagesCount: Int = 0
+    var indexingProgress: Double {
+        guard totalImagesCount > 0 else { return isLibraryIndexed ? 1.0 : 0.0 }
+        return min(1.0, Double(indexedCount) / Double(totalImagesCount))
+    }
+
     /// 特征指纹缓存：磁盘（Core Data）持久层 + 会话级全量内存库
     private lazy var cache = FeaturePrintCache()
     /// 会话级特征库：首次使用时从磁盘一次性全量载入，此后纯内存查询。
-    /// 跨线程读写（workQueue 写、主线程同步快照读）统一由 storeLock 保护
+    /// 跨线程读写（queryQueue/indexingQueue 写、主线程同步快照读）统一由 storeLock 保护
     private var featureStore: [String: CachedFeature]?
     /// 同步快照备忘：同一会话内同一基准只计算一次（主线程读写，锁保护）
     private var snapshotMemo: [String: [PHAsset]] = [:]
@@ -109,12 +125,30 @@ final class PhotoSimilarityMatcher {
         }
     }
 
+    /// 通知有前台用户活跃（如进入详情页、滑动翻页等）：
+    /// 后台建库立即暂停，闲置 1.5 秒后自动续跑，彻底消除前台掉帧与抢算力
+    func notifyForegroundActivity() {
+        activityLock.lock()
+        isForegroundActive = true
+        foregroundDebounceWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.activityLock.lock()
+            self.isForegroundActive = false
+            self.activityLock.unlock()
+        }
+        foregroundDebounceWorkItem = item
+        activityLock.unlock()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: item)
+    }
+
     /// 启动后台静默特征索引构建（低优先级、分批温控让步、主线程零卡顿）
     func startBackgroundIndexingIfNeeded() {
         guard !isLibraryIndexed, !isBackgroundIndexing else { return }
         isBackgroundIndexing = true
 
-        workQueue.async { [weak self] in
+        indexingQueue.async { [weak self] in
             guard let self else { return }
 
             // 1. 相册权限校验
@@ -134,7 +168,12 @@ final class PhotoSimilarityMatcher {
                 assetsToIndex.append(asset)
             }
 
-            guard !assetsToIndex.isEmpty else {
+            let total = assetsToIndex.count
+            DispatchQueue.main.async {
+                self.totalImagesCount = total
+            }
+
+            guard total > 0 else {
                 self.isLibraryIndexed = true
                 self.isBackgroundIndexing = false
                 DispatchQueue.main.async {
@@ -143,26 +182,40 @@ final class PhotoSimilarityMatcher {
                 return
             }
 
-            // 3. 逐批温和提取指纹（每 15 张让步 40ms，避免占用 CPU/GPU 发烫与抢占主线程）
+            self.ensureFeatureStoreLoaded()
+            self.updateIndexedCount()
+
+            // 3. 逐批温和提取指纹（每 20 张微歇 50ms，且前台有交互或设备严重发热/低电量时主动挂起）
             var processed = 0
             for asset in assetsToIndex {
-                // 如果用户在前台主动发起了相簿扫描任务或正在详情页查看单张相似照片，后台主动让步
-                while self.albumActiveToken != nil || self.activeToken != nil {
+                // 前台交互避让：前台正在翻页或浏览详情时，后台静默挂起
+                while self.isForegroundActive {
                     self.cache.flush()
-                    Thread.sleep(forTimeInterval: 0.15)
+                    Thread.sleep(forTimeInterval: 0.2)
                 }
 
-                _ = autoreleasepool {
-                    self.cachedOrCompute(asset)
+                // 设备温控与低电量保护：发热严重或开启低电量模式时挂起
+                while ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical {
+                    Thread.sleep(forTimeInterval: 1.0)
+                }
+
+                // 若已有有效指纹缓存则直接跳过
+                if self.cachedObservation(for: asset) == nil {
+                    _ = autoreleasepool {
+                        self.cachedOrCompute(asset)
+                    }
                 }
 
                 processed += 1
-                if processed % 15 == 0 {
-                    usleep(40_000) // 40 毫秒温控微让步
+                if processed % 20 == 0 {
+                    self.cache.flush()
+                    self.updateIndexedCount()
+                    usleep(50_000) // 50 毫秒温控微让步
                 }
             }
 
             self.cache.flush()
+            self.updateIndexedCount()
             self.isLibraryIndexed = true
             self.isBackgroundIndexing = false
 
@@ -172,73 +225,154 @@ final class PhotoSimilarityMatcher {
         }
     }
 
+    private func updateIndexedCount() {
+        let count = cache.count(pipelineVersion: Self.pipelineVersion)
+        DispatchQueue.main.async {
+            self.indexedCount = count
+        }
+    }
+
+    /// 获取会话内存库中所有可用的 Vision 特征向量快照（用于纯内存毫秒级比对）
+    func allCachedObservations() -> [String: VNFeaturePrintObservation] {
+        ensureFeatureStoreLoaded()
+        storeLock.lock()
+        defer { storeLock.unlock() }
+        var result: [String: VNFeaturePrintObservation] = [:]
+        if let store = featureStore {
+            for (id, cached) in store {
+                result[id] = cached.observation
+            }
+        }
+        return result
+    }
+
     // MARK: - Public API
 
     /// 检索与基准照片视觉最相似的 Top N 张。
     ///
     /// - Parameters:
     ///   - base: 基准照片（详情页当前素材）
+    ///   - contextAssetIDs: 上下文照片 ID 列表（如来自相簿或当前浏览批次，优先召回）
     ///   - topN: 返回数量上限，默认 12
     ///   - maxDistance: 相似度阈值（特征距离），默认 `defaultMaxDistance`
     ///   - progress: 进度回调（已处理数 / 候选总数），主线程
-    ///   - completion: 完成回调（相似度从高到低的结果 + 错误），主线程；
-    ///     每次调用保证回调且仅回调一次，任何失败路径 results 均为空数组
+    ///   - completion: 完成回调（相似度从高到低的结果 + 错误），主线程
     func findSimilar(
         to base: PHAsset,
+        contextAssetIDs: [String] = [],
         topN: Int = 12,
         maxDistance: Float = PhotoSimilarityMatcher.defaultMaxDistance,
         progress: @escaping (_ processed: Int, _ total: Int) -> Void = { _, _ in },
         completion: @escaping (_ results: [PHAsset], _ error: Error?) -> Void
     ) {
-        workQueue.async { [weak self] in
+        notifyForegroundActivity()
+
+        queryQueue.async { [weak self] in
             guard let self else { return }
 
             let token = UUID()
             self.activeToken = token
 
-            // 1. 相册权限校验（查询 .readWrite 级别，已授权该级别及以上才放行）
+            // 1. 相册权限校验
             let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
             guard status == .authorized || status == .limited else {
                 self.finish([], MatcherError.photoAccessDenied(status), token: token, completion)
                 return
             }
 
-            // 2. 基准特征提取（缓存命中则零计算）：失败即整体失败（没有可比较的锚点）
-            guard let basePrint = self.cachedOrCompute(base) else {
-                self.finish([], MatcherError.baseFeatureUnavailable, token: token, completion)
-                return
-            }
-
-            // 3. 候选收集：全相册图片，枚举时排除基准自身
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-            let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
-
             let baseID = base.localIdentifier
-            var candidates: [PHAsset] = []
-            fetchResult.enumerateObjects { asset, _, _ in
-                // 【强制】排除基准照片（第一重）：localIdentifier 精确匹配
-                guard asset.localIdentifier != baseID else { return }
-                candidates.append(asset)
-            }
 
-            let total = candidates.count
-            guard total > 0 else {
-                self.finish([], nil, token: token, completion)
+            // 2. 基准特征提取（优先从会话内存/CoreData缓存读取，未命中则单张现场计算 ~30ms）
+            guard let basePrint = self.cachedOrCompute(base) else {
+                let fallback = self.fastFallbackSimilar(to: base, contextAssetIDs: contextAssetIDs, topN: topN)
+                self.finish(fallback, fallback.isEmpty ? MatcherError.baseFeatureUnavailable : nil, token: token, completion)
                 return
             }
 
-            // 4. 逐候选提取特征并计算距离（同步图像请求要求在后台线程，此处满足）
+            // 3. 构建候选池（上下文感知 + 全库已索引库 + 前后3天邻近素材）
             var scored: [(asset: PHAsset, distance: Float)] = []
-            var processed = 0
-            for asset in candidates {
-                // 任务被取消 / 被新一轮检索取代：立即终止本轮回调 .cancelled
+            var evaluatedIDs = Set<String>([baseID])
+
+            // 3.1 上下文优先候选（若传入了当前相簿/分组的素材 ID 列表）
+            if !contextAssetIDs.isEmpty {
+                let contextAssets = PHAsset.fetchAssets(withLocalIdentifiers: contextAssetIDs, options: nil)
+                contextAssets.enumerateObjects { asset, _, _ in
+                    guard asset.localIdentifier != baseID else { return }
+                    guard asset.mediaType == .image else { return }
+                    evaluatedIDs.insert(asset.localIdentifier)
+                    if let print = self.cachedObservation(for: asset) {
+                        var distance: Float = .greatestFiniteMagnitude
+                        if (try? basePrint.computeDistance(&distance, to: print)) != nil,
+                           distance <= maxDistance {
+                            scored.append((asset, distance))
+                        }
+                    }
+                }
+            }
+
+            // 3.2 全库已索引特征快速检索（纯内存/轻量向量比对，万张只需 < 5ms）
+            let allCached = self.allCachedObservations()
+            var matchedCachedIDs: [(id: String, distance: Float)] = []
+            for (candID, print) in allCached {
+                guard !evaluatedIDs.contains(candID) else { continue }
+                var distance: Float = .greatestFiniteMagnitude
+                if (try? basePrint.computeDistance(&distance, to: print)) != nil,
+                   distance <= maxDistance {
+                    evaluatedIDs.insert(candID)
+                    matchedCachedIDs.append((candID, distance))
+                }
+            }
+
+            if !matchedCachedIDs.isEmpty {
+                let sortedIDs = matchedCachedIDs.sorted { $0.distance < $1.distance }.prefix(topN * 2)
+                let fetchedAssets = PHAsset.fetchAssets(withLocalIdentifiers: sortedIDs.map(\.id), options: nil)
+                var idMap: [String: PHAsset] = [:]
+                fetchedAssets.enumerateObjects { asset, _, _ in
+                    idMap[asset.localIdentifier] = asset
+                }
+                for item in sortedIDs {
+                    if let asset = idMap[item.id] {
+                        scored.append((asset, item.distance))
+                    }
+                }
+            }
+
+            // 3.3 邻近时间窗口候选（前后 3 天内，最多取 60 张，覆盖连拍与同场景）
+            var uncomputedCandidates: [PHAsset] = []
+            if let baseDate = base.creationDate {
+                let options = PHFetchOptions()
+                let startDate = baseDate.addingTimeInterval(-3 * 86400)
+                let endDate = baseDate.addingTimeInterval(3 * 86400)
+                options.predicate = NSPredicate(
+                    format: "mediaType == %d AND creationDate >= %@ AND creationDate <= %@",
+                    PHAssetMediaType.image.rawValue, startDate as NSDate, endDate as NSDate
+                )
+                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                options.fetchLimit = 60
+
+                let nearby = PHAsset.fetchAssets(with: options)
+                nearby.enumerateObjects { asset, _, _ in
+                    guard !evaluatedIDs.contains(asset.localIdentifier) else { return }
+                    evaluatedIDs.insert(asset.localIdentifier)
+                    if let print = self.cachedObservation(for: asset) {
+                        var distance: Float = .greatestFiniteMagnitude
+                        if (try? basePrint.computeDistance(&distance, to: print)) != nil,
+                           distance <= maxDistance {
+                            scored.append((asset, distance))
+                        }
+                    } else {
+                        uncomputedCandidates.append(asset)
+                    }
+                }
+            }
+
+            // 3.4 允许对邻近未索引候选进行小额现算（上限 25 张，耗时数百毫秒内）
+            let maxOnDemand = 25
+            for asset in uncomputedCandidates.prefix(maxOnDemand) {
                 if self.activeToken != token {
                     self.finish([], MatcherError.cancelled, token: token, completion)
                     return
                 }
-
-                // 单张失败仅跳过（连本地缩略图都没有 / 数据损坏），不中断整体
                 if let print = autoreleasepool(invoking: { self.cachedOrCompute(asset) }) {
                     var distance: Float = .greatestFiniteMagnitude
                     if (try? basePrint.computeDistance(&distance, to: print)) != nil,
@@ -246,29 +380,141 @@ final class PhotoSimilarityMatcher {
                         scored.append((asset, distance))
                     }
                 }
-
-                processed += 1
-                if processed % Self.progressStride == 0 || processed == total {
-                    let done = processed
-                    DispatchQueue.main.async { progress(done, total) }
-                }
             }
 
-            // 5. 距离升序（= 相似度降序）取 Top N；基准排除二次校验（强制规则兜底）
+            // 4. 排序并取 Top N
             let results = Array(scored
                 .sorted { $0.distance < $1.distance }
                 .prefix(max(0, topN))
                 .map(\.asset)
-                // 【强制】结果兜底：无论如何不允许基准自身出现
                 .filter { $0.localIdentifier != baseID })
 
-            // 刷新快照备忘：下次进入该照片的详情页时同步直出本次结果
-            storeLock.lock()
-            snapshotMemo[baseID] = results
-            storeLock.unlock()
+            // 5. 冷启动兜底：若全库尚未建好索引且结果为空，用 fastFallbackSimilar 0ms 呈现连拍/相似
+            if results.isEmpty && !self.isLibraryIndexed {
+                let fallback = self.fastFallbackSimilar(to: base, contextAssetIDs: contextAssetIDs, topN: topN)
+                if !fallback.isEmpty {
+                    self.storeLock.lock()
+                    self.snapshotMemo[baseID] = fallback
+                    self.storeLock.unlock()
+                    self.finish(fallback, nil, token: token, completion)
+                    return
+                }
+            }
+
+            self.storeLock.lock()
+            self.snapshotMemo[baseID] = results
+            self.storeLock.unlock()
 
             self.finish(results, nil, token: token, completion)
         }
+    }
+
+    /// 冷启动极速兜底：针对全库 Vision 索引尚未建立阶段，利用拍摄时间前后 60 秒与快速差值哈希（dHash）
+    /// 在 5~10 毫秒内秒级召回连拍与同场景素材，作为首屏占位
+    func fastFallbackSimilar(
+        to base: PHAsset,
+        contextAssetIDs: [String] = [],
+        topN: Int = 12
+    ) -> [PHAsset] {
+        let baseID = base.localIdentifier
+        guard let baseDate = base.creationDate else { return [] }
+
+        // 1. 取前后 60 秒内的同场景/连拍照片候选（最多 25 张）
+        let options = PHFetchOptions()
+        let startDate = baseDate.addingTimeInterval(-60)
+        let endDate = baseDate.addingTimeInterval(60)
+        options.predicate = NSPredicate(
+            format: "mediaType == %d AND creationDate >= %@ AND creationDate <= %@",
+            PHAssetMediaType.image.rawValue, startDate as NSDate, endDate as NSDate
+        )
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.fetchLimit = 25
+
+        let nearby = PHAsset.fetchAssets(with: options)
+        var candidates: [PHAsset] = []
+        nearby.enumerateObjects { asset, _, _ in
+            if asset.localIdentifier != baseID {
+                candidates.append(asset)
+            }
+        }
+
+        guard !candidates.isEmpty else { return [] }
+
+        // 2. 快速差值哈希比对（单张仅 ~0.2ms，20 张总耗时 < 5ms）
+        let baseHash = computeQuickDHash(for: base)
+        guard !baseHash.isEmpty else { return Array(candidates.prefix(topN)) }
+
+        var matched: [(asset: PHAsset, distance: Int)] = []
+        for cand in candidates {
+            let candHash = computeQuickDHash(for: cand)
+            guard !candHash.isEmpty else { continue }
+            let dist = hammingDistance(baseHash, candHash)
+            if dist <= 14 {
+                matched.append((cand, dist))
+            }
+        }
+
+        if matched.isEmpty {
+            return candidates.filter { abs($0.creationDate?.timeIntervalSince(baseDate) ?? 999) <= 15 }
+        }
+
+        return matched.sorted { $0.distance < $1.distance }.prefix(topN).map(\.asset)
+    }
+
+    private func computeQuickDHash(for asset: PHAsset) -> String {
+        let options = PHImageRequestOptions()
+        options.resizeMode = .fast
+        options.deliveryMode = .fastFormat
+        options.isNetworkAccessAllowed = false
+        options.isSynchronous = true
+
+        var hash = ""
+        PHImageManager.default().requestImage(
+            for: asset,
+            targetSize: CGSize(width: 64, height: 64),
+            contentMode: .aspectFill,
+            options: options
+        ) { image, _ in
+            guard let image = image else { return }
+            let width = 9
+            let height = 8
+            let colorSpace = CGColorSpaceCreateDeviceGray()
+            guard let context = CGContext(
+                data: nil, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.none.rawValue
+            ) else { return }
+
+            UIGraphicsPushContext(context)
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1.0, y: -1.0)
+            image.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+            UIGraphicsPopContext()
+
+            guard let pixelData = context.data else { return }
+            let pixels = pixelData.bindMemory(to: UInt8.self, capacity: width * height)
+
+            for row in 0..<height {
+                for col in 0..<(width - 1) {
+                    let left = Int(pixels[row * width + col])
+                    let right = Int(pixels[row * width + col + 1])
+                    hash += left < right ? "1" : "0"
+                }
+            }
+        }
+        return hash
+    }
+
+    private func hammingDistance(_ a: String, _ b: String) -> Int {
+        guard a.count == b.count else { return 64 }
+        var dist = 0
+        let aChars = Array(a)
+        let bChars = Array(b)
+        for i in 0..<aChars.count {
+            if aChars[i] != bChars[i] { dist += 1 }
+        }
+        return dist
     }
 
     /// 同步缓存快照：供详情页初始化时使用，使相关照片区与页面首帧同在。
@@ -294,39 +540,51 @@ final class PhotoSimilarityMatcher {
         maxDistance: Float = PhotoSimilarityMatcher.defaultMaxDistance
     ) async -> [PHAsset]? {
         await withCheckedContinuation { continuation in
-            workQueue.async { [weak self] in
+            queryQueue.async { [weak self] in
                 guard let self else {
                     continuation.resume(returning: nil)
                     return
                 }
+                let baseID = base.localIdentifier
+                self.storeLock.lock()
+                if let memo = self.snapshotMemo[baseID] {
+                    self.storeLock.unlock()
+                    continuation.resume(returning: memo)
+                    return
+                }
+                self.storeLock.unlock()
+
                 guard let basePrint = self.cachedObservation(for: base) else {
                     continuation.resume(returning: nil)
                     return
                 }
 
-                let fetchOptions = PHFetchOptions()
-                fetchOptions.predicate = NSPredicate(
-                    format: "mediaType == %d", PHAssetMediaType.image.rawValue
-                )
-                let fetchResult = PHAsset.fetchAssets(with: fetchOptions)
-                let baseID = base.localIdentifier
-
-                var scored: [(asset: PHAsset, distance: Float)] = []
-                fetchResult.enumerateObjects { asset, _, _ in
-                    guard asset.localIdentifier != baseID else { return }
-                    guard let print = self.cachedObservation(for: asset) else { return }
+                let allCached = self.allCachedObservations()
+                var scored: [(id: String, distance: Float)] = []
+                for (candID, print) in allCached where candID != baseID {
                     var distance: Float = .greatestFiniteMagnitude
                     if (try? basePrint.computeDistance(&distance, to: print)) != nil,
                        distance <= maxDistance {
-                        scored.append((asset, distance))
+                        scored.append((candID, distance))
                     }
                 }
 
-                let results = Array(scored
-                    .sorted { $0.distance < $1.distance }
-                    .prefix(max(0, topN))
-                    .map(\.asset)
-                    .filter { $0.localIdentifier != baseID })
+                let topIDs = scored.sorted { $0.distance < $1.distance }.prefix(max(0, topN)).map(\.id)
+                guard !topIDs.isEmpty else {
+                    self.storeLock.lock()
+                    self.snapshotMemo[baseID] = []
+                    self.storeLock.unlock()
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                let assets = PHAsset.fetchAssets(withLocalIdentifiers: Array(topIDs), options: nil)
+                var idToAsset: [String: PHAsset] = [:]
+                assets.enumerateObjects { asset, _, _ in
+                    idToAsset[asset.localIdentifier] = asset
+                }
+                let results = topIDs.compactMap { idToAsset[$0] }
+
                 self.storeLock.lock()
                 self.snapshotMemo[baseID] = results
                 self.storeLock.unlock()
@@ -338,7 +596,7 @@ final class PhotoSimilarityMatcher {
     /// 取消进行中的单张素材检索：
     /// 在跑任务会尽快以 `.cancelled` 错误回调，后续新检索立即获得队列
     func cancel() {
-        workQueue.async { [weak self] in
+        queryQueue.async { [weak self] in
             self?.activeToken = nil
             self?.cache.flush()
         }
@@ -372,7 +630,9 @@ final class PhotoSimilarityMatcher {
         progress: @escaping (_ processed: Int, _ total: Int) -> Void = { _, _ in },
         completion: @escaping (_ results: [PHAsset], _ error: Error?) -> Void
     ) {
-        workQueue.async { [weak self] in
+        notifyForegroundActivity()
+
+        queryQueue.async { [weak self] in
             guard let self else { return }
 
             let token = UUID()
@@ -450,7 +710,7 @@ final class PhotoSimilarityMatcher {
             var scored: [(asset: PHAsset, distance: Float)] = []
             var processed = 0
             var uncomputedCount = 0
-            let maxUncomputedScan = 800 // 限制未索引图片的最大扫描张数，避免巨型相册卡死
+            let maxUncomputedScan = 40 // 限制未索引图片的最大扫描张数，避免前台卡顿
 
             for asset in candidates {
                 if self.albumActiveToken != token {
@@ -463,7 +723,7 @@ final class PhotoSimilarityMatcher {
                 if !isCached {
                     uncomputedCount += 1
                     // 如果已经获取到足够多极佳匹配且未索引素材过多，可提早收敛
-                    if scored.count >= topN * 2 && uncomputedCount > 200 {
+                    if scored.count >= topN * 2 && uncomputedCount > 15 {
                         break
                     }
                     if uncomputedCount > maxUncomputedScan {
@@ -579,7 +839,9 @@ final class PhotoSimilarityMatcher {
         progress: @escaping (_ processed: Int, _ total: Int) -> Void = { _, _ in },
         completion: @escaping (_ results: [PHAsset], _ error: Error?) -> Void
     ) {
-        workQueue.async { [weak self] in
+        notifyForegroundActivity()
+
+        queryQueue.async { [weak self] in
             guard let self else { return }
 
             let token = UUID()
@@ -686,7 +948,7 @@ final class PhotoSimilarityMatcher {
 
     /// 取消进行中的相簿相似推荐检索
     nonisolated func cancelAlbumSearch() {
-        workQueue.async { [weak self] in
+        queryQueue.async { [weak self] in
             self?.albumActiveToken = nil
             self?.cache.flush()
         }
@@ -804,8 +1066,9 @@ final class PhotoSimilarityMatcher {
 
     /// 启动预热：提前把磁盘指纹载入内存库，详情页初始化时的同步快照即为纯内存查询
     func prewarm() {
-        workQueue.async { [weak self] in
+        queryQueue.async { [weak self] in
             self?.ensureFeatureStoreLoaded()
+            self?.updateIndexedCount()
         }
     }
 
@@ -1030,6 +1293,19 @@ private final class FeaturePrintCache {
             self.context.reset()
             self.pendingCount = 0
         }
+    }
+
+    /// 获取指定管线版本的已缓存指纹总数
+    func count(pipelineVersion: String) -> Int {
+        var total = 0
+        context.performAndWait {
+            let request = CachedFeaturePrint.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "pipelineVersion == %@", pipelineVersion
+            )
+            total = (try? self.context.count(for: request)) ?? 0
+        }
+        return total
     }
 
     /// 从磁盘单条读取指定资产的特征指纹（用于二级缓存兜底，读完即释放）

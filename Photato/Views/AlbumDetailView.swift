@@ -69,21 +69,15 @@ struct AlbumDetailView: View {
         self.onViewAllTapped = onViewAllTapped
 
         let currentPhotos = albumManager.displayedAlbumPhotos
-        let isIndexed = PhotoSimilarityMatcher.shared.isLibraryIndexed
         if let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: currentPhotos) {
             _recommendedPhotos = State(initialValue: cached)
             _isLoadingRecommendations = State(initialValue: false)
             _hasScannedCurrentAlbum = State(initialValue: true)
-        } else if isIndexed {
-            // 全局已建立索引：首次进入本相簿秒级纯内存匹配，绝不展示引导卡
+        } else {
+            // 即时增量推荐：进入相簿直接依据已索引特征与时间窗口即时呈现，无感体验
             _recommendedPhotos = State(initialValue: [])
             _isLoadingRecommendations = State(initialValue: true)
             _hasScannedCurrentAlbum = State(initialValue: true)
-        } else {
-            // 全局尚未建立索引：首帧呈现智能分析引导卡
-            _recommendedPhotos = State(initialValue: [])
-            _isLoadingRecommendations = State(initialValue: false)
-            _hasScannedCurrentAlbum = State(initialValue: false)
         }
     }
 
@@ -363,12 +357,12 @@ struct AlbumDetailView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-            } else if !PhotoSimilarityMatcher.shared.isLibraryIndexed {
-                // 引导卡：全局尚未建立索引时展示（一次扫描，所有相簿共同解锁）
+            } else if !hasScannedCurrentAlbum && !PhotoSimilarityMatcher.shared.isLibraryIndexed {
+                // 引导卡：全局尚未建立索引且尚未扫描过本相簿时展示
                 aiScanPromptCard
                     .padding(.horizontal, 16)
             } else {
-                // 空卡状态：相簿已整理完毕（全库已索引，但确实无当前相簿相似素材）
+                // 空卡状态：相簿已整理完毕（全库已索引，或当前确无推荐素材）
                 albumCompleteCard
                     .padding(.horizontal, 16)
                     .transition(.opacity.animation(.easeInOut(duration: 0.35)))
@@ -679,15 +673,7 @@ struct AlbumDetailView: View {
             return
         }
 
-        // 全局尚未建立索引且非强制刷新：保持引导状态，等待用户在引导卡中主动触发全库索引
-        if !force && !PhotoSimilarityMatcher.shared.isLibraryIndexed {
-            self.recommendedPhotos = []
-            self.isLoadingRecommendations = false
-            self.hasScannedCurrentAlbum = false
-            return
-        }
-
-        // 强制刷新：展示骨架屏并重新检索
+        // 首次进入或强制刷新：展示骨架屏并基于已有索引与时间窗口重新检索
         if recommendedPhotos.isEmpty {
             isLoadingRecommendations = true
         }

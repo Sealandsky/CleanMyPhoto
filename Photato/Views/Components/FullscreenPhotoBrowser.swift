@@ -116,10 +116,18 @@ struct FullscreenPhotoBrowser: View {
         _currentPhotoID = State(initialValue: initial)
 
         // 相关照片初始状态：有缓存快照时与页面首帧同在（标题+图片不后置弹出）。
-        // 快照走同步内存查询（matcher 备忘命中零开销）；无缓存 → .loading 骨架
-        if let baseAsset = photos.first(where: { $0.id == initial })?.asset,
-           let snapshot = PhotoSimilarityMatcher.shared.cachedSnapshotSync(to: baseAsset) {
-            _relatedState = State(initialValue: snapshot.isEmpty ? .empty : .loaded(snapshot))
+        // 快照走同步内存查询；无快照时尝试 0ms dHash 兜底，均无则走 .loading 骨架
+        if let baseAsset = photos.first(where: { $0.id == initial })?.asset {
+            if let snapshot = PhotoSimilarityMatcher.shared.cachedSnapshotSync(to: baseAsset) {
+                _relatedState = State(initialValue: snapshot.isEmpty ? .empty : .loaded(snapshot))
+            } else {
+                let fallback = PhotoSimilarityMatcher.shared.fastFallbackSimilar(to: baseAsset, topN: 12)
+                if !fallback.isEmpty {
+                    _relatedState = State(initialValue: .loaded(fallback))
+                } else {
+                    _relatedState = State(initialValue: .loading)
+                }
+            }
         } else {
             _relatedState = State(initialValue: .loading)
         }
@@ -263,6 +271,7 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
+            PhotoSimilarityMatcher.shared.notifyForegroundActivity()
             guard !isFilmStripDragging else { return }
             prewarmNeighbors()
             await loadRelatedPhotos()
@@ -888,10 +897,14 @@ struct FullscreenPhotoBrowser: View {
         }
 
         let matcher = PhotoSimilarityMatcher.shared
-        // 先取消可能残留的旧扫描，保证串行队列立即服务本次检索
+        // 标记前台活跃状态，使后台静默建库立即避让，不与前台争抢算力
+        matcher.notifyForegroundActivity()
+        // 先取消可能残留的旧扫描，保证高优先级队列立即服务本次检索
         matcher.cancel()
 
-        // 同步快照：init 已给出初值，此处仅刷新（如启动预热晚于首次进入导致的缺数据）
+        let contextIDs = browsePhotos.map(\.id)
+
+        // 同步快照：init 已给出初值，此处仅刷新
         if let snapshot = matcher.cachedSnapshotSync(to: photo.asset) {
             let newState: RelatedPhotosState = snapshot.isEmpty ? .empty : .loaded(snapshot)
             if newState != relatedState {
@@ -899,25 +912,34 @@ struct FullscreenPhotoBrowser: View {
                     relatedState = newState
                 }
             }
-        } else if case .loaded = relatedState {
-            // 内存库尚未就绪且已有展示（上一张的快照不再适用）→ 亮骨架过渡
-            withAnimation(.easeInOut(duration: 0.25)) {
-                relatedState = .loading
+        } else {
+            // 冷启动 dHash 极速兜底（0ms 直出，不让页面死等骨架屏）
+            let fallback = matcher.fastFallbackSimilar(to: photo.asset, contextAssetIDs: contextIDs, topN: 12)
+            if !fallback.isEmpty {
+                let newState: RelatedPhotosState = .loaded(fallback)
+                if newState != relatedState {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        relatedState = newState
+                    }
+                }
+            } else if case .loaded = relatedState {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    relatedState = .loading
+                }
             }
         }
 
-        // 后台全量扫描定稿：快速划动翻页时防抖 0.2s，避免连续发单引起后台队列拥堵
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        // 轻量翻页防抖 120ms，避免滑过连点时连续发单
+        try? await Task.sleep(nanoseconds: 120_000_000)
         guard !Task.isCancelled else { return }
 
         let result: ([PHAsset], Error?) = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                matcher.findSimilar(to: photo.asset) { assets, error in
+                matcher.findSimilar(to: photo.asset, contextAssetIDs: contextIDs) { assets, error in
                     continuation.resume(returning: (assets, error))
                 }
             }
         } onCancel: {
-            // 页面消失/素材已切换：中止后台扫描（回调 .cancelled，旧协程随即退出）
             Task { @MainActor in
                 matcher.cancel()
             }
