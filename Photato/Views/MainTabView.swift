@@ -137,8 +137,7 @@ struct MainTabView: View {
                     loadingView
                 }
             }
-            .navigationTitle(String(localized: "Albums"))
-            .navigationBarTitleDisplayMode(.large)
+            .tabInlineNavigationTitle(String(localized: "Albums"))
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
@@ -197,8 +196,7 @@ struct MainTabView: View {
                     organizePath.append(OrganizeDestination.categoryResults(category))
                 }
             )
-            .navigationTitle(String(localized: "Organize"))
-            .navigationBarTitleDisplayMode(.large)
+            .tabInlineNavigationTitle(String(localized: "Organize"))
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {

@@ -131,9 +131,7 @@ struct ContentView: View {
                 transitionNamespace: photoTransitionNamespace
             )
             .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
-            .navigationTitle(String(localized: "Memories"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .tabInlineNavigationTitle(String(localized: "Memories"))
             .toolbar(.visible, for: .tabBar)
             .toolbar {
                 // 第一组：筛选菜单，独立胶囊

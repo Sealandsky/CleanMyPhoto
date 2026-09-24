@@ -239,8 +239,7 @@ struct SettingsView: View {
                 #endif
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
-            .navigationTitle(String(localized: "Settings"))
-            .navigationBarTitleDisplayMode(.large)
+            .tabInlineNavigationTitle(String(localized: "Settings"))
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .task {
