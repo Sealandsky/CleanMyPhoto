@@ -93,7 +93,6 @@ struct MainTabView: View {
             }
             .tag(AppTab.settings)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
             // 1. 首屏渲染完成即刻轻量预热特征内存库（~20ms），确保用户点进详情页秒出相似照片
@@ -140,7 +139,6 @@ struct MainTabView: View {
             .tabInlineNavigationTitle(String(localized: "Albums")) {
                 PendingPhotosEntryButton(isLiquidGlass: true)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .task {
                 // 首次进入相簿 Tab 时创建管理器（TabView 懒加载，未选中该 Tab
@@ -196,7 +194,6 @@ struct MainTabView: View {
             .tabInlineNavigationTitle(String(localized: "Organize")) {
                 PendingPhotosEntryButton(isLiquidGlass: true)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .navigationDestination(for: OrganizeDestination.self) { destination in
                 switch destination {

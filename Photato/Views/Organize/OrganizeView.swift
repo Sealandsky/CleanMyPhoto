@@ -72,7 +72,6 @@ struct OrganizeView: View {
         }
         .background(Color.pageBackground)
         .scrollIndicators(.hidden)  // 隐藏滚动条
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
             let options = PHFetchOptions()

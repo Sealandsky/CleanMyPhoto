@@ -50,7 +50,6 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)  // 隐藏滚动条
             .background(Color.pageBackground)
             .tabInlineNavigationTitle(String(localized: "Settings"))
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .task {
                 refreshLibraryPhotoCount()

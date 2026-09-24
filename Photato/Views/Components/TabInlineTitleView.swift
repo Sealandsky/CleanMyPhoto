@@ -41,8 +41,21 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
     let title: String
     @ViewBuilder let trailing: () -> Trailing
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var scrollOffsetY: CGFloat = 0
+
+    /// 随滚动位移（0 ~ 20pt）平滑线性淡入淡出（0.0 -> 1.0）
+    private var scrollProgress: CGFloat {
+        min(1.0, max(0.0, scrollOffsetY / 20.0))
+    }
+
     func body(content: Content) -> some View {
         content
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { _, newOffset in
+                scrollOffsetY = max(0, newOffset)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -60,47 +73,28 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
                 .padding(.horizontal, 16)
                 .frame(height: 54)
                 .background {
-                    headerGradientBlurBackground
+                    headerDynamicBlurBackground
                 }
             }
     }
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    /// 单层渐变毛玻璃背景：
-    /// 1. 现代系统（iOS 15+）且未开启降低透明度：
-    ///    使用单层系统原生 .ultraThinMaterial 毛玻璃作为基底，
-    ///    通过 .colorMultiply(Color.pageBackground.opacity(0.35)) 色调校准对齐 App #F3F3F3 底色（无任何纯色 overlay 叠加）；
-    ///    仅使用单层材质向上覆盖状态栏并向下延伸 16pt；
-    ///    对单层材质整体施加渐变遮罩（状态栏 + 54pt 标题栏主体为 100% 不透明黑，下方 16pt 为平滑淡出渐变），
-    ///    彻底避免多层毛玻璃材质在接缝处产生的双层叠影与硬切线；
-    /// 2. 低版本兼容性 / 开启降低透明度：回退纯色 Color.pageBackground 背景。
+    /// 滚动动态毛玻璃背景：
+    /// 1. 静止置顶状态（scrollOffsetY == 0）：完全透明，0 遮挡内容，卡片与页面底色 100% 清晰纯净呈现；
+    /// 2. 随手势连续过渡（0 ~ 20pt）：透明度随上滑位移平滑渐显（opacity: 0.0 -> 1.0）；
+    /// 3. 无边框无延伸（Borderless）：严格锁定在状态栏 + 54pt 标题栏主体内，彻底消除向下 16pt 延伸遮挡；
+    /// 4. 低版本/降低透明度模式：平滑淡入纯色 Color.pageBackground (#F3F3F3) 实体底色。
     @ViewBuilder
-    private var headerGradientBlurBackground: some View {
+    private var headerDynamicBlurBackground: some View {
         if #available(iOS 15.0, *), !reduceTransparency {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .colorMultiply(Color.pageBackground.opacity(0.35))
-                .mask {
-                    VStack(spacing: 0) {
-                        Color.black
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.72),
-                                .init(color: .clear, location: 1.0),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 16)
-                    }
-                }
-                .padding(.bottom, -16)
+                .opacity(scrollProgress)
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
         } else {
             Color.pageBackground
+                .opacity(scrollProgress)
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
         }
