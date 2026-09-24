@@ -13,19 +13,41 @@ struct TabInlineTitleView: View {
     }
 }
 
-extension View {
-    /// 为 Tab 首页配置左侧大标题的 Inline 导航栏规范
-    func tabInlineNavigationTitle(_ title: String) -> some View {
-        self
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    TabInlineTitleView(title: title)
+struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
+    let title: String
+    @ViewBuilder let trailing: () -> Trailing
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(alignment: .center, spacing: 12) {
+                    Text(title)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    trailing()
                 }
-                ToolbarItem(placement: .principal) {
-                    EmptyView()
-                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(.ultraThinMaterial)
             }
+    }
+}
+
+extension View {
+    /// 为 Tab 首页配置左侧大标题的 Inline 导航栏规范（无右侧操作项）
+    func tabInlineNavigationTitle(_ title: String) -> some View {
+        self.modifier(TabInlineHeaderModifier(title: title, trailing: { EmptyView() }))
+    }
+
+    /// 为 Tab 首页配置左侧大标题的 Inline 导航栏规范（带右侧操作项）
+    func tabInlineNavigationTitle<Trailing: View>(
+        _ title: String,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        self.modifier(TabInlineHeaderModifier(title: title, trailing: trailing))
     }
 }

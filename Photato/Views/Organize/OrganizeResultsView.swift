@@ -148,6 +148,7 @@ struct OrganizeResultsView: View {
         }
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)
         .scrollEdgeEffectStyle(.soft, for: .top)

@@ -126,6 +126,7 @@ struct AlbumPhotoListView: View {
         .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
+        .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(selectionManager.isSelectMode ? .visible : .hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {

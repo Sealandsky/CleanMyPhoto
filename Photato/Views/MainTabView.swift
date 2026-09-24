@@ -137,14 +137,11 @@ struct MainTabView: View {
                     loadingView
                 }
             }
-            .tabInlineNavigationTitle(String(localized: "Albums"))
+            .tabInlineNavigationTitle(String(localized: "Albums")) {
+                PendingPhotosEntryButton()
+            }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PendingPhotosEntryButton()
-                }
-            }
             .task {
                 // 首次进入相簿 Tab 时创建管理器（TabView 懒加载，未选中该 Tab
                 // 前不会执行）；每次进入都静默刷新相簿列表——详情页「添加到相簿/
@@ -196,14 +193,11 @@ struct MainTabView: View {
                     organizePath.append(OrganizeDestination.categoryResults(category))
                 }
             )
-            .tabInlineNavigationTitle(String(localized: "Organize"))
+            .tabInlineNavigationTitle(String(localized: "Organize")) {
+                PendingPhotosEntryButton()
+            }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PendingPhotosEntryButton()
-                }
-            }
             .navigationDestination(for: OrganizeDestination.self) { destination in
                 switch destination {
                 case .categoryResults(let category):

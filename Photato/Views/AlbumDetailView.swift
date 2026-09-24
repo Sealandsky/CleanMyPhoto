@@ -118,6 +118,7 @@ struct AlbumDetailView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
