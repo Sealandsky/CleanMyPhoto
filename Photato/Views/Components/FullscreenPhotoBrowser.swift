@@ -184,15 +184,29 @@ struct FullscreenPhotoBrowser: View {
         // （颜色/热区/侧滑返回全系统行为，不做自定义替代）
         .toolbar {
             ToolbarItem(placement: .principal) {
-                // 标题文字使用 .title1，点击弹出照片信息面板
+                // 标题信息按钮（参考系统图库）：Liquid Glass 胶囊样式，点击弹出照片信息面板
                 Button {
                     showInfoSheet = true
                 } label: {
-                    Text(captionTitle)
-                        .font(.title1)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                    VStack(spacing: 1) {
+                        Text(captionTitle)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if !captionSubtitle.isEmpty {
+                            Text(captionSubtitle)
+                                .font(.system(size: 11, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: false)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 5)
+                    .modifier(TitleGlassCapsule())
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
