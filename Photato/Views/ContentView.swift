@@ -215,22 +215,23 @@ struct ContentView: View {
         if discoverManager.selectedFilter == .all {
             // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.system(size: 24, weight: .regular, design: .rounded))
                 .foregroundColor(.primary)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .modifier(HeaderLiquidGlassModifier())
                 .contentShape(Circle())
         } else {
             // 选中某个分类：系统原生颜色，文本+图标排版与 Liquid Glass 胶囊底
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text(discoverManager.selectedFilter.localizedText)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.system(size: 24, weight: .regular, design: .rounded))
             }
             .foregroundColor(.primary)
-            .padding(.horizontal, 10)
-            .frame(height: 36)
+            .padding(.horizontal, 12)
+            .frame(minWidth: 44, minHeight: 44)
+            .frame(height: 44)
             .modifier(HeaderLiquidGlassModifier())
             .contentShape(Capsule())
         }

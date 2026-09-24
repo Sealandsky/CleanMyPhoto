@@ -57,13 +57,36 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
                     trailing()
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 4)
-                .frame(minHeight: 52)
+                .frame(height: 54)
                 .background {
-                    Color.pageBackground
-                        .ignoresSafeArea(edges: .top)
+                    headerGradientBlurBackground
                 }
             }
+    }
+
+    /// 渐变高斯模糊背景：以系统原生 ultraThinMaterial 为材质基底，
+    /// 覆盖状态栏并延伸至标题栏下方 16pt，实现柔和自然的渐变高斯模糊过渡。
+    private var headerGradientBlurBackground: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+            Color.pageBackground
+                .opacity(0.35)
+        }
+        .mask {
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.72),
+                    .init(color: .black.opacity(0), location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .padding(.bottom, -16)
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
     }
 }
 

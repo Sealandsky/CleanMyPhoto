@@ -203,7 +203,7 @@ struct FullscreenPhotoBrowser: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
         .sheet(isPresented: $showAddToAlbum) {

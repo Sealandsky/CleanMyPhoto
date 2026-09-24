@@ -128,7 +128,7 @@ struct AlbumDetailView: View {
             }
         }
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {

@@ -133,10 +133,12 @@ struct OrganizeResultsView: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "sparkles")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 24, weight: .regular, design: .rounded))
                             Text(String(localized: "AI Select"))
                                 .font(.system(size: 15))
                         }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .disabled(allPhotos.isEmpty)
                 }
@@ -150,6 +152,8 @@ struct OrganizeResultsView: View {
                          ? String(localized: "Deselect All")
                          : String(localized: "Select All"))
                         .font(.system(size: 15))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .disabled(allPhotos.isEmpty)
             }
@@ -157,7 +161,7 @@ struct OrganizeResultsView: View {
         .navigationTitle(category.localizedText)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .bottomBar)
         .toolbar(.hidden, for: .tabBar)

@@ -137,7 +137,7 @@ struct AlbumPhotoListView: View {
             }
         }
         .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(Color.pageBackground, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
@@ -181,6 +181,8 @@ struct AlbumPhotoListView: View {
                             selectionManager.clearSelection()
                         }
                     }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -192,8 +194,11 @@ struct AlbumPhotoListView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "trash.fill")
+                                .font(.system(size: 24, weight: .regular, design: .rounded))
                             Text(String(localized: "Delete"))
                         }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
