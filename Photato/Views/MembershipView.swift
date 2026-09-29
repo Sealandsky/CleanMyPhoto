@@ -293,23 +293,38 @@ struct MembershipView: View {
 
     private var bottomActionBar: some View {
         VStack(spacing: 10) {
-            Button {
-                Task {
-                    await membershipManager.purchase(membershipManager.selectedProduct)
+            // 稍后升级 与 立即订阅 并排
+            HStack(spacing: 12) {
+                if !isMandatory {
+                    LiquidGlassCapsuleButton {
+                        hasShownMembership = true
+                        dismiss()
+                    } label: {
+                        Text(String(localized: "Later"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
-            } label: {
-                if membershipManager.isLoadingPurchase {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Text(membershipManager.selectedProduct.actionButtonTitle(
-                        from: membershipManager.products,
-                        eligibleForIntroOffer: membershipManager.isEligibleForIntroOffer
-                    ))
+
+                LiquidGlassCapsuleButton(isProminent: true, tintColor: .blue) {
+                    Task {
+                        await membershipManager.purchase(membershipManager.selectedProduct)
+                    }
+                } label: {
+                    if membershipManager.isLoadingPurchase {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text(membershipManager.selectedProduct.actionButtonTitle(
+                            from: membershipManager.products,
+                            eligibleForIntroOffer: membershipManager.isEligibleForIntroOffer
+                        ))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    }
                 }
+                .disabled(membershipManager.isLoadingPurchase || membershipManager.products.isEmpty)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(membershipManager.isLoadingPurchase || membershipManager.products.isEmpty)
 
             // 扣费披露：明确试用时长与试用结束后将自动收取的金额（App Store 审核 3.1.2 要求）
             if let disclosure = membershipManager.selectedProduct.purchaseDisclosureText(
@@ -323,29 +338,16 @@ struct MembershipView: View {
                     .padding(.horizontal, 8)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    Task {
-                        await membershipManager.restorePurchases()
-                    }
-                } label: {
-                    Text(String(localized: "Restore Purchases"))
+            Button {
+                Task {
+                    await membershipManager.restorePurchases()
                 }
-
-                if !isMandatory {
-                    Text("·")
-                        .foregroundColor(.secondary)
-
-                    Button {
-                        hasShownMembership = true
-                        dismiss()
-                    } label: {
-                        Text(String(localized: "Later"))
-                    }
-                }
+            } label: {
+                Text(String(localized: "Restore Purchases"))
             }
             .font(.system(size: 13, design: .rounded))
-            .foregroundColor(.blue)
+            .foregroundColor(.secondary)
+            .padding(.top, 2)
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)

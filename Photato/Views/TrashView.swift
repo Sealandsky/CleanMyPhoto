@@ -1,9 +1,11 @@
 import SwiftUI
+import StoreKit
 
 struct TrashView: View {
     @ObservedObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     @State private var showingDeleteConfirmation = false
     @State private var showingRestoreConfirmation = false
@@ -22,18 +24,10 @@ struct TrashView: View {
                     trashContent
                 }
             }
-            .background(Color.pageBackground)
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
-                        .font(.title1)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
                     Button {
@@ -71,8 +65,10 @@ struct TrashView: View {
             .alert(String(localized: "Delete All Photos"), isPresented: $showingDeleteConfirmation) {
                 Button(String(localized: "Cancel"), role: .cancel) { }
                 Button(String(localized: "Delete"), role: .destructive) {
+                    let count = photoManager.trashCount
                     Task {
                         await photoManager.emptyTrash()
+                        ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: count, requestReview: requestReview)
                         dismiss()
                     }
                 }
@@ -200,6 +196,7 @@ struct TrashView: View {
                     .foregroundColor(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Trash Content

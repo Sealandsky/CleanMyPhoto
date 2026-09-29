@@ -251,6 +251,26 @@ struct SettingsView: View {
 
             Divider().padding(.leading, 54)
 
+            Link(destination: ReviewPromptManager.appStoreReviewURL) {
+                HStack {
+                    Image(systemName: "star")
+                        .foregroundColor(.blue)
+                        .frame(width: 30)
+
+                    Text(String(localized: "Rate Photato"))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .foregroundColor(.primary)
+
+            Divider().padding(.leading, 54)
+
             Link(destination: privacyPolicyURL) {
                 HStack {
                     Image(systemName: "hand.raised")
@@ -294,24 +314,6 @@ struct SettingsView: View {
     #if DEBUG
     private var debugSection: some View {
         sectionCard(title: "Debug") {
-            NavigationLink {
-                OrbitingAvatarView()
-            } label: {
-                HStack {
-                    Text("Orbiting Avatar Preview")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 48)
-                .contentShape(Rectangle())
-            }
-
-            Divider().padding(.leading, 16)
-
             Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
                 .padding(.horizontal, 16)
                 .frame(minHeight: 48)
