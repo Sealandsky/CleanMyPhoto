@@ -34,7 +34,6 @@ struct FullscreenPhotoBrowser: View {
     @State private var showFavoriteDeleteAlert = false
     @State private var isFilmStripDragging = false
     @State private var prewarmedAssets: [PHAsset] = []
-    @State private var tabBarVisibility: Visibility = .hidden
 
     // 分享状态（与原 photoBrowserView 行为一致）
     @State private var isPreparingShare = false
@@ -116,10 +115,18 @@ struct FullscreenPhotoBrowser: View {
         _currentPhotoID = State(initialValue: initial)
 
         // 相关照片初始状态：有缓存快照时与页面首帧同在（标题+图片不后置弹出）。
-        // 快照走同步内存查询（matcher 备忘命中零开销）；无缓存 → .loading 骨架
-        if let baseAsset = photos.first(where: { $0.id == initial })?.asset,
-           let snapshot = PhotoSimilarityMatcher.shared.cachedSnapshotSync(to: baseAsset) {
-            _relatedState = State(initialValue: snapshot.isEmpty ? .empty : .loaded(snapshot))
+        // 快照走同步内存查询；无快照时尝试 0ms dHash 兜底，均无则走 .loading 骨架
+        if let baseAsset = photos.first(where: { $0.id == initial })?.asset {
+            if let snapshot = PhotoSimilarityMatcher.shared.cachedSnapshotSync(to: baseAsset) {
+                _relatedState = State(initialValue: snapshot.isEmpty ? .empty : .loaded(snapshot))
+            } else {
+                let fallback = PhotoSimilarityMatcher.shared.fastFallbackSimilar(to: baseAsset, topN: 12)
+                if !fallback.isEmpty {
+                    _relatedState = State(initialValue: .loaded(fallback))
+                } else {
+                    _relatedState = State(initialValue: .loading)
+                }
+            }
         } else {
             _relatedState = State(initialValue: .loading)
         }
@@ -133,8 +140,8 @@ struct FullscreenPhotoBrowser: View {
                 emptyStateView
             }
         }
-        // 页面底色铺满全屏（含安全区）：统一使用系统分组背景色，与设置页保持一致
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        // 页面底色铺满全屏（含安全区）：统一使用 #F3F3F3
+        .background(Color.pageBackground.ignoresSafeArea())
         // 联动控制 iOS 18 原生 Zoom 转场返回手势（边缘侧滑放行、捏合禁用、顶栏下拉放行、浏览相似照片下拉回滚）
         .background(ZoomInteractiveDismissConfigurator(isFullScreen: expandProgress > 0.01, scrollOffsetY: scrollOffsetY))
         // 操作结果反馈 toast：覆盖在详情页上，自动消失，高对比度深色胶囊，不拦截触摸
@@ -177,44 +184,39 @@ struct FullscreenPhotoBrowser: View {
         // （颜色/热区/侧滑返回全系统行为，不做自定义替代）
         .toolbar {
             ToolbarItem(placement: .principal) {
-                // 标题按钮（参考系统图库）：Liquid Glass 胶囊样式，点击弹出照片信息面板
+                // 标题信息按钮（参考系统图库）：Liquid Glass 胶囊样式，点击弹出照片信息面板
                 Button {
                     showInfoSheet = true
                 } label: {
                     VStack(spacing: 1) {
                         Text(captionTitle)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         if !captionSubtitle.isEmpty {
                             Text(captionSubtitle)
-                                .font(.system(size: 11))
+                                .font(.system(size: 11, design: .rounded))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
                     }
-                    // 刻意不加 .animation(value:)：文本内容变化伴随宽度变化，
-                    // 动画会把文字横向拉伸变形（切页时方向不一、超出的根源）；
-                    // 允许水平压缩（fixedSize false）保证长文本在胶囊内截断不溢出
                     .fixedSize(horizontal: false, vertical: false)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 20)
                     .padding(.vertical, 5)
-                    // iOS 26 Liquid Glass 胶囊（interactive 支持按压高光）；
-                    // iOS 18 回退半透明材质
                     .modifier(TitleGlassCapsule())
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                // 待处理照片入口：数量以文本实时展示，删除后立即增加
-                PendingPhotosEntryButton()
+                // 待处理照片入口：在系统导航栏由原生 ToolbarItem 承载，避免多层 Liquid Glass 嵌套
+                PendingPhotosEntryButton(isLiquidGlass: false)
             }
         }
-        .toolbar(tabBarVisibility, for: .tabBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .dynamicSecondaryNavigationBar(scrollOffsetY: scrollOffsetY, opacityMultiplier: 1.0 - expandProgress)
         // 添加到相簿：成功关闭面板后复用分享 toast 通道反馈结果
         .sheet(isPresented: $showAddToAlbum) {
             if let photo = currentPhoto {
@@ -249,7 +251,6 @@ struct FullscreenPhotoBrowser: View {
             .navigationTransition(.zoom(sourceID: relatedBrowseInitialID, in: relatedTransitionNamespace))
         }
         .onAppear {
-            tabBarVisibility = .hidden
             // 初始化当前照片：优先用外部指定的初始照片，异常时回退首张
             if currentPhotoID.isEmpty || !browsePhotos.contains(where: { $0.id == currentPhotoID }) {
                 currentPhotoID = browsePhotos.first(where: { $0.id == initialPhotoID })?.id
@@ -263,12 +264,12 @@ struct FullscreenPhotoBrowser: View {
         // 处理器自动中止，页面消失同样触发取消，防堆积与泄漏）
         .task(id: currentPhotoID) {
             updateCaption(for: currentPhoto)
+            PhotoSimilarityMatcher.shared.notifyForegroundActivity()
             guard !isFilmStripDragging else { return }
             prewarmNeighbors()
             await loadRelatedPhotos()
         }
         .onDisappear {
-            tabBarVisibility = .visible
             PhotoAssetImageManager.shared.stopCachingImagesForAllAssets()
         }
         // 照片被外部移除（删除等）时跳转到相邻照片
@@ -888,10 +889,14 @@ struct FullscreenPhotoBrowser: View {
         }
 
         let matcher = PhotoSimilarityMatcher.shared
-        // 先取消可能残留的旧扫描，保证串行队列立即服务本次检索
+        // 标记前台活跃状态，使后台静默建库立即避让，不与前台争抢算力
+        matcher.notifyForegroundActivity()
+        // 先取消可能残留的旧扫描，保证高优先级队列立即服务本次检索
         matcher.cancel()
 
-        // 同步快照：init 已给出初值，此处仅刷新（如启动预热晚于首次进入导致的缺数据）
+        let contextIDs = browsePhotos.map(\.id)
+
+        // 同步快照：init 已给出初值，此处仅刷新
         if let snapshot = matcher.cachedSnapshotSync(to: photo.asset) {
             let newState: RelatedPhotosState = snapshot.isEmpty ? .empty : .loaded(snapshot)
             if newState != relatedState {
@@ -899,25 +904,34 @@ struct FullscreenPhotoBrowser: View {
                     relatedState = newState
                 }
             }
-        } else if case .loaded = relatedState {
-            // 内存库尚未就绪且已有展示（上一张的快照不再适用）→ 亮骨架过渡
-            withAnimation(.easeInOut(duration: 0.25)) {
-                relatedState = .loading
+        } else {
+            // 冷启动 dHash 极速兜底（0ms 直出，不让页面死等骨架屏）
+            let fallback = matcher.fastFallbackSimilar(to: photo.asset, contextAssetIDs: contextIDs, topN: 12)
+            if !fallback.isEmpty {
+                let newState: RelatedPhotosState = .loaded(fallback)
+                if newState != relatedState {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        relatedState = newState
+                    }
+                }
+            } else if case .loaded = relatedState {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    relatedState = .loading
+                }
             }
         }
 
-        // 后台全量扫描定稿：快速划动翻页时防抖 0.2s，避免连续发单引起后台队列拥堵
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        // 轻量翻页防抖 120ms，避免滑过连点时连续发单
+        try? await Task.sleep(nanoseconds: 120_000_000)
         guard !Task.isCancelled else { return }
 
         let result: ([PHAsset], Error?) = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                matcher.findSimilar(to: photo.asset) { assets, error in
+                matcher.findSimilar(to: photo.asset, contextAssetIDs: contextIDs) { assets, error in
                     continuation.resume(returning: (assets, error))
                 }
             }
         } onCancel: {
-            // 页面消失/素材已切换：中止后台扫描（回调 .cancelled，旧协程随即退出）
             Task { @MainActor in
                 matcher.cancel()
             }

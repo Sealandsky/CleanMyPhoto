@@ -25,13 +25,12 @@ struct AlbumListView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 4)
                 .padding(.bottom, 24)
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .scrollIndicators(.hidden)  // 隐藏滚动条
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
@@ -43,7 +42,7 @@ struct AlbumListView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .padding(.bottom, 24)
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 统一的系统蓝色主按钮样式（对齐 iOS HIG 标准系统蓝色规范）
 struct PrimaryButtonStyle: ButtonStyle {
-    var height: CGFloat = 52
+    var height: CGFloat = 56
     var cornerRadius: CGFloat = 16
 
     func makeBody(configuration: Configuration) -> some View {

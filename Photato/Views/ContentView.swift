@@ -131,26 +131,13 @@ struct ContentView: View {
                 transitionNamespace: photoTransitionNamespace
             )
             .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
-            .navigationTitle(String(localized: "Memories"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar(.visible, for: .tabBar)
-            .toolbar {
-                // 第一组：筛选菜单，独立胶囊
-                ToolbarItemGroup(placement: .topBarTrailing) {
+            .tabInlineNavigationTitle(String(localized: "Memories")) {
+                HStack(spacing: 8) {
                     formatFilterMenu
-                }
-
-                if #available(iOS 26.0, *) {
-                    // Spacer 放在 ItemGroup 外面同级，切断分组
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                }
-
-                // 第二组：待处理照片按钮，独立胶囊
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    PendingPhotosEntryButton()
+                    PendingPhotosEntryButton(isLiquidGlass: true)
                 }
             }
+            .toolbar(.visible, for: .tabBar)
             .navigationDestination(isPresented: $isFullscreenMode) {
                 if let photoID = currentPhotoID {
                     FullscreenPhotoBrowser(
@@ -180,15 +167,6 @@ struct ContentView: View {
                     .background(PopCompletionObserver {
                         isFullscreenMode = false
                     })
-                    .onDisappear {
-                        isFullscreenMode = false
-                        if let current = currentPhotoID, current != initialPhotoID {
-                            scrollToPhotoID = current
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            canSelectPhoto = true
-                        }
-                    }
                 }
             }
             // pop 转场开始即定位：仅当用户实际切图才触发网格滚动
@@ -203,7 +181,7 @@ struct ContentView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .background(Color.pageBackground.ignoresSafeArea())
     }
 
     // MARK: - 页面右上角格式筛选器（原生系统下拉菜单）
@@ -235,21 +213,27 @@ struct ContentView: View {
     @ViewBuilder
     private var filterMenuLabel: some View {
         if discoverManager.selectedFilter == .all {
-            // 全部分类下：纯图标排版，系统原生菜单颜色
+            // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(.system(size: 18, weight: .regular, design: .rounded))
                 .foregroundColor(.primary)
-                .frame(width: 32, height: 32)
+                .frame(width: 44, height: 44)
+                .modifier(HeaderLiquidGlassModifier())
+                .contentShape(Circle())
         } else {
-            // 选中某个分类：系统原生颜色，文本+图标排版（文字大一点，图标与默认态保持一致为 15pt）
-            HStack(spacing: 4) {
+            // 选中某个分类：系统原生颜色，文本+图标排版与 Liquid Glass 胶囊底
+            HStack(spacing: 6) {
                 Text(discoverManager.selectedFilter.localizedText)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 18, weight: .regular, design: .rounded))
             }
             .foregroundColor(.primary)
-            .frame(height: 32)
+            .padding(.horizontal, 12)
+            .frame(minWidth: 44, minHeight: 44)
+            .frame(height: 44)
+            .modifier(HeaderLiquidGlassModifier())
+            .contentShape(Capsule())
         }
     }
 }

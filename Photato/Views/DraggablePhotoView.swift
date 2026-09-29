@@ -399,7 +399,7 @@ struct DraggablePhotoView: View {
     @ViewBuilder
     private var backgroundLayer: some View {
         if cardPresentation == .fullScreen {
-            Color(UIColor.systemGroupedBackground)
+            Color.pageBackground
                 .ignoresSafeArea()
         } else {
             Color.clear

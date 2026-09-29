@@ -1,9 +1,11 @@
 import SwiftUI
+import StoreKit
 
 struct TrashView: View {
     @ObservedObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     @State private var showingDeleteConfirmation = false
     @State private var showingRestoreConfirmation = false
@@ -24,7 +26,6 @@ struct TrashView: View {
             }
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -39,10 +40,14 @@ struct TrashView: View {
                         }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 18, weight: .regular, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                 }
             }
+            .dynamicSecondaryNavigationBar()
             .safeAreaInset(edge: .bottom) {
                 bottomFloatingBar
             }
@@ -60,8 +65,10 @@ struct TrashView: View {
             .alert(String(localized: "Delete All Photos"), isPresented: $showingDeleteConfirmation) {
                 Button(String(localized: "Cancel"), role: .cancel) { }
                 Button(String(localized: "Delete"), role: .destructive) {
+                    let count = photoManager.trashCount
                     Task {
                         await photoManager.emptyTrash()
+                        ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: count, requestReview: requestReview)
                         dismiss()
                     }
                 }
@@ -189,6 +196,7 @@ struct TrashView: View {
                     .foregroundColor(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Trash Content
@@ -233,7 +241,6 @@ struct TrashView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 

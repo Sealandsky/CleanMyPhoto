@@ -93,7 +93,6 @@ struct MainTabView: View {
             }
             .tag(AppTab.settings)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
             // 1. 首屏渲染完成即刻轻量预热特征内存库（~20ms），确保用户点进详情页秒出相似照片
@@ -137,15 +136,10 @@ struct MainTabView: View {
                     loadingView
                 }
             }
-            .navigationTitle(String(localized: "Albums"))
-            .navigationBarTitleDisplayMode(.large)
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PendingPhotosEntryButton()
-                }
+            .tabInlineNavigationTitle(String(localized: "Albums")) {
+                PendingPhotosEntryButton(isLiquidGlass: true)
             }
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .task {
                 // 首次进入相簿 Tab 时创建管理器（TabView 懒加载，未选中该 Tab
                 // 前不会执行）；每次进入都静默刷新相簿列表——详情页「添加到相簿/
@@ -184,7 +178,7 @@ struct MainTabView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
     }
 
     // MARK: - Organize Tab
@@ -197,15 +191,10 @@ struct MainTabView: View {
                     organizePath.append(OrganizeDestination.categoryResults(category))
                 }
             )
-            .navigationTitle(String(localized: "Organize"))
-            .navigationBarTitleDisplayMode(.large)
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PendingPhotosEntryButton()
-                }
+            .tabInlineNavigationTitle(String(localized: "Organize")) {
+                PendingPhotosEntryButton(isLiquidGlass: true)
             }
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .navigationDestination(for: OrganizeDestination.self) { destination in
                 switch destination {
                 case .categoryResults(let category):
@@ -217,7 +206,7 @@ struct MainTabView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
     }
 
     // MARK: - Loading View（相簿管理器初始化中的占位）
@@ -232,7 +221,7 @@ struct MainTabView: View {
                 .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .ignoresSafeArea()
     }
 }

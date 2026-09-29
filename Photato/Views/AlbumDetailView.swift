@@ -69,21 +69,26 @@ struct AlbumDetailView: View {
         self.onViewAllTapped = onViewAllTapped
 
         let currentPhotos = albumManager.displayedAlbumPhotos
-        let isIndexed = PhotoSimilarityMatcher.shared.isLibraryIndexed
         if let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: currentPhotos) {
             _recommendedPhotos = State(initialValue: cached)
             _isLoadingRecommendations = State(initialValue: false)
             _hasScannedCurrentAlbum = State(initialValue: true)
-        } else if isIndexed {
-            // 全局已建立索引：首次进入本相簿秒级纯内存匹配，绝不展示引导卡
-            _recommendedPhotos = State(initialValue: [])
-            _isLoadingRecommendations = State(initialValue: true)
-            _hasScannedCurrentAlbum = State(initialValue: true)
         } else {
-            // 全局尚未建立索引：首帧呈现智能分析引导卡
-            _recommendedPhotos = State(initialValue: [])
-            _isLoadingRecommendations = State(initialValue: false)
-            _hasScannedCurrentAlbum = State(initialValue: false)
+            // 极速冷启动兜底：进入相簿优先通过 0ms 时间窗口 + 内存已有指纹极速上屏，告别骨架屏转圈
+            let excludingIDs = Set(currentPhotos.map(\.id)).union(photoManager.pendingDeletionIDs)
+            let fallbackAssets = PhotoSimilarityMatcher.shared.fastFallbackSimilar(
+                toAlbumAssets: currentPhotos.map(\.asset),
+                excludingIDs: excludingIDs,
+                topN: 16
+            )
+            if !fallbackAssets.isEmpty {
+                _recommendedPhotos = State(initialValue: fallbackAssets.map { PhotoAsset(asset: $0) })
+                _isLoadingRecommendations = State(initialValue: false)
+            } else {
+                _recommendedPhotos = State(initialValue: [])
+                _isLoadingRecommendations = State(initialValue: true)
+            }
+            _hasScannedCurrentAlbum = State(initialValue: true)
         }
     }
 
@@ -100,19 +105,28 @@ struct AlbumDetailView: View {
                 // 模块二：【更多适合这个相簿的照片】
                 morePhotosSection
             }
-            .padding(.top, 12)
+            .padding(.top, 4)
             .padding(.bottom, 24)
         }
         .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
         .refreshable {
             await loadRecommendations(force: true)
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .background(Color.pageBackground)
         .scrollIndicators(.hidden)
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationTitle(album.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(album.title)
+                    .font(.title1)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
@@ -145,12 +159,6 @@ struct AlbumDetailView: View {
                 )
                 .environmentObject(photoManager)
                 .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
-                .onDisappear {
-                    isFullscreenMode = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        canSelectPhoto = true
-                    }
-                }
             }
         }
         .onChange(of: isFullscreenMode) { oldValue, newValue in
@@ -363,12 +371,12 @@ struct AlbumDetailView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-            } else if !PhotoSimilarityMatcher.shared.isLibraryIndexed {
-                // 引导卡：全局尚未建立索引时展示（一次扫描，所有相簿共同解锁）
+            } else if !hasScannedCurrentAlbum && !PhotoSimilarityMatcher.shared.isLibraryIndexed {
+                // 引导卡：全局尚未建立索引且尚未扫描过本相簿时展示
                 aiScanPromptCard
                     .padding(.horizontal, 16)
             } else {
-                // 空卡状态：相簿已整理完毕（全库已索引，但确实无当前相簿相似素材）
+                // 空卡状态：相簿已整理完毕（全库已索引，或当前确无推荐素材）
                 albumCompleteCard
                     .padding(.horizontal, 16)
                     .transition(.opacity.animation(.easeInOut(duration: 0.35)))
@@ -664,6 +672,9 @@ struct AlbumDetailView: View {
             await albumManager.fetchPhotos(in: album)
         }
 
+        let excludingIDs = Set(albumPhotos.map(\.id))
+            .union(photoManager.pendingDeletionIDs)
+
         // 检查缓存：非强制刷新且存在有效缓存时直接复用，不重复触发全量扫描与骨架屏
         if !force, let cached = albumManager.getCachedRecommendations(for: album.id, currentPhotos: albumPhotos) {
             self.recommendedPhotos = cached
@@ -679,21 +690,23 @@ struct AlbumDetailView: View {
             return
         }
 
-        // 全局尚未建立索引且非强制刷新：保持引导状态，等待用户在引导卡中主动触发全库索引
-        if !force && !PhotoSimilarityMatcher.shared.isLibraryIndexed {
-            self.recommendedPhotos = []
-            self.isLoadingRecommendations = false
-            self.hasScannedCurrentAlbum = false
-            return
-        }
-
-        // 强制刷新：展示骨架屏并重新检索
+        // 首次进入且无推荐时：先尝试极速时间窗口兜底秒级上屏，避免转圈
         if recommendedPhotos.isEmpty {
-            isLoadingRecommendations = true
+            let fallbackAssets = PhotoSimilarityMatcher.shared.fastFallbackSimilar(
+                toAlbumAssets: albumPhotos.map(\.asset),
+                excludingIDs: excludingIDs,
+                topN: 16
+            )
+            if !fallbackAssets.isEmpty {
+                self.recommendedPhotos = fallbackAssets.map { PhotoAsset(asset: $0) }
+                self.isLoadingRecommendations = false
+            } else {
+                self.isLoadingRecommendations = true
+            }
         }
         defer { isLoadingRecommendations = false }
 
-        await performRecommendationSearch(isSilent: false)
+        await performRecommendationSearch(isSilent: !recommendedPhotos.isEmpty)
     }
 
     private func performRecommendationSearch(isSilent: Bool) async {

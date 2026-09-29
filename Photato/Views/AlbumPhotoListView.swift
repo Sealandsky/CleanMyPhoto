@@ -71,7 +71,7 @@ struct AlbumPhotoListView: View {
                     .padding(.horizontal, 4)
                 }
             }
-            .background(Color(UIColor.systemGroupedBackground))
+            .background(Color.pageBackground)
             .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
             .onChange(of: scrollToPhotoID) { oldValue, newValue in
                 guard let photoID = newValue else { return }
@@ -117,16 +117,25 @@ struct AlbumPhotoListView: View {
                 }
             }
             .scrollIndicators(.hidden)  // 隐藏滚动条
-            .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue
         }
+        .background(Color.pageBackground)
         .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(selectionManager.isSelectMode)
-        .toolbarBackground(selectionManager.isSelectMode ? .visible : .hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
+                    .font(.title1)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
@@ -159,12 +168,6 @@ struct AlbumPhotoListView: View {
                 )
                 .environmentObject(photoManager)
                 .navigationTransition(.zoom(sourceID: currentPhotoID ?? photoID, in: photoTransitionNamespace))
-                .onDisappear {
-                    isFullscreenMode = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        canSelectPhoto = true
-                    }
-                }
             }
         }
         .toolbar {
@@ -175,6 +178,8 @@ struct AlbumPhotoListView: View {
                             selectionManager.clearSelection()
                         }
                     }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -186,8 +191,11 @@ struct AlbumPhotoListView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "trash.fill")
+                                .font(.system(size: 18, weight: .regular, design: .rounded))
                             Text(String(localized: "Delete"))
                         }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
