@@ -39,6 +39,7 @@ extension View {
 
 struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
     let title: String
+    var titleColor: Color = .primary
     @ViewBuilder let trailing: () -> Trailing
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -47,6 +48,14 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
     /// 随滚动位移（0 ~ 20pt）平滑线性淡入淡出（0.0 -> 1.0）
     private var scrollProgress: CGFloat {
         min(1.0, max(0.0, scrollOffsetY / 20.0))
+    }
+
+    /// 当指定顶部为白色标题时，滚动超过阈值平滑过渡至深色 primary 确保可读性
+    private var activeHeaderColor: Color {
+        if titleColor == .white {
+            return scrollProgress > 0.5 ? .primary : .white
+        }
+        return titleColor
     }
 
     func body(content: Content) -> some View {
@@ -62,13 +71,14 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
                 HStack(alignment: .center, spacing: 12) {
                     Text(title)
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(activeHeaderColor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
 
                     Spacer(minLength: 8)
 
                     trailing()
+                        .foregroundColor(activeHeaderColor)
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 54)
@@ -103,15 +113,16 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
 
 extension View {
     /// 为 Tab 首页配置左侧大标题的 Inline 导航栏规范（无右侧操作项）
-    func tabInlineNavigationTitle(_ title: String) -> some View {
-        self.modifier(TabInlineHeaderModifier(title: title, trailing: { EmptyView() }))
+    func tabInlineNavigationTitle(_ title: String, titleColor: Color = .primary) -> some View {
+        self.modifier(TabInlineHeaderModifier(title: title, titleColor: titleColor, trailing: { EmptyView() }))
     }
 
     /// 为 Tab 首页配置左侧大标题的 Inline 导航栏规范（带右侧操作项）
     func tabInlineNavigationTitle<Trailing: View>(
         _ title: String,
+        titleColor: Color = .primary,
         @ViewBuilder trailing: @escaping () -> Trailing
     ) -> some View {
-        self.modifier(TabInlineHeaderModifier(title: title, trailing: trailing))
+        self.modifier(TabInlineHeaderModifier(title: title, titleColor: titleColor, trailing: trailing))
     }
 }

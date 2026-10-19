@@ -191,7 +191,7 @@ struct MainTabView: View {
                     organizePath.append(OrganizeDestination.categoryResults(category))
                 }
             )
-            .tabInlineNavigationTitle(String(localized: "Organize")) {
+            .tabInlineNavigationTitle(String(localized: "Organize"), titleColor: .white) {
                 PendingPhotosEntryButton(isLiquidGlass: true)
             }
             .scrollEdgeEffectStyle(.soft, for: .bottom)
@@ -206,7 +206,7 @@ struct MainTabView: View {
                 }
             }
         }
-        .background(Color.pageBackground)
+        .background(OrganizeSkyBackgroundView())
     }
 
     // MARK: - Loading View（相簿管理器初始化中的占位）

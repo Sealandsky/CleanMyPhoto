@@ -108,7 +108,7 @@ struct OrganizeView: View {
             .padding(.top, 4)
             .padding(.bottom, 24)
         }
-        .background(Color.pageBackground)
+        .background(OrganizeSkyBackgroundView())
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
