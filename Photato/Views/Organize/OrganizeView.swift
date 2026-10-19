@@ -28,34 +28,24 @@ struct OrganizeView: View {
         .lowQuality
     ]
 
+    // MARK: - 投影规范
+    private static let cardShadowColor = Color.black.opacity(0.06)
+    private static let cardShadowRadius: CGFloat = 8
+    private static let cardShadowX: CGFloat = 0
+    private static let cardShadowY: CGFloat = 3
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // 1. 顶部核心数据仪表盘大卡片 (参考 Steps 卡片设计)
-                OrganizeHeroCard(
-                    organizeManager: organizeManager,
-                    totalLibraryCount: totalLibraryCount,
-                    junkCount: junkCount,
-                    recoverableSizeText: recoverableSizeText,
-                    onStartScan: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            organizeManager.startFullAnalysis()
-                        }
-                    },
-                    onCancelScan: {
-                        organizeManager.cancelAnalysis()
-                    },
-                    onCategorySelect: { category in
-                        handleCategoryTap(category)
-                    }
-                )
+                // 1. 顶部大卡（原版版式与蓝色渐变设计）
+                scanCard
 
                 // 2. 历史清理成就横幅（若已释放过空间）
                 if statisticsManager.storageSpaceSavedBytes > 0 || statisticsManager.totalDeletedPhotos > 0 {
                     cleanedAccomplishmentBanner
                 }
 
-                // 3. 智能清理分类 (2x2 网格，对标 Calories / Water / Sleep / Weight)
+                // 3. 智能清理分类 (2x2 网格纯白卡片)
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(
                         title: String(localized: "Smart Cleanup"),
@@ -75,7 +65,7 @@ struct OrganizeView: View {
                     }
                 }
 
-                // 4. 媒体类型与回收站 (2x2 网格，补全四格对称)
+                // 4. 媒体类型与回收站 (2x2 网格纯白卡片，对称闭环)
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(
                         title: String(localized: "Media Types"),
@@ -89,13 +79,9 @@ struct OrganizeView: View {
                         ],
                         spacing: 12
                     ) {
-                        // 屏幕快照
                         metricCard(for: .screenshots)
-                        // 视频资源
                         metricCard(for: .videos)
-                        // 实况照片
                         metricCard(for: .livePhotos)
-                        // 待处理废纸篓入口
                         TrashMetricCard(
                             trashCount: photoManager.pendingDeletionIDs.count
                         ) {
@@ -108,7 +94,7 @@ struct OrganizeView: View {
             .padding(.top, 4)
             .padding(.bottom, 24)
         }
-        .background(OrganizeSkyBackgroundView())
+        .background(Color.pageBackground)
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .task {
@@ -122,7 +108,267 @@ struct OrganizeView: View {
         }
     }
 
-    // MARK: - 分类卡片生成器
+    // MARK: - 可清理照片数量与占比
+    private var junkCount: Int {
+        organizeManager.uniqueJunkCount(categories: Self.functionCategories)
+    }
+
+    private var junkPercentage: Double {
+        guard totalLibraryCount > 0, junkCount > 0 else { return 0 }
+        return min(1.0, max(0.03, Double(junkCount) / Double(totalLibraryCount)))
+    }
+
+    // MARK: - 原版百分比圆环图标
+    private var percentageRingView: some View {
+        let lineWidth: CGFloat = 3.5
+
+        return ZStack {
+            // 背景轨道圆环
+            Circle()
+                .stroke(Color.white.opacity(0.25), lineWidth: lineWidth)
+
+            // 百分比进度弧线
+            Circle()
+                .trim(from: 0, to: junkPercentage)
+                .stroke(
+                    Color.white,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+        }
+        .frame(width: 24, height: 24)
+    }
+
+    // MARK: - Scan Card（原版版式与蓝色渐变大卡）
+    @ViewBuilder
+    private var scanCard: some View {
+        if organizeManager.isAnalyzing {
+            analyzingScanCard
+        } else if !organizeManager.hasCompletedFullScan {
+            unscannedActionCard
+        } else if junkCount == 0 {
+            cleanLibraryCard
+        } else {
+            junkResultsCard
+        }
+    }
+
+    /// 1. 扫描中卡片
+    private var analyzingScanCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(String(localized: "Scanning..."))
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                scanPillButton(title: String(localized: "Cancel"), icon: "xmark.circle.fill") {
+                    organizeManager.cancelAnalysis()
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(organizeManager.currentStep.isEmpty
+                     ? String(localized: "Scanning...")
+                     : organizeManager.currentStep)
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+
+                ProgressView(value: organizeManager.analysisProgress)
+                    .tint(.white)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+    }
+
+    /// 2. 未扫描态大卡（引导开始扫描）
+    private var unscannedActionCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(String(localized: "Smart Analysis"))
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                scanPillButton(title: String(localized: "Start Scan"), icon: "sparkles") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Deep scan for duplicates, similar, and blurry photos"))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(String(localized: "Tap to analyze all \(totalLibraryCount) photos"))
+                        .font(.system(size: 11, design: .rounded))
+                }
+                .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                organizeManager.startFullAnalysis()
+            }
+        }
+    }
+
+    /// 3. 扫描后确实为 0 的正面反馈态
+    private var cleanLibraryCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(.headline, design: .rounded))
+                    Text(String(localized: "Library is Clean"))
+                        .font(.system(.headline, design: .rounded))
+                }
+                .foregroundColor(.white)
+
+                Spacer()
+
+                scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 42, height: 42)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "No junk photos found"))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text(String(localized: "Analyzed \(totalLibraryCount) photos · In great shape"))
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundColor(.white.opacity(0.75))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+    }
+
+    /// 4. 有可清理照片态
+    private var junkResultsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(String(localized: "Junk Items"))
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        organizeManager.startFullAnalysis()
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .center, spacing: 10) {
+                percentageRingView
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(junkCount)")
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("/")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.2))
+
+                    Text("\(totalLibraryCount.formatted())")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.2))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 128)
+        .background(scanCardBackground)
+    }
+
+    private var scanCardBackground: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(.accentGradient)
+            .shadow(
+                color: Self.cardShadowColor,
+                radius: Self.cardShadowRadius,
+                x: Self.cardShadowX,
+                y: Self.cardShadowY
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+            )
+    }
+
+    /// 样式沿用设置页会员卡右侧的「升级」胶囊按钮
+    private func scanPillButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
+                Text(title)
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+            )
+            .background(Color.white.opacity(0.1))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 分类卡片生成器 (2x2 纯白卡片)
     private func metricCard(for category: OrganizeCategory) -> some View {
         let count = organizeManager.stat(for: category)
         let isCategoryLoading = organizeManager.isCategoryLoading(category)
@@ -161,23 +407,6 @@ struct OrganizeView: View {
         } else {
             onCategorySelect(category)
         }
-    }
-
-    // MARK: - 可清理照片数量与空间估算
-    private var junkCount: Int {
-        organizeManager.uniqueJunkCount(categories: Self.functionCategories)
-    }
-
-    /// 预计可释放空间：结合大文件实际体积与其余垃圾照片均值估算
-    private var recoverableSizeText: String {
-        let largeFileSize = organizeManager.scanResults[.largeFiles]?.first?.potentialSpaceSaved ?? 0
-        let largeFileCount = organizeManager.stat(for: .largeFiles)
-        let otherJunkCount = max(0, junkCount - largeFileCount)
-        let estimatedOtherBytes = Int64(otherJunkCount) * 3_200_000 // 默认每张估约 3.2MB
-        let totalBytes = largeFileSize + estimatedOtherBytes
-
-        guard totalBytes > 0 else { return "" }
-        return ByteFormatter.format(totalBytes)
     }
 
     // MARK: - 分组标题组件
@@ -238,4 +467,3 @@ struct OrganizeView: View {
     .environmentObject(statisticsManager)
     .environmentObject(MembershipManager())
 }
-
