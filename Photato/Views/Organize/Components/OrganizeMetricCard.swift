@@ -1,28 +1,21 @@
 import SwiftUI
 
-// MARK: - 视觉微图表类型
-enum OrganizeMetricVisualType {
-    case gauge(progress: Double)
-    case barSparkline(peakIndex: Int)
-    case waveSparkline
-}
-
-// MARK: - 分类配色与微图表映射扩展
+// MARK: - 分类配色与图标扩展
 extension OrganizeCategory {
     /// 活力年轻时尚色系（对标苹果健康与现代数据仪表盘审美）
     var themeColor: Color {
         switch self {
         case .similar:
-            // 热情暖珊瑚橙（Calories 风格）
+            // 热情暖珊瑚橙
             return Color(red: 1.0, green: 0.36, blue: 0.22)
         case .duplicates:
-            // 翡翠薄荷绿（Weight 风格）
+            // 翡翠薄荷绿
             return Color(red: 0.08, green: 0.74, blue: 0.44)
         case .largeFiles:
-            // 亮天蓝（Water 风格）
+            // 亮天蓝
             return Color(red: 0.0, green: 0.54, blue: 1.0)
         case .blurry:
-            // 暖金琥珀色（Sleep 风格）
+            // 暖金琥珀色
             return Color(red: 1.0, green: 0.64, blue: 0.0)
         case .poorFace:
             // 魅惑紫罗兰
@@ -65,39 +58,6 @@ extension OrganizeCategory {
             return "livephoto"
         }
     }
-
-    /// 对应参考截图的三大微图表风格映射
-    var visualType: OrganizeMetricVisualType {
-        switch self {
-        case .similar:
-            // 环形刻度进度圈（如 Calories）
-            return .gauge(progress: 0.68)
-        case .duplicates:
-            // 贝塞尔波形曲线（如 Weight）
-            return .waveSparkline
-        case .largeFiles:
-            // 环形刻度进度圈（如 Water）
-            return .gauge(progress: 0.54)
-        case .blurry:
-            // 垂直迷你条形图（如 Sleep）
-            return .barSparkline(peakIndex: 3)
-        case .poorFace:
-            // 贝塞尔波形曲线
-            return .waveSparkline
-        case .lowQuality:
-            // 垂直迷你条形图
-            return .barSparkline(peakIndex: 2)
-        case .screenshots:
-            // 贝塞尔波形曲线
-            return .waveSparkline
-        case .videos:
-            // 环形刻度进度圈
-            return .gauge(progress: 0.42)
-        case .livePhotos:
-            // 垂直迷你条形图
-            return .barSparkline(peakIndex: 3)
-        }
-    }
 }
 
 // MARK: - 按压弹性按钮样式
@@ -110,7 +70,7 @@ struct CardPressButtonStyle: ButtonStyle {
 }
 
 // MARK: - 整理功能分类卡片 (Organize Metric Card)
-/// 参考截图 2x2 网格设计：大数字 + 类别图标 + 专属色彩洗浅底面 + 右侧微图表
+/// 纯白卡片：图标 + 标题 + 大数字 + 描述单位，简约优雅
 struct OrganizeMetricCard: View {
     let category: OrganizeCategory
     let count: Int
@@ -155,45 +115,37 @@ struct OrganizeMetricCard: View {
 
                 Spacer(minLength: 10)
 
-                // 2. 底部数据行：大数字 + 描述单位在左，微图表在右
-                HStack(alignment: .bottom, spacing: 8) {
-                    // 大字号指标数值与单位
-                    VStack(alignment: .leading, spacing: 1) {
-                        if isPending {
-                            Text("—")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundColor(Color(.secondaryLabel))
-                        } else if let fileSize = fileSizeText, !fileSize.isEmpty {
-                            Text(fileSize)
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        } else {
-                            Text("\(count.formatted())")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
-                                .foregroundColor(count > 0 ? .primary : Color(.secondaryLabel))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-
-                        Text(unitDescription)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                // 2. 底部数据行：大数字 + 描述单位
+                VStack(alignment: .leading, spacing: 1) {
+                    if isPending {
+                        Text("—")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(Color(.secondaryLabel))
+                    } else if let fileSize = fileSizeText, !fileSize.isEmpty {
+                        Text(fileSize)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    } else {
+                        Text("\(count.formatted())")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundColor(count > 0 ? .primary : Color(.secondaryLabel))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
 
-                    Spacer(minLength: 4)
-
-                    // 右侧个性化微图表
-                    microChart
+                    Text(unitDescription)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.secondaryLabel))
+                        .lineLimit(1)
                 }
             }
             .padding(14)
-            .frame(maxWidth: .infinity)
-            .frame(height: 112)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 100)
             .background(cardBackground)
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(CardPressButtonStyle())
     }
@@ -225,9 +177,9 @@ struct OrganizeMetricCard: View {
         }
     }
 
-    /// 卡片底板：统一纯白底色，无背景色水洗，无描边，配柔和悬浮投影
+    /// 卡片底板：统一纯白底色，无描边，配柔和悬浮投影
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(Color.white)
             .shadow(
                 color: Color.black.opacity(0.04),
@@ -235,22 +187,6 @@ struct OrganizeMetricCard: View {
                 x: 0,
                 y: 3
             )
-    }
-
-    /// 微图表选择器
-    @ViewBuilder
-    private var microChart: some View {
-        switch category.visualType {
-        case .gauge(let baseProgress):
-            let p = count > 0 ? min(1.0, max(0.2, baseProgress)) : 0.08
-            CircularGaugeView(progress: p, color: themeColor, lineWidth: 4.5, size: 38)
-
-        case .barSparkline(let peakIndex):
-            MiniBarSparklineView(color: themeColor, peakIndex: peakIndex, size: CGSize(width: 38, height: 28))
-
-        case .waveSparkline:
-            MiniWaveSparklineView(color: themeColor, size: CGSize(width: 42, height: 26))
-        }
     }
 }
 
@@ -292,41 +228,30 @@ struct TrashMetricCard: View {
                 Spacer(minLength: 10)
 
                 // 底部数据行
-                HStack(alignment: .bottom, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("\(trashCount.formatted())")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .foregroundColor(trashCount > 0 ? themeColor : Color(.secondaryLabel))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(trashCount.formatted())")
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(trashCount > 0 ? themeColor : Color(.secondaryLabel))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
 
-                        Text(String(localized: "Pending Cleanup"))
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(Color(.secondaryLabel))
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 4)
-
-                    CircularGaugeView(
-                        progress: trashCount > 0 ? 0.75 : 0.08,
-                        color: themeColor,
-                        lineWidth: 4.5,
-                        size: 38
-                    )
+                    Text(String(localized: "Pending Cleanup"))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.secondaryLabel))
+                        .lineLimit(1)
                 }
             }
             .padding(14)
-            .frame(maxWidth: .infinity)
-            .frame(height: 112)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 100)
             .background(cardBackground)
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(CardPressButtonStyle())
     }
 
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(Color.white)
             .shadow(
                 color: Color.black.opacity(0.04),
