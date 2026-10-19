@@ -14,6 +14,7 @@ struct AlbumPhotoListView: View {
     @State private var canSelectPhoto = true
     @State private var currentPhotoID: String? = nil
     @State private var targetScrollPhotoID: String? = nil
+    @State private var showFavoriteDeleteAlert = false
     @Namespace private var photoTransitionNamespace
 
     private var photos: [PhotoAsset] { albumManager.displayedAlbumPhotos }
@@ -35,15 +36,12 @@ struct AlbumPhotoListView: View {
                     }
                     // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
                     AdaptivePhotoGrid(photos: photos) { photo, index in
-                        PhotoCell(
+                        let cell = PhotoCell(
                             photo: photo,
                             isSelected: selectionManager.isSelected(photo.id),
                             isSelectMode: selectionManager.isSelectMode
                         )
                         .id(photo.id)
-                        .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
-                            source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if selectionManager.isSelectMode {
@@ -66,6 +64,22 @@ struct AlbumPhotoListView: View {
                         }
                         .onAppear {
                             photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
+                        }
+
+                        let swipeableCell = cell.swipeToTrash(
+                            photo: photo,
+                            isEnabled: !selectionManager.isSelectMode && !isFullscreenMode,
+                            isFavorite: photoManager.isFavorite(photo),
+                            onTrash: { targetPhoto in
+                                photoManager.addToTrash(targetPhoto)
+                            },
+                            onBlocked: {
+                                showFavoriteDeleteAlert = true
+                            }
+                        )
+
+                        swipeableCell.matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                            source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
                     }
                     .padding(.horizontal, 4)
@@ -203,6 +217,11 @@ struct AlbumPhotoListView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: selectionManager.isSelectMode)
+        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
+        }
     }
 
     // MARK: - Album Info Header

@@ -41,6 +41,8 @@ struct DiscoverView: View {
     /// 滚动位置（iOS 18 ScrollPosition）：双击回顶时按"边缘"滚到真正的
     /// offset 0——大标题完全展开且带平滑动画。不预设 edge: .top 避免状态刷新时强制回顶位移
     @State private var scrollPosition = ScrollPosition()
+    /// 收藏照片不可划除轻提示弹窗
+    @State private var showFavoriteDeleteAlert = false
     /// 行业标准触发距离（手指滑动行程约 175pt），配合非线性阻尼曲线防误触
     private static let triggerTravelDistance: CGFloat = 175
 
@@ -181,6 +183,11 @@ struct DiscoverView: View {
             }
         }
         .background(Color.pageBackground.ignoresSafeArea())
+        .alert(String(localized: "Cannot Delete"), isPresented: $showFavoriteDeleteAlert) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
+        }
         // 首次采样由 ContentView 切换到「发现」Tab 时触发，
         // 与相簿页懒加载策略一致；本视图以 opacity 0 常驻视图树，不能在这里用 .task，
         // 否则 app 启动即会执行全库枚举
@@ -266,12 +273,25 @@ struct DiscoverView: View {
                 }
             }
 
+        let swipeableCell = cell.swipeToTrash(
+            photo: photo,
+            isEnabled: isAuthorized,
+            isFavorite: photoManager.isFavorite(photo),
+            onTrash: { targetPhoto in
+                photoManager.addToTrash(targetPhoto)
+                manager.removePhoto(targetPhoto)
+            },
+            onBlocked: {
+                showFavoriteDeleteAlert = true
+            }
+        )
+
         if let transitionNamespace {
-            cell.matchedTransitionSource(id: photo.id, in: transitionNamespace) { source in
+            swipeableCell.matchedTransitionSource(id: photo.id, in: transitionNamespace) { source in
                 source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         } else {
-            cell
+            swipeableCell
         }
     }
 
