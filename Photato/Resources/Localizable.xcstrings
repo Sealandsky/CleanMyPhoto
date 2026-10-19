@@ -106,6 +106,7 @@
 
     },
     "%lld Categories" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -913,6 +914,7 @@
 
     },
     "4 Items" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5445,13 +5447,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個のファイル"
+            "value" : "枚"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "개 파일"
+            "value" : "장"
           }
         },
         "pt-BR" : {
@@ -5463,13 +5465,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "个大文件"
+            "value" : "张"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個大檔案"
+            "value" : "張"
           }
         }
       }
@@ -7060,13 +7062,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "枚のLive Photos"
+            "value" : "枚"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "장의 라이브 포토"
+            "value" : "장"
           }
         },
         "pt-BR" : {
@@ -7078,13 +7080,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "张实况"
+            "value" : "张"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "張原況照片"
+            "value" : "張"
           }
         }
       }
@@ -12099,13 +12101,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "枚のスクショ"
+            "value" : "枚"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "장의 스크린샷"
+            "value" : "장"
           }
         },
         "pt-BR" : {
@@ -12117,13 +12119,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "张截屏"
+            "value" : "张"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "張螢幕截圖"
+            "value" : "張"
           }
         }
       }
@@ -14966,13 +14968,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本のビデオ"
+            "value" : "本"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "개의 비디오"
+            "value" : "개"
           }
         },
         "pt-BR" : {
@@ -14984,13 +14986,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "个视频"
+            "value" : "个"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個影片"
+            "value" : "個"
           }
         }
       }
