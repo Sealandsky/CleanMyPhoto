@@ -50,12 +50,9 @@ struct OrganizeView: View {
                     cleanedAccomplishmentBanner
                 }
 
-                // 3. 智能清理分类 (2x2 网格纯白卡片)
+                // 3. 智能清理分类 (2列网格纯白卡片)
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader(
-                        title: String(localized: "Smart Cleanup"),
-                        badge: String(localized: "\(Self.functionCategories.count) Categories")
-                    )
+                    sectionHeader(title: String(localized: "Smart Cleanup"))
 
                     LazyVGrid(
                         columns: [
@@ -70,12 +67,9 @@ struct OrganizeView: View {
                     }
                 }
 
-                // 4. 媒体类型与回收站 (2x2 网格纯白卡片，对称闭环)
+                // 4. 媒体类型 (2列网格纯白卡片)
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader(
-                        title: String(localized: "Media Types"),
-                        badge: String(localized: "4 Items")
-                    )
+                    sectionHeader(title: String(localized: "Media Types"))
 
                     LazyVGrid(
                         columns: [
@@ -84,13 +78,8 @@ struct OrganizeView: View {
                         ],
                         spacing: 12
                     ) {
-                        metricCard(for: .screenshots)
-                        metricCard(for: .videos)
-                        metricCard(for: .livePhotos)
-                        TrashMetricCard(
-                            trashCount: photoManager.pendingDeletionIDs.count
-                        ) {
-                            photoManager.showTrash = true
+                        ForEach(Self.mediaTypeCategories) { category in
+                            metricCard(for: category)
                         }
                     }
                 }
@@ -161,20 +150,12 @@ struct OrganizeView: View {
     }
 
     // MARK: - 分组标题组件
-    private func sectionHeader(title: String, badge: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(Color(.secondaryLabel))
-
-            Spacer()
-
-            Text(badge)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundColor(Color(.tertiaryLabel))
-        }
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
+    private func sectionHeader(title: String) -> some View {
+        Text(title)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundColor(Color(.secondaryLabel))
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
     }
 
     // MARK: - 历史清理成就横幅
