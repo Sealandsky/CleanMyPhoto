@@ -221,10 +221,6 @@ struct OrganizeView: View {
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(red: 0.16, green: 0.78, blue: 0.24).opacity(0.12), lineWidth: 1)
-        )
     }
 }
 

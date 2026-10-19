@@ -225,25 +225,16 @@ struct OrganizeMetricCard: View {
         }
     }
 
-    /// 卡片底板：纯白叠加上极淡微饱和分类色彩水洗，外加超细柔和边框与悬浮投影
+    /// 卡片底板：统一纯白底色，无背景色水洗，无描边，配柔和悬浮投影
     private var cardBackground: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.white)
-
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(themeColor.opacity(0.04))
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(themeColor.opacity(0.10), lineWidth: 1)
-        )
-        .shadow(
-            color: Color.black.opacity(0.035),
-            radius: 8,
-            x: 0,
-            y: 3
-        )
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(Color.white)
+            .shadow(
+                color: Color.black.opacity(0.04),
+                radius: 8,
+                x: 0,
+                y: 3
+            )
     }
 
     /// 微图表选择器
@@ -335,22 +326,13 @@ struct TrashMetricCard: View {
     }
 
     private var cardBackground: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.white)
-
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(themeColor.opacity(0.04))
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(themeColor.opacity(0.10), lineWidth: 1)
-        )
-        .shadow(
-            color: Color.black.opacity(0.035),
-            radius: 8,
-            x: 0,
-            y: 3
-        )
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .fill(Color.white)
+            .shadow(
+                color: Color.black.opacity(0.04),
+                radius: 8,
+                x: 0,
+                y: 3
+            )
     }
 }

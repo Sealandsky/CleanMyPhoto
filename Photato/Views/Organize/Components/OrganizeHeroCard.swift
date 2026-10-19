@@ -59,10 +59,6 @@ struct OrganizeHeroCard: View {
     private var heroCardBackground: some View {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
             .fill(Color.white)
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.04), lineWidth: 1)
-            )
             .shadow(
                 color: Color.black.opacity(0.04),
                 radius: 12,
