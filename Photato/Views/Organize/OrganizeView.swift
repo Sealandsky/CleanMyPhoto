@@ -342,6 +342,7 @@ struct OrganizeView: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .frame(height: 128)
+        .background(scanCardBackground)
     }
 
     private var scanCardBackground: some View {
