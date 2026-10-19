@@ -4,6 +4,9 @@
     "—" : {
 
     },
+    "/" : {
+
+    },
     "/month" : {
       "localizations" : {
         "en" : {
@@ -1000,9 +1003,6 @@
         }
       }
     },
-    "100%" : {
-
-    },
     "About" : {
       "localizations" : {
         "en" : {
@@ -1510,6 +1510,7 @@
       }
     },
     "AI Deep" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1993,7 +1994,6 @@
       }
     },
     "Analyzed %lld photos · In great shape" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3925,6 +3925,7 @@
       }
     },
     "Clean Score" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4595,7 +4596,6 @@
       }
     },
     "Deep scan for duplicates, similar, and blurry photos" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6441,7 +6441,6 @@
       }
     },
     "Junk Items" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6766,7 +6765,6 @@
       }
     },
     "Library is Clean" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6813,6 +6811,7 @@
       }
     },
     "Library is in great shape · No junk photos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8325,7 +8324,6 @@
       }
     },
     "No junk photos found" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10123,6 +10121,7 @@
       }
     },
     "Photos Analyzed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10169,6 +10168,7 @@
       }
     },
     "Photos to Analyze" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10215,6 +10215,7 @@
       }
     },
     "photos to clean" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10882,6 +10883,7 @@
       }
     },
     "recoverable" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11895,6 +11897,7 @@
       }
     },
     "Scanning Progress" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12494,7 +12497,6 @@
       }
     },
     "Smart Analysis" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12634,6 +12636,7 @@
       }
     },
     "Smart Scan" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13096,6 +13099,7 @@
       }
     },
     "Storage Health" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13469,6 +13473,7 @@
       }
     },
     "Tap Start Scan to deep analyze duplicates, similar and blurry photos." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13515,7 +13520,6 @@
       }
     },
     "Tap to analyze all %lld photos" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

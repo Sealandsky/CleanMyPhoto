@@ -70,11 +70,10 @@ struct CardPressButtonStyle: ButtonStyle {
 }
 
 // MARK: - 整理功能分类卡片 (Organize Metric Card)
-/// 纯白卡片：图标 + 标题 + 大数字 + 描述单位，简约优雅
+/// 纯白卡片：图标 + 标题 + 大数字后紧跟单位（底部基线对齐），简约优雅
 struct OrganizeMetricCard: View {
     let category: OrganizeCategory
     let count: Int
-    let fileSizeText: String?
     let isLoading: Bool
     let isPending: Bool
     let action: () -> Void
@@ -115,35 +114,36 @@ struct OrganizeMetricCard: View {
 
                 Spacer(minLength: 10)
 
-                // 2. 底部数据行：大数字 + 描述单位
-                VStack(alignment: .leading, spacing: 1) {
-                    if isPending {
+                // 2. 底部数据行：大数字 + 跟在后面的单位（底部基线对齐）
+                if isPending {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("—")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(Color(.secondaryLabel))
-                    } else if let fileSize = fileSizeText, !fileSize.isEmpty {
-                        Text(fileSize)
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
+
+                        Text(String(localized: "Pending Scan"))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(.tertiaryLabel))
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    } else {
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(count.formatted())")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(count > 0 ? .primary : Color(.secondaryLabel))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                    }
 
-                    Text(unitDescription)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(Color(.secondaryLabel))
-                        .lineLimit(1)
+                        Text(unitDescription)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(.secondaryLabel))
+                            .lineLimit(1)
+                    }
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 100)
+            .frame(height: 94)
             .background(cardBackground)
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
@@ -152,22 +152,11 @@ struct OrganizeMetricCard: View {
 
     /// 单位与辅助说明文案
     private var unitDescription: String {
-        if isPending {
-            return String(localized: "Tap to Scan")
-        }
         switch category {
-        case .similar:
-            return String(localized: "photos")
-        case .duplicates:
+        case .similar, .duplicates, .blurry, .poorFace, .lowQuality:
             return String(localized: "photos")
         case .largeFiles:
-            return count > 0 ? String(localized: "\(count) files") : String(localized: "files")
-        case .blurry:
-            return String(localized: "photos")
-        case .poorFace:
-            return String(localized: "photos")
-        case .lowQuality:
-            return String(localized: "photos")
+            return String(localized: "files")
         case .screenshots:
             return String(localized: "screenshots")
         case .videos:
@@ -227,8 +216,8 @@ struct TrashMetricCard: View {
 
                 Spacer(minLength: 10)
 
-                // 底部数据行
-                VStack(alignment: .leading, spacing: 1) {
+                // 底部数据行：大数字 + 单位紧跟其后（底部基线对齐）
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(trashCount.formatted())")
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .foregroundColor(trashCount > 0 ? themeColor : Color(.secondaryLabel))
@@ -236,14 +225,14 @@ struct TrashMetricCard: View {
                         .minimumScaleFactor(0.8)
 
                     Text(String(localized: "Pending Cleanup"))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundColor(Color(.secondaryLabel))
                         .lineLimit(1)
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 100)
+            .frame(height: 94)
             .background(cardBackground)
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }

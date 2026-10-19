@@ -375,18 +375,9 @@ struct OrganizeView: View {
         let isFunctional = Self.functionCategories.contains(category)
         let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
 
-        var fileSizeText: String? = nil
-        if category == .largeFiles {
-            let size = organizeManager.scanResults[.largeFiles]?.first?.potentialSpaceSaved ?? 0
-            if size > 0 {
-                fileSizeText = ByteFormatter.format(size)
-            }
-        }
-
         return OrganizeMetricCard(
             category: category,
             count: count,
-            fileSizeText: fileSizeText,
             isLoading: isCategoryLoading,
             isPending: isPending
         ) {
