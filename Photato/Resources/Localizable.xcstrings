@@ -292,6 +292,7 @@
       }
     },
     "%lld files" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13566,6 +13567,7 @@
       }
     },
     "Tap to Scan" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

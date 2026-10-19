@@ -106,6 +106,11 @@ struct OrganizeView: View {
                 await organizeManager.quickAnalysis()
             }
         }
+        .onChange(of: organizeManager.isAnalyzing) { oldValue, newValue in
+            if oldValue && !newValue && organizeManager.hasCompletedFullScan {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
     }
 
     // MARK: - 可清理照片数量与占比
@@ -118,7 +123,7 @@ struct OrganizeView: View {
         return min(1.0, max(0.03, Double(junkCount) / Double(totalLibraryCount)))
     }
 
-    // MARK: - 原版百分比圆环图标
+    // MARK: - 原版百分比圆环图标（带平滑展开动效）
     private var percentageRingView: some View {
         let lineWidth: CGFloat = 3.5
 
@@ -135,6 +140,7 @@ struct OrganizeView: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 0.65, dampingFraction: 0.75), value: junkPercentage)
         }
         .frame(width: 24, height: 24)
     }
@@ -142,15 +148,19 @@ struct OrganizeView: View {
     // MARK: - Scan Card（原版版式与蓝色渐变大卡）
     @ViewBuilder
     private var scanCard: some View {
-        if organizeManager.isAnalyzing {
-            analyzingScanCard
-        } else if !organizeManager.hasCompletedFullScan {
-            unscannedActionCard
-        } else if junkCount == 0 {
-            cleanLibraryCard
-        } else {
-            junkResultsCard
+        Group {
+            if organizeManager.isAnalyzing {
+                analyzingScanCard
+            } else if !organizeManager.hasCompletedFullScan {
+                unscannedActionCard
+            } else if junkCount == 0 {
+                cleanLibraryCard
+            } else {
+                junkResultsCard
+            }
         }
+        .animation(.easeInOut(duration: 0.35), value: organizeManager.isAnalyzing)
+        .animation(.easeInOut(duration: 0.35), value: organizeManager.hasCompletedFullScan)
     }
 
     /// 1. 扫描中卡片
@@ -165,13 +175,14 @@ struct OrganizeView: View {
                 Spacer()
 
                 scanPillButton(title: String(localized: "Cancel"), icon: "xmark.circle.fill") {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     organizeManager.cancelAnalysis()
                 }
             }
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(organizeManager.currentStep.isEmpty
                      ? String(localized: "Scanning...")
                      : organizeManager.currentStep)
@@ -179,8 +190,7 @@ struct OrganizeView: View {
                     .foregroundColor(.white.opacity(0.75))
                     .lineLimit(1)
 
-                ProgressView(value: organizeManager.analysisProgress)
-                    .tint(.white)
+                ScanProgressBar(progress: organizeManager.analysisProgress)
             }
         }
         .padding(16)
@@ -201,6 +211,7 @@ struct OrganizeView: View {
                 Spacer()
 
                 scanPillButton(title: String(localized: "Start Scan"), icon: "sparkles") {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         organizeManager.startFullAnalysis()
                     }
@@ -228,6 +239,7 @@ struct OrganizeView: View {
         .background(scanCardBackground)
         .contentShape(Rectangle())
         .onTapGesture {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             withAnimation(.easeInOut(duration: 0.3)) {
                 organizeManager.startFullAnalysis()
             }
@@ -249,6 +261,7 @@ struct OrganizeView: View {
                 Spacer()
 
                 scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         organizeManager.startFullAnalysis()
                     }
@@ -297,6 +310,7 @@ struct OrganizeView: View {
                 Spacer()
 
                 scanPillButton(title: String(localized: "Rescan"), icon: "arrow.clockwise.circle.fill") {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         organizeManager.startFullAnalysis()
                     }
@@ -312,6 +326,8 @@ struct OrganizeView: View {
                     Text("\(junkCount)")
                         .font(.system(size: 32, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
+                        .contentTransition(.numericText(value: Double(junkCount)))
+                        .animation(.snappy(duration: 0.35), value: junkCount)
 
                     Text("/")
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -326,7 +342,6 @@ struct OrganizeView: View {
         .padding(16)
         .frame(maxWidth: .infinity)
         .frame(height: 128)
-        .background(scanCardBackground)
     }
 
     private var scanCardBackground: some View {
@@ -441,6 +456,51 @@ struct OrganizeView: View {
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
         )
+    }
+}
+
+// MARK: - 扫描流光胶囊进度条 (Scan Shimmer Progress Bar)
+private struct ScanProgressBar: View {
+    let progress: Double
+    @State private var isShimmering = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let totalWidth = geometry.size.width
+            let currentWidth = max(4, min(totalWidth, totalWidth * CGFloat(progress)))
+
+            ZStack(alignment: .leading) {
+                // 1. 底槽轨道
+                Capsule()
+                    .fill(Color.white.opacity(0.22))
+
+                // 2. 进度填充条
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: currentWidth)
+
+                // 3. 流光扫光效果 (Shimmer)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.0),
+                        Color.white.opacity(0.55),
+                        Color.white.opacity(0.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 80)
+                .offset(x: isShimmering ? totalWidth : -80)
+                .clipShape(Capsule())
+            }
+        }
+        .frame(height: 6)
+        .animation(.easeInOut(duration: 0.25), value: progress)
+        .onAppear {
+            withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
+                isShimmering = true
+            }
+        }
     }
 }
 

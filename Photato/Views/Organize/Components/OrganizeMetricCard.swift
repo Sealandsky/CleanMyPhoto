@@ -60,12 +60,13 @@ extension OrganizeCategory {
     }
 }
 
-// MARK: - 按压弹性按钮样式
+// MARK: - 按压弹性按钮样式 (App Store 风格微触感)
 struct CardPressButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.965 : 1.0)
-            .animation(.spring(response: 0.26, dampingFraction: 0.72), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.94 : 1.0)
+            .animation(.spring(response: 0.24, dampingFraction: 0.75), value: configuration.isPressed)
     }
 }
 
@@ -133,6 +134,8 @@ struct OrganizeMetricCard: View {
                             .foregroundColor(count > 0 ? .primary : Color(.secondaryLabel))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
+                            .contentTransition(.numericText(value: Double(count)))
+                            .animation(.snappy(duration: 0.35), value: count)
 
                         Text(unitDescription)
                             .font(.system(size: 13, weight: .medium, design: .rounded))
@@ -223,6 +226,8 @@ struct TrashMetricCard: View {
                         .foregroundColor(trashCount > 0 ? themeColor : Color(.secondaryLabel))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+                        .contentTransition(.numericText(value: Double(trashCount)))
+                        .animation(.snappy(duration: 0.35), value: trashCount)
 
                     Text(String(localized: "Pending Cleanup"))
                         .font(.system(size: 13, weight: .medium, design: .rounded))
