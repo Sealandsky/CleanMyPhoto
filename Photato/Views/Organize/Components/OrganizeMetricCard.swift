@@ -89,25 +89,19 @@ struct OrganizeMetricCard: View {
             action()
         }) {
             VStack(alignment: .leading, spacing: 0) {
-                // 1. 顶部行：图标 + 标题 + 加载/待扫描状态
-                HStack(spacing: 6) {
+                // 1. 顶部标签行：图标 + 分类标签（弱化为次级说明，突出下方核心数据）
+                HStack(spacing: 5) {
                     Image(systemName: category.filledIcon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(themeColor)
-                        .frame(width: 20, height: 20, alignment: .leading)
+                        .frame(width: 16, height: 16, alignment: .leading)
 
                     Text(category.localizedText)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.secondaryLabel))
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
-
-                    if isPending {
-                        Text(String(localized: "Pending Scan"))
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(Color(.tertiaryLabel))
-                    }
                 }
 
                 Spacer(minLength: 10)
@@ -205,16 +199,16 @@ struct TrashMetricCard: View {
             action()
         }) {
             VStack(alignment: .leading, spacing: 0) {
-                // 顶部行
-                HStack(spacing: 6) {
+                // 顶部标签行：弱化为次级说明
+                HStack(spacing: 5) {
                     Image(systemName: "trash.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(themeColor)
-                        .frame(width: 20, height: 20, alignment: .leading)
+                        .frame(width: 16, height: 16, alignment: .leading)
 
                     Text(String(localized: "Trash"))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(.secondaryLabel))
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
