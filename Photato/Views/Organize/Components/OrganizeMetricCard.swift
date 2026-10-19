@@ -103,10 +103,7 @@ struct OrganizeMetricCard: View {
 
                     Spacer(minLength: 4)
 
-                    if isLoading && count == 0 {
-                        ProgressView()
-                            .controlSize(.mini)
-                    } else if isPending {
+                    if isPending {
                         Text(String(localized: "Pending Scan"))
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(Color(.tertiaryLabel))
@@ -127,6 +124,19 @@ struct OrganizeMetricCard: View {
                             .foregroundColor(Color(.tertiaryLabel))
                             .lineLimit(1)
                     }
+                } else if isLoading && count == 0 {
+                    // 正在扫描中：优雅的扫描转子与状态文案
+                    HStack(alignment: .center, spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(themeColor)
+
+                        Text(String(localized: "Analyzing..."))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(Color(.secondaryLabel))
+                            .lineLimit(1)
+                    }
+                    .frame(height: 31, alignment: .leading)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("\(count.formatted())")
@@ -134,8 +144,7 @@ struct OrganizeMetricCard: View {
                             .foregroundColor(count > 0 ? .primary : Color(.secondaryLabel))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .contentTransition(.numericText(value: Double(count)))
-                            .animation(.snappy(duration: 0.35), value: count)
+                            .contentTransition(.numericText())
 
                         Text(unitDescription)
                             .font(.system(size: 13, weight: .medium, design: .rounded))
@@ -226,8 +235,7 @@ struct TrashMetricCard: View {
                         .foregroundColor(trashCount > 0 ? themeColor : Color(.secondaryLabel))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .contentTransition(.numericText(value: Double(trashCount)))
-                        .animation(.snappy(duration: 0.35), value: trashCount)
+                        .contentTransition(.numericText())
 
                     Text(String(localized: "Pending Cleanup"))
                         .font(.system(size: 13, weight: .medium, design: .rounded))

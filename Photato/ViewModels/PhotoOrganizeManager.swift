@@ -398,7 +398,10 @@ final class PhotoOrganizeManager {
 
         // 批量获取大小（缓存一次预取 + 缺失补测 + 单次写回），替代逐张 N+1 Core Data 往返
         let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
-            self.analysisProgress = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
+            let current = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
+            if abs(current - self.analysisProgress) >= 0.008 || processed == total {
+                self.analysisProgress = current
+            }
         }
 
         var sized: [(identifier: String, size: Int64)] = []
@@ -439,7 +442,10 @@ final class PhotoOrganizeManager {
         let endProgress: Double = 3.0 / 6.0
 
         let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
-            self.analysisProgress = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
+            let current = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
+            if abs(current - self.analysisProgress) >= 0.008 || processed == total {
+                self.analysisProgress = current
+            }
         }
 
         var lowQuality: [(identifier: String, resolution: Int)] = []

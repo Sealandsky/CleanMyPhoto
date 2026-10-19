@@ -38,7 +38,12 @@ struct OrganizeView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // 1. 顶部大卡（原版版式与蓝色渐变设计）
-                scanCard
+                OrganizeScanCard(
+                    organizeManager: organizeManager,
+                    totalLibraryCount: totalLibraryCount,
+                    junkCount: junkCount,
+                    junkPercentage: junkPercentage
+                )
 
                 // 2. 历史清理成就横幅（若已释放过空间）
                 if statisticsManager.storageSpaceSavedBytes > 0 || statisticsManager.totalDeletedPhotos > 0 {
@@ -123,31 +128,96 @@ struct OrganizeView: View {
         return min(1.0, max(0.03, Double(junkCount) / Double(totalLibraryCount)))
     }
 
-    // MARK: - 原版百分比圆环图标（带平滑展开动效）
-    private var percentageRingView: some View {
-        let lineWidth: CGFloat = 3.5
+    // MARK: - 分类卡片生成器 (2x2 纯白卡片)
+    private func metricCard(for category: OrganizeCategory) -> some View {
+        let count = organizeManager.stat(for: category)
+        let isCategoryLoading = organizeManager.isCategoryLoading(category)
+        let isFunctional = Self.functionCategories.contains(category)
+        let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
 
-        return ZStack {
-            // 背景轨道圆环
-            Circle()
-                .stroke(Color.white.opacity(0.25), lineWidth: lineWidth)
-
-            // 百分比进度弧线
-            Circle()
-                .trim(from: 0, to: junkPercentage)
-                .stroke(
-                    Color.white,
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.65, dampingFraction: 0.75), value: junkPercentage)
+        return OrganizeMetricCard(
+            category: category,
+            count: count,
+            isLoading: isCategoryLoading,
+            isPending: isPending
+        ) {
+            handleCategoryTap(category)
         }
-        .frame(width: 24, height: 24)
     }
 
-    // MARK: - Scan Card（原版版式与蓝色渐变大卡）
-    @ViewBuilder
-    private var scanCard: some View {
+    // MARK: - 统一分类点击逻辑
+    private func handleCategoryTap(_ category: OrganizeCategory) {
+        let isFunctional = Self.functionCategories.contains(category)
+        let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
+
+        if isPending {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                organizeManager.startFullAnalysis()
+            }
+        } else {
+            onCategorySelect(category)
+        }
+    }
+
+    // MARK: - 分组标题组件
+    private func sectionHeader(title: String, badge: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(Color(.secondaryLabel))
+
+            Spacer()
+
+            Text(badge)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(Color(.tertiaryLabel))
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
+    }
+
+    // MARK: - 历史清理成就横幅
+    private var cleanedAccomplishmentBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
+
+            Text(String(localized: "Freed \(statisticsManager.storageSpaceSavedText) · Cleaned \(statisticsManager.totalDeletedPhotos) photos"))
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
+        )
+    }
+}
+
+// MARK: - 顶部大卡（独立子视图隔离刷新，避免扫描高频进度重绘下方卡片网格）
+private struct OrganizeScanCard: View {
+    @Bindable var organizeManager: PhotoOrganizeManager
+    let totalLibraryCount: Int
+    let junkCount: Int
+    let junkPercentage: Double
+
+    // MARK: - 投影规范
+    private static let cardShadowColor = Color.black.opacity(0.06)
+    private static let cardShadowRadius: CGFloat = 8
+    private static let cardShadowX: CGFloat = 0
+    private static let cardShadowY: CGFloat = 3
+
+    var body: some View {
         Group {
             if organizeManager.isAnalyzing {
                 analyzingScanCard
@@ -326,8 +396,7 @@ struct OrganizeView: View {
                     Text("\(junkCount)")
                         .font(.system(size: 32, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
-                        .contentTransition(.numericText(value: Double(junkCount)))
-                        .animation(.snappy(duration: 0.35), value: junkCount)
+                        .contentTransition(.numericText())
 
                     Text("/")
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
@@ -343,6 +412,27 @@ struct OrganizeView: View {
         .frame(maxWidth: .infinity)
         .frame(height: 128)
         .background(scanCardBackground)
+    }
+
+    private var percentageRingView: some View {
+        let lineWidth: CGFloat = 3.5
+
+        return ZStack {
+            // 背景轨道圆环
+            Circle()
+                .stroke(Color.white.opacity(0.25), lineWidth: lineWidth)
+
+            // 百分比进度弧线（带平滑展开动效）
+            Circle()
+                .trim(from: 0, to: junkPercentage)
+                .stroke(
+                    Color.white,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 0.65, dampingFraction: 0.75), value: junkPercentage)
+        }
+        .frame(width: 24, height: 24)
     }
 
     private var scanCardBackground: some View {
@@ -382,81 +472,6 @@ struct OrganizeView: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - 分类卡片生成器 (2x2 纯白卡片)
-    private func metricCard(for category: OrganizeCategory) -> some View {
-        let count = organizeManager.stat(for: category)
-        let isCategoryLoading = organizeManager.isCategoryLoading(category)
-        let isFunctional = Self.functionCategories.contains(category)
-        let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
-
-        return OrganizeMetricCard(
-            category: category,
-            count: count,
-            isLoading: isCategoryLoading,
-            isPending: isPending
-        ) {
-            handleCategoryTap(category)
-        }
-    }
-
-    // MARK: - 统一分类点击逻辑
-    private func handleCategoryTap(_ category: OrganizeCategory) {
-        let isFunctional = Self.functionCategories.contains(category)
-        let isPending = isFunctional && !organizeManager.hasCompletedFullScan && !organizeManager.isAnalyzing
-
-        if isPending {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.easeInOut(duration: 0.3)) {
-                organizeManager.startFullAnalysis()
-            }
-        } else {
-            onCategorySelect(category)
-        }
-    }
-
-    // MARK: - 分组标题组件
-    private func sectionHeader(title: String, badge: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(Color(.secondaryLabel))
-
-            Spacer()
-
-            Text(badge)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundColor(Color(.tertiaryLabel))
-        }
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
-    }
-
-    // MARK: - 历史清理成就横幅
-    private var cleanedAccomplishmentBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
-
-            Text(String(localized: "Freed \(statisticsManager.storageSpaceSavedText) · Cleaned \(statisticsManager.totalDeletedPhotos) photos"))
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 12))
-                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
-        )
     }
 }
 
