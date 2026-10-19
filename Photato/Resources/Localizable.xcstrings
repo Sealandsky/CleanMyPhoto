@@ -10064,13 +10064,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "张照片"
+            "value" : "张"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "張照片"
+            "value" : "張"
           }
         }
       }
