@@ -395,11 +395,13 @@ final class PhotoOrganizeManager {
 
         let startProgress: Double = 1.0 / 6.0
         let endProgress: Double = 2.0 / 6.0
+        // 阶段内最多约 50 次进度刷新，保证大库扫描时进度条持续可见移动
+        let progressStep = (endProgress - startProgress) / 50
 
         // 批量获取大小（缓存一次预取 + 缺失补测 + 单次写回），替代逐张 N+1 Core Data 往返
         let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
             let current = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
-            if abs(current - self.analysisProgress) >= 0.008 || processed == total {
+            if abs(current - self.analysisProgress) >= progressStep || processed == total {
                 self.analysisProgress = current
             }
         }
@@ -440,10 +442,11 @@ final class PhotoOrganizeManager {
         // Pass 2: 批量获取大小后过滤（替代逐张 N+1）
         let startProgress: Double = 2.0 / 6.0
         let endProgress: Double = 3.0 / 6.0
+        let progressStep = (endProgress - startProgress) / 50
 
         let sizes = await similarityManager.getOrFetchFileSizes(for: candidates.map(\.asset)) { processed, total in
             let current = startProgress + (endProgress - startProgress) * Double(processed) / Double(max(total, 1))
-            if abs(current - self.analysisProgress) >= 0.008 || processed == total {
+            if abs(current - self.analysisProgress) >= progressStep || processed == total {
                 self.analysisProgress = current
             }
         }

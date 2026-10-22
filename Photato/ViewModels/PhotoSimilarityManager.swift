@@ -2,6 +2,7 @@ import Foundation
 import Photos
 import UIKit
 import CoreData
+import SQLite3
 import Observation
 
 // MARK: - Core Data Object
@@ -66,9 +67,35 @@ final class PhotoSimilarityManager {
                 print("Core Data load error: \(error)")
             }
         }
+        // 模型级索引只对新库生效；存量库打开时 Core Data 不会补建，这里直接在 SQLite 层补齐
+        Self.ensureSQLiteLegacyIndex(at: storeURL)
         _persistentContainer = container
         return container
     }
+
+    /// 给存量库补建 localIdentifier 索引。索引不参与模型版本哈希（已验证老库
+    /// 用带索引模型可无迁移打开），Core Data 对 schema 里多出的外部索引无感知、不冲突；
+    /// 任何失败都静默跳过，仅损失查询性能不影响数据。
+    private static func ensureSQLiteLegacyIndex(at storeURL: URL) {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(storeURL.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK,
+              let db else { return }
+        defer { sqlite3_close(db) }
+        _ = sqlite3_exec(
+            db,
+            "CREATE INDEX IF NOT EXISTS 'localIdentifierIndex' ON ZPHOTOFINGERPRINT (ZLOCALIDENTIFIER)",
+            nil, nil, nil
+        )
+    }
+
+    /// 只读后台 context：批量预取缓存大小的大 IN 查询在后台队列执行，避免冻结主线程。
+    /// 只做读且仅返回值类型，与 viewContext 写入路径不产生合并冲突。
+    @ObservationIgnored
+    private lazy var sizeReadContext: NSManagedObjectContext = {
+        let context = persistentContainer.newBackgroundContext()
+        context.mergePolicy = NSRollbackMergePolicy
+        return context
+    }()
 
     @ObservationIgnored
     private var context: NSManagedObjectContext {
@@ -129,6 +156,10 @@ final class PhotoSimilarityManager {
         fileSizeAttr.defaultValue = 0
 
         entity.properties = [localId, dhashAttr, creationDate, width, height, computedAt, fileSizeAttr]
+
+        // localIdentifier 是缓存读写的主查询键（IN 分块预取 / 逐条 upsert），显式建索引
+        let indexElement = NSFetchIndexElementDescription(property: localId, collationType: .binary)
+        entity.indexes = [NSFetchIndexDescription(name: "localIdentifierIndex", elements: [indexElement])]
 
         model.entities = [entity]
         return model
@@ -372,9 +403,9 @@ final class PhotoSimilarityManager {
         return size
     }
 
-    /// 批量获取文件大小：一次分块预取 Core Data 缓存 → 仅对未命中的逐张请求系统
-    /// （PhotoKit 无批量接口）→ 批量写回 + 单次 save。
-    /// 替代逐张 getOrFetchFileSize 的 N+1 模式（每张 1~3 次主线程 fetch/save）。
+    /// 批量获取文件大小：只读后台 context 分块预取缓存 → 未命中部分受控并发走
+    /// PHAssetResource 元数据快路径（不逐张发起 requestImage/requestData 兜底，
+    /// iCloud-only 资产禁网后兜底必然失败，只会拖慢整段扫描）→ 分块写回 + 让出主线程。
     /// progress 在主线程回调（已处理数 / 总数），内部每 20 张节流一次。
     func getOrFetchFileSizes(
         for assets: [PHAsset],
@@ -382,41 +413,74 @@ final class PhotoSimilarityManager {
     ) async -> [String: Int64] {
         guard !assets.isEmpty else { return [:] }
 
-        // 1. 分块预取已缓存的大小（IN 谓词按块查询，避免超长参数）
+        // 1. 只读后台 context 分块预取已缓存的大小（IN 谓词按块查询，避免超长参数）
         var cached: [String: Int64] = [:]
         cached.reserveCapacity(assets.count)
         let identifiers = assets.map(\.localIdentifier)
         for chunkStart in stride(from: 0, to: identifiers.count, by: 1000) {
             let chunk = Array(identifiers[chunkStart..<min(chunkStart + 1000, identifiers.count)])
+            for (identifier, size) in await fetchCachedSizes(chunk: chunk) {
+                cached[identifier] = size
+            }
+        }
+
+        // 2. 未命中的用 8 路并发仅测元数据快路径（替代旧的逐张串行三层探测）
+        var results = cached
+        let misses = assets.filter { cached[$0.localIdentifier] == nil }
+        let total = assets.count
+        var processed = total - misses.count
+        progress?(processed, total)
+
+        var pending: [(identifier: String, size: Int64, creationDate: Date?, pixelWidth: Int32, pixelHeight: Int32)] = []
+        pending.reserveCapacity(misses.count)
+
+        typealias MeasureResult = (identifier: String, size: Int64, creationDate: Date?, pixelWidth: Int32, pixelHeight: Int32)
+        await withTaskGroup(of: MeasureResult.self) { group in
+            var iterator = misses.makeIterator()
+            func enqueueNext() {
+                guard !Task.isCancelled, let asset = iterator.next() else { return }
+                group.addTask {
+                    let size = PHAssetSizeHelper.getFileSize(asset)
+                    return (asset.localIdentifier, size, asset.creationDate,
+                            Int32(asset.pixelWidth), Int32(asset.pixelHeight))
+                }
+            }
+            for _ in 0..<8 { enqueueNext() }
+            while let measured = await group.next() {
+                if measured.size > 0 {
+                    results[measured.identifier] = measured.size
+                    pending.append(measured)
+                }
+                processed += 1
+                if processed % 20 == 0 || processed == total {
+                    progress?(processed, total)
+                }
+                enqueueNext()
+            }
+        }
+
+        // 3. 分块写回：每块一次 save 并让出主线程，避免大库单事务长时间占用主线程
+        for chunkStart in stride(from: 0, to: pending.count, by: 1000) {
+            let chunkEnd = min(chunkStart + 1000, pending.count)
+            batchUpsertFileSizes(Array(pending[chunkStart..<chunkEnd]))
+            await Task.yield()
+        }
+        return results
+    }
+
+    /// 只读后台 context 分块预取已缓存大小，返回值类型避免跨上下文传递托管对象
+    private func fetchCachedSizes(chunk: [String]) async -> [String: Int64] {
+        let context = sizeReadContext
+        return await context.perform {
             let request = PhotoFingerprint.fetchRequest()
             request.predicate = NSPredicate(format: "localIdentifier IN %@", chunk)
             request.propertiesToFetch = ["localIdentifier", "fileSize"]
+            var map: [String: Int64] = [:]
             for fp in (try? context.fetch(request)) ?? [] where fp.fileSize > 0 {
-                cached[fp.localIdentifier] = fp.fileSize
+                map[fp.localIdentifier] = fp.fileSize
             }
+            return map
         }
-
-        // 2. 未命中的逐张请求系统大小，收集为批量写回行
-        var results = cached
-        var pending: [(identifier: String, size: Int64, creationDate: Date?, pixelWidth: Int32, pixelHeight: Int32)] = []
-        let total = assets.count
-        for (index, asset) in assets.enumerated() {
-            if Task.isCancelled { break }
-            if cached[asset.localIdentifier] == nil {
-                let size = await PHAssetSizeHelper.getAssetSize(asset)
-                if size > 0 {
-                    results[asset.localIdentifier] = size
-                    pending.append((asset.localIdentifier, size, asset.creationDate,
-                                    Int32(asset.pixelWidth), Int32(asset.pixelHeight)))
-                }
-            }
-            if index % 20 == 0 || index == total - 1 {
-                progress?(index + 1, total)
-            }
-        }
-
-        batchUpsertFileSizes(pending)
-        return results
     }
 
     /// 批量写回文件大小：分块取已存在行后统一赋值，单次 save
