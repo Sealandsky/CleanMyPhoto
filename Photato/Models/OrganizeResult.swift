@@ -140,7 +140,8 @@ struct OrganizeCacheSummary: Codable {
     let poorFaceIds: [String]
     let hasCompletedFullScan: Bool?
 
-    static let currentVersion = 9
+    // v10: blurry 分组接入 aesthetics 两级判定,旧 blurryIds 口径作废,强制重建
+    static let currentVersion = 10
     static let fileName = "OrganizeCache.json"
 }
 
