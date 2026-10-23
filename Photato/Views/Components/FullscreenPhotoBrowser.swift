@@ -941,15 +941,23 @@ struct FullscreenPhotoBrowser: View {
         guard !Task.isCancelled else { return }
 
         withAnimation(.easeInOut(duration: 0.25)) {
-            if result.1 != nil {
-                // 匹配失败（权限不足/基准图不可提取/已取消）：静默隐藏列表区域，
-                // 不弹窗打扰主图浏览
-                relatedState = .hidden
-            } else if result.0.isEmpty {
-                relatedState = .empty
-            } else if case .loaded(let shown) = relatedState,
-                      shown.map(\.localIdentifier) == result.0.map(\.localIdentifier) {
-                // 与已展示内容完全一致：跳过重写，避免列表无谓重绘闪动
+            if result.1 != nil || result.0.isEmpty {
+                // 匹配失败（权限不足/基准图不可提取/已取消）或无匹配：静默处理，
+                // 不弹窗打扰主图浏览；屏上已有兜底照片时只增不删保留原内容，
+                // 仅空屏时维持原收起/空态
+                if case .loaded(let shown) = relatedState, !shown.isEmpty {
+                    return
+                }
+                relatedState = result.1 != nil ? .hidden : .empty
+            } else if case .loaded(let shown) = relatedState, !shown.isEmpty {
+                // 只增不删：已展示内容原位不动，新检索结果去重后追加到列表尾部，
+                // 既不把正在看的照片换掉，也不触发已有单元格重排闪动；
+                // 无新增时不写状态，避免列表无谓重绘
+                let shownIDs = Set(shown.map(\.localIdentifier))
+                let additions = result.0.filter { !shownIDs.contains($0.localIdentifier) }
+                if !additions.isEmpty {
+                    relatedState = .loaded(shown + additions)
+                }
             } else {
                 relatedState = .loaded(result.0)
             }
