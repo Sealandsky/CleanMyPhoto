@@ -730,10 +730,21 @@ struct AlbumDetailView: View {
             )
             let newPhotos = matchedAssets.map { PhotoAsset(asset: $0) }
             withAnimation(.easeInOut(duration: 0.25)) {
-                self.recommendedPhotos = newPhotos
+                if isSilent, !recommendedPhotos.isEmpty {
+                    // 只增不删：静默刷新时已展示内容原位不动，新结果去重后追加到列表尾部，
+                    // 既不把正在浏览的照片顶掉，也不触发已有单元格重排闪动
+                    let shownIDs = Set(recommendedPhotos.map(\.id))
+                    let additions = newPhotos.filter { !shownIDs.contains($0.id) }
+                    if !additions.isEmpty {
+                        self.recommendedPhotos.append(contentsOf: additions)
+                    }
+                } else {
+                    // 主动下拉刷新 / 空屏首载：整表替换
+                    self.recommendedPhotos = newPhotos
+                }
                 self.hasScannedCurrentAlbum = true
             }
-            albumManager.cacheRecommendations(newPhotos, for: album.id, currentPhotos: albumPhotos)
+            albumManager.cacheRecommendations(recommendedPhotos, for: album.id, currentPhotos: albumPhotos)
         } catch {
             print("Failed to find similar photos for album: \(error)")
         }
