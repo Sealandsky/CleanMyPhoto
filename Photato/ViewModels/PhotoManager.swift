@@ -14,6 +14,8 @@ class PhotoManager: NSObject, ObservableObject {
     @Published var errorMessage: String?
     @Published var isSelectMode: Bool = false
     @Published var showTrash: Bool = false
+    @Published var pendingCleanupResult: CleanupResult?
+    @Published var lastCleanupResult: CleanupResult?
 
     /// 相册查询结果；作为 PHChange 增量比对的基准
     private var fetchResult: PHFetchResult<PHAsset>?
@@ -33,6 +35,7 @@ class PhotoManager: NSObject, ObservableObject {
         if let cachedCount = statisticsManager?.currentPhotoCount, cachedCount > 0 {
             self.totalPhotoCount = cachedCount
         }
+
         // 初始化时检查当前的权限状态
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         // 监听系统相册变更（外部增删改、iCloud 下载完成等），保持数据与相册一致
@@ -256,22 +259,26 @@ class PhotoManager: NSObject, ObservableObject {
     }
 
     // MARK: - Empty Trash
-    func emptyTrash() async {
-        guard !pendingDeletionIDs.isEmpty else { return }
+    @discardableResult
+    func emptyTrash() async -> CleanupResult? {
+        guard !pendingDeletionIDs.isEmpty else { return nil }
 
         let assetsToDelete = trashedAssets.map { $0.asset }
+        let count = trashedAssets.count
+
+        // 在删除前预先统计素材大小（真实删除后无法读取元数据）
+        var totalSize: Int64 = 0
+        for asset in trashedAssets {
+            totalSize += await getAssetSize(asset.asset)
+        }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.deleteAssets(assetsToDelete as NSArray)
             }
 
-            let count = trashedAssets.count
-            var totalSize: Int64 = 0
-            for asset in trashedAssets {
-                totalSize += await getAssetSize(asset.asset)
-            }
             statisticsManager?.recordDeletions(count: count, totalSize: totalSize)
+            AppAnalytics.event("permanent_delete_completed", properties: ["count": count])
             // 免费删除额度按实际删除张数消耗（会员在 consume 内部跳过；失败路径不扣）
             membershipManager?.consumeFreeDeletions(count)
 
@@ -279,8 +286,18 @@ class PhotoManager: NSObject, ObservableObject {
             trashedAssets.removeAll()
             pendingDeletionIDs.removeAll()
             updateTotalPhotoCountFromSystem()
+
+            let result = CleanupResult(deletedCount: count, freedBytes: totalSize)
+            self.lastCleanupResult = result
+            return result
         } catch {
+            let nsError = error as NSError
+            if (nsError.domain == PHPhotosErrorDomain && nsError.code == PHPhotosError.userCancelled.rawValue)
+                || (nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError) {
+                return nil
+            }
             errorMessage = String(localized: "Failed to delete photos: \(error.localizedDescription)")
+            return nil
         }
     }
 

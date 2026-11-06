@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 enum AppTab: String, CaseIterable {
     case photos
@@ -38,12 +39,26 @@ enum AppTab: String, CaseIterable {
             return "gearshape.fill"
         }
     }
+    /// 统计埋点用的英文界面名（只记录界面名，不记录内容）。
+    var analyticsName: String {
+        switch self {
+        case .photos:
+            return "Memories"
+        case .albums:
+            return "Albums"
+        case .organize:
+            return "Organize"
+        case .settings:
+            return "Settings"
+        }
+    }
 }
 
 struct MainTabView: View {
     @EnvironmentObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
+    @Environment(\.requestReview) private var requestReview
 
     @State private var selectedTab: AppTab = .photos
     @State private var organizeManager = PhotoOrganizeManager()
@@ -56,6 +71,7 @@ struct MainTabView: View {
     @State private var albumsPath = NavigationPath()
 
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
+    @StateObject private var onThisDayManager = OnThisDayManager()
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
 
@@ -94,7 +110,11 @@ struct MainTabView: View {
             .tag(AppTab.settings)
         }
         .scrollEdgeEffectStyle(.soft, for: .bottom)
+        .onChange(of: selectedTab) { _, newTab in
+            AppAnalytics.screen(newTab.analyticsName)
+        }
         .task {
+            AppAnalytics.screen(selectedTab.analyticsName)
             // 1. 首屏渲染完成即刻轻量预热特征内存库（~20ms），确保用户点进详情页秒出相似照片
             try? await Task.sleep(nanoseconds: 150_000_000)
             PhotoSimilarityMatcher.shared.prewarm()
@@ -109,10 +129,24 @@ struct MainTabView: View {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
         }
-        .sheet(isPresented: $photoManager.showTrash) {
+        .sheet(isPresented: $photoManager.showTrash, onDismiss: {
+            if let pending = photoManager.pendingCleanupResult {
+                photoManager.pendingCleanupResult = nil
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 120_000_000)
+                    photoManager.lastCleanupResult = pending
+                }
+            }
+        }) {
             TrashView(photoManager: photoManager)
                 // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
                 .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(item: $photoManager.lastCleanupResult) { result in
+            CleanupResultView(result: result) {
+                photoManager.lastCleanupResult = nil
+                ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: result.deletedCount, requestReview: requestReview)
+            }
         }
     }
 
@@ -124,14 +158,21 @@ struct MainTabView: View {
         NavigationStack(path: $albumsPath) {
             Group {
                 if let albumMgr = albumManager {
-                    AlbumListView(albumManager: albumMgr) { album in
-                        selectedAlbum = album
-                        Task { [album] in
-                            await albumMgr.fetchPhotos(in: album)
-                            guard selectedAlbum?.id == album.id else { return }
-                            albumsPath.append(AlbumsDestination.albumDetail(album.id))
+                    AlbumListView(
+                        albumManager: albumMgr,
+                        onThisDayManager: onThisDayManager,
+                        onAlbumSelect: { album in
+                            selectedAlbum = album
+                            Task { [album] in
+                                await albumMgr.fetchPhotos(in: album)
+                                guard selectedAlbum?.id == album.id else { return }
+                                albumsPath.append(AlbumsDestination.albumDetail(album.id))
+                            }
+                        },
+                        onYearGroupSelect: { group in
+                            albumsPath.append(AlbumsDestination.onThisDay(group))
                         }
-                    }
+                    )
                 } else {
                     loadingView
                 }
@@ -149,6 +190,9 @@ struct MainTabView: View {
                 }
                 if let albumMgr = albumManager {
                     await albumMgr.fetchUserAlbums()
+                }
+                if !onThisDayManager.hasLoadedOnce {
+                    await onThisDayManager.fetchOnThisDay()
                 }
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
@@ -175,6 +219,11 @@ struct MainTabView: View {
                             onPhotoSelect: { _ in }
                         )
                     }
+                case .onThisDay(let group):
+                    OnThisDayPhotoListView(
+                        group: group,
+                        photoManager: photoManager
+                    )
                 }
             }
         }

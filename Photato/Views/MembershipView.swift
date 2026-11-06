@@ -27,6 +27,7 @@ struct MembershipView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear { AppAnalytics.event("paywall_opened") }
         .alert(String(localized: "Purchase Successful"), isPresented: $membershipManager.showSuccessAlert) {
             Button(String(localized: "OK")) {
                 hasShownMembership = true

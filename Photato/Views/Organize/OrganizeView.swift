@@ -45,12 +45,7 @@ struct OrganizeView: View {
                     junkPercentage: junkPercentage
                 )
 
-                // 2. 历史清理成就横幅（若已释放过空间）
-                if statisticsManager.storageSpaceSavedBytes > 0 || statisticsManager.totalDeletedPhotos > 0 {
-                    cleanedAccomplishmentBanner
-                }
-
-                // 3. 智能清理分类 (2列网格纯白卡片)
+                // 2. 智能清理分类 (2列网格纯白卡片)
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(title: String(localized: "Smart Cleanup"))
 
@@ -152,36 +147,10 @@ struct OrganizeView: View {
     // MARK: - 分组标题组件
     private func sectionHeader(title: String) -> some View {
         Text(title)
-            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .font(.system(size: 14, weight: .medium, design: .rounded))
             .foregroundColor(Color(.secondaryLabel))
             .padding(.horizontal, 4)
             .padding(.top, 4)
-    }
-
-    // MARK: - 历史清理成就横幅
-    private var cleanedAccomplishmentBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
-
-            Text(String(localized: "Freed \(statisticsManager.storageSpaceSavedText) · Cleaned \(statisticsManager.totalDeletedPhotos) photos"))
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 12))
-                .foregroundColor(Color(red: 0.16, green: 0.78, blue: 0.24))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
-        )
     }
 }
 
@@ -433,7 +402,10 @@ private struct OrganizeScanCard: View {
 
     /// 样式沿用设置页会员卡右侧的「升级」胶囊按钮
     private func scanPillButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(action: {
+            SoundManager.playAction()
+            action()
+        }) {
             HStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(.title3, design: .rounded))

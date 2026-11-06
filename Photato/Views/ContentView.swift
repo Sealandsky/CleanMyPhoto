@@ -212,29 +212,35 @@ struct ContentView: View {
 
     @ViewBuilder
     private var filterMenuLabel: some View {
-        if discoverManager.selectedFilter == .all {
-            // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
-            Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 18, weight: .regular, design: .rounded))
-                .foregroundColor(.primary)
-                .frame(width: 44, height: 44)
-                .modifier(HeaderLiquidGlassModifier())
-                .contentShape(Circle())
-        } else {
-            // 选中某个分类：系统原生颜色，文本+图标排版与 Liquid Glass 胶囊底
-            HStack(spacing: 6) {
-                Text(discoverManager.selectedFilter.localizedText)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+        Group {
+            if discoverManager.selectedFilter == .all {
+                // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 18, weight: .regular, design: .rounded))
+                    .foregroundColor(.primary)
+                    .frame(width: 44, height: 44)
+                    .modifier(HeaderLiquidGlassModifier())
+                    .contentShape(Circle())
+            } else {
+                // 选中某个分类：系统原生颜色，文本+图标排版与 Liquid Glass 胶囊底
+                HStack(spacing: 6) {
+                    Text(discoverManager.selectedFilter.localizedText)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 18, weight: .regular, design: .rounded))
+                }
+                .foregroundColor(.primary)
+                .padding(.horizontal, 12)
+                .frame(minWidth: 44, minHeight: 44)
+                .frame(height: 44)
+                .modifier(HeaderLiquidGlassModifier())
+                .contentShape(Capsule())
             }
-            .foregroundColor(.primary)
-            .padding(.horizontal, 12)
-            .frame(minWidth: 44, minHeight: 44)
-            .frame(height: 44)
-            .modifier(HeaderLiquidGlassModifier())
-            .contentShape(Capsule())
         }
+        // VoiceOver：读出“筛选”与当前选中分类，而不是“按钮”
+        .accessibilityLabel(discoverManager.selectedFilter == .all
+            ? String(localized: "Filter")
+            : String(localized: "Filter: \(discoverManager.selectedFilter.localizedText)"))
     }
 }
 

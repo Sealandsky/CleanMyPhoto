@@ -7,9 +7,9 @@ struct TrashView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
 
-    @State private var showingDeleteConfirmation = false
     @State private var showingRestoreConfirmation = false
     @State private var showMembershipPaywall = false
+    @State private var isDeleting = false
     @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
 
@@ -27,6 +27,7 @@ struct TrashView: View {
             .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : String(localized: "Pending Photos"))
             .navigationBarTitleDisplayMode(.inline)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .onAppear { AppAnalytics.screen("Pending Photos") }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
@@ -54,6 +55,7 @@ struct TrashView: View {
             .confirmationDialog(String(localized: "Restore All Photos"), isPresented: $showingRestoreConfirmation) {
                 Button(String(localized: "Cancel"), role: .cancel) { }
                 Button(String(localized: "Restore All")) {
+                    SoundManager.playAction()
                     withAnimation {
                         photoManager.restoreAllFromTrash()
                         dismiss()
@@ -61,26 +63,6 @@ struct TrashView: View {
                 }
             } message: {
                 Text(String(localized: "Restore \(photoManager.trashCount) photos to your library?"))
-            }
-            .alert(String(localized: "Delete All Photos"), isPresented: $showingDeleteConfirmation) {
-                Button(String(localized: "Cancel"), role: .cancel) { }
-                Button(String(localized: "Delete"), role: .destructive) {
-                    let count = photoManager.trashCount
-                    Task {
-                        await photoManager.emptyTrash()
-                        ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: count, requestReview: requestReview)
-                        dismiss()
-                    }
-                }
-            } message: {
-                // 免费用户追加额度消耗提示（消耗数封顶为剩余额度）；会员保持原文案
-                if membershipManager.isPremiumMember {
-                    Text(String(localized: "Permanently delete \(photoManager.trashCount) photos? This cannot be undone."))
-                } else {
-                    let consumed = min(photoManager.trashCount, membershipManager.freeDeletionsRemaining)
-                    let remainingAfter = max(0, membershipManager.freeDeletionsRemaining - photoManager.trashCount)
-                    Text(String(localized: "Free Quota Delete Message \(photoManager.trashCount) \(consumed) \(remainingAfter)"))
-                }
             }
             .sheet(isPresented: $showMembershipPaywall) {
                 MembershipView(isMandatory: true)
@@ -116,6 +98,7 @@ struct TrashView: View {
                         Text(String(localized: "Restore All"))
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                     }
+                    .disabled(isDeleting)
 
                     liquidGlassCapsule(tint: .red, prominent: true) {
                         // 门槛：会员或仍有免费额度即可清空；两者皆无才弹会员墙
@@ -123,18 +106,34 @@ struct TrashView: View {
                             showMembershipPaywall = true
                             return
                         }
-                        showingDeleteConfirmation = true
+                        guard !isDeleting else { return }
+                        isDeleting = true
+                        Task {
+                            defer { isDeleting = false }
+                            if let result = await photoManager.emptyTrash() {
+                                photoManager.pendingCleanupResult = result
+                                dismiss()
+                            }
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            // 非会员且免费额度用尽时按钮带锁标预告知：点击后才弹付费墙不显突兀
-                            if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            if isDeleting {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                                    .scaleEffect(0.85)
+                            } else {
+                                // 非会员且免费额度用尽时按钮带锁标预告知：点击后才弹付费墙不显突兀
+                                if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                }
                             }
                             Text(String(localized: "Empty Trash"))
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                         }
                     }
+                    .disabled(isDeleting)
                 }
             }
             .padding(.horizontal, 16)
@@ -153,6 +152,7 @@ struct TrashView: View {
                                     action: @escaping () -> Void,
                                     @ViewBuilder label: @escaping () -> some View) -> some View {
         let button = Button {
+            SoundManager.playAction()
             action()
         } label: {
             label()

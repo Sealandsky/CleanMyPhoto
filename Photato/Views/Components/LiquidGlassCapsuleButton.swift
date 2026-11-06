@@ -23,10 +23,15 @@ struct LiquidGlassCapsuleButton<Label: View>: View {
         self.label = label
     }
 
+    private func handleAction() {
+        SoundManager.playAction()
+        action()
+    }
+
     var body: some View {
         if #available(iOS 26.0, *) {
             if isProminent {
-                Button(action: action) {
+                Button(action: handleAction) {
                     label()
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .frame(maxWidth: .infinity)
@@ -36,7 +41,7 @@ struct LiquidGlassCapsuleButton<Label: View>: View {
                 .tint(tintColor)
                 .buttonBorderShape(.capsule)
             } else {
-                Button(action: action) {
+                Button(action: handleAction) {
                     label()
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .frame(maxWidth: .infinity)
@@ -46,7 +51,7 @@ struct LiquidGlassCapsuleButton<Label: View>: View {
                 .buttonBorderShape(.capsule)
             }
         } else {
-            Button(action: action) {
+            Button(action: handleAction) {
                 label()
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(isProminent ? .white : .primary)

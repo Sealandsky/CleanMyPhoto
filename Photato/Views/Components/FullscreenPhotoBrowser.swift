@@ -481,12 +481,14 @@ struct FullscreenPhotoBrowser: View {
     private var moreButton: some View {
         Menu {
             Button {
+                SoundManager.playAction()
                 shareCurrentItem()
             } label: {
                 Label(String(localized: "Share"), systemImage: "square.and.arrow.up")
             }
 
             Button {
+                SoundManager.playAction()
                 showInfoSheet = true
             } label: {
                 Label(String(localized: "Info"), systemImage: "info.circle")
@@ -494,6 +496,7 @@ struct FullscreenPhotoBrowser: View {
 
             if let photo = currentPhoto, photo.mediaType != .video {
                 Button {
+                    SoundManager.playAction()
                     copyCurrentImage()
                 } label: {
                     Label(String(localized: "Copy"), systemImage: "doc.on.doc")
@@ -502,6 +505,7 @@ struct FullscreenPhotoBrowser: View {
 
             if albumContext != nil {
                 Button(role: .destructive) {
+                    SoundManager.playAction()
                     removeFromCurrentAlbum()
                 } label: {
                     Label(
@@ -580,7 +584,10 @@ struct FullscreenPhotoBrowser: View {
         @ViewBuilder content: @escaping () -> Content,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button(action: {
+            SoundManager.playAction()
+            action()
+        }) {
             glassLabel(size: size, iconSize: iconSize, tint: tint, content: content)
         }
     }

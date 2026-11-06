@@ -147,6 +147,7 @@ struct DiscoverView: View {
                         .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .foregroundColor(pullArmed ? .blue : .primary)
                         .rotationEffect(.degrees(visualPullProgress * 180))
+                        .accessibilityHidden(true)
                 }
             }
             .frame(width: 48, height: 48)
@@ -200,13 +201,15 @@ struct DiscoverView: View {
         // 目标 cell 再滚动——与相簿页同一套已验证方案）
         ScrollViewReader { proxy in
             ScrollView {
-            // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
-                AdaptivePhotoGrid(photos: manager.photos) { photo in
-                    photoCellView(photo)
+                VStack(spacing: 0) {
+                    // 自适应网格：固定比例 LazyVGrid / 原比例瀑布流
+                    AdaptivePhotoGrid(photos: manager.photos) { photo in
+                        photoCellView(photo)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
                 }
-                .padding(.horizontal, 4)
-                .padding(.top, 4)
-                .padding(.bottom, 4)
             }
             // 滚动位置绑定：支持按边缘滚到真正的顶部（offset 0）
             .scrollPosition($scrollPosition)
@@ -384,7 +387,10 @@ struct DiscoverView: View {
 }
 
 #Preview {
-    DiscoverView(manager: DiscoverManager(), onPhotoSelect: { _ in })
-        .environment(GridSettings())
-        .environmentObject(PhotoManager())
+    DiscoverView(
+        manager: DiscoverManager(),
+        onPhotoSelect: { _ in }
+    )
+    .environment(GridSettings())
+    .environmentObject(PhotoManager())
 }

@@ -213,12 +213,12 @@ struct AlbumDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 4) {
                             Text(String(localized: "Your Photos"))
-                                .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundColor(Color(.secondaryLabel))
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(.secondaryLabel))
                         }
 
                         Text(String(localized: "\(albumPhotos.count) Photos"))
@@ -330,13 +330,13 @@ struct AlbumDetailView: View {
             // 标题栏：在任何状态下始终保留
             HStack(spacing: 6) {
                 Text(String(localized: "More Photos for This Album"))
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(Color(.secondaryLabel))
 
                 if !isLoadingRecommendations && !recommendedPhotos.isEmpty {
                     Text("\(recommendedPhotos.count)")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14, weight: .regular, design: .rounded))
+                        .foregroundColor(Color(.secondaryLabel))
                 }
 
                 Spacer()
@@ -452,6 +452,7 @@ struct AlbumDetailView: View {
 
             // 行动按钮：开启 AI 推荐（触发半屏面板）
             Button {
+                SoundManager.playAction()
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 showScanSheet = true
             } label: {
@@ -607,6 +608,7 @@ struct AlbumDetailView: View {
     private func addPhotoToAlbum(_ photo: PhotoAsset) {
         guard !addingPhotoIDs.contains(photo.id) && !addedPhotoIDs.contains(photo.id) else { return }
         _ = addingPhotoIDs.insert(photo.id)
+        SoundManager.playAction()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         Task {

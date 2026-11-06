@@ -42,6 +42,9 @@ struct AlbumPhotoListView: View {
                             isSelectMode: selectionManager.isSelectMode
                         )
                         .id(photo.id)
+                        .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                            source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if selectionManager.isSelectMode {
@@ -66,7 +69,7 @@ struct AlbumPhotoListView: View {
                             photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
                         }
 
-                        let swipeableCell = cell.swipeToTrash(
+                        cell.swipeToTrash(
                             photo: photo,
                             isEnabled: !selectionManager.isSelectMode && !isFullscreenMode,
                             isFavorite: photoManager.isFavorite(photo),
@@ -77,10 +80,6 @@ struct AlbumPhotoListView: View {
                                 showFavoriteDeleteAlert = true
                             }
                         )
-
-                        swipeableCell.matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
-                            source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
                     }
                     .padding(.horizontal, 4)
                 }
@@ -197,6 +196,7 @@ struct AlbumPhotoListView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        SoundManager.playAction()
                         let selected = photos.filter { selectionManager.isSelected($0.id) }
                         for photo in selected {
                             photoManager.addToTrash(photo)

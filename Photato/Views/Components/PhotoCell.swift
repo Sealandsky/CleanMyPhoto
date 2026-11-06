@@ -51,6 +51,18 @@ struct PhotoCell: View {
     var body: some View {
         cardContainer(thumbnailSize: resolvedThumbnailSize)
             .aspectRatio(cardAspectRatio, contentMode: .fit)
+            .accessibilityElement(children: isSelectMode ? .combine : .contain)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// 无障碍标签："照片，{日期}"；无日期元数据时退回"照片"
+    private var accessibilityText: String {
+        guard let date = photo.asset.creationDate else {
+            return String(localized: "Photo")
+        }
+        let dateText = date.formatted(date: .abbreviated, time: .omitted)
+        return String(localized: "Photo, \(dateText)")
     }
 
     @ViewBuilder
@@ -136,6 +148,7 @@ struct PhotoCell: View {
     private var addButton: some View {
         Button {
             guard !isAdding && !isAdded else { return }
+            SoundManager.playAction()
             onAdd?()
         } label: {
             ZStack {

@@ -153,6 +153,7 @@ struct AddToAlbumSheet: View {
     /// 添加当前素材到已有相簿：与 AlbumManager.addAssetToAlbum 相同的 PhotoKit 写入
     private func addToAlbum(_ album: AlbumModel) {
         guard addingAlbumID == nil else { return }
+        SoundManager.playAction()
         addingAlbumID = album.id
         let albumID = album.id
         Task {

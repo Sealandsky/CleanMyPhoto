@@ -9,6 +9,7 @@ struct PendingPhotosEntryButton: View {
     var body: some View {
         if isLiquidGlass {
             Button {
+                SoundManager.playAction()
                 photoManager.showTrash = true
             } label: {
                 buttonContent
@@ -20,13 +21,19 @@ struct PendingPhotosEntryButton: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            // VoiceOver：读出“待处理照片”，有数量时一并读出
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Pending Photos"))
         } else {
             Button {
+                SoundManager.playAction()
                 photoManager.showTrash = true
             } label: {
                 buttonContent
                     .foregroundColor(.primary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Pending Photos"))
         }
     }
 

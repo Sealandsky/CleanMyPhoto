@@ -12,6 +12,7 @@ struct SettingsView: View {
 
     @State private var totalLibraryCount = 0
     @State private var showMembership = false
+    @State private var showFeedback = false
     @Environment(GridSettings.self) private var gridSettings
 
     /// 比例选项的当前显示文案（原比例 / 1:1 / 3:4）
@@ -58,6 +59,9 @@ struct SettingsView: View {
         .fullScreenCover(isPresented: $showMembership) {
             MembershipView(isMandatory: false)
         }
+        .sheet(isPresented: $showFeedback) {
+            FeedbackView()
+        }
     }
 
     // MARK: - Sections
@@ -65,15 +69,16 @@ struct SettingsView: View {
     private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundColor(Color(.systemGray))
+                .font(.system(.footnote, design: .rounded).weight(.medium))
+                .foregroundColor(Color(.secondaryLabel))
                 .padding(.leading, 4)
 
             VStack(spacing: 0) {
                 content()
             }
+            .padding(.vertical, 6)
             .background(Color.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 
@@ -95,7 +100,7 @@ struct SettingsView: View {
 
                     Text(membershipCardSubtitle)
                         .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.85))
                 }
 
                 Spacer()
@@ -123,7 +128,7 @@ struct SettingsView: View {
             .padding(.vertical, 28)
             .padding(.horizontal, 16)
             .background(.accentGradient)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -134,23 +139,15 @@ struct SettingsView: View {
                     title: String(localized: "Free Deletion Quota"),
                     value: quotaDisplayText)
 
-            Divider().padding(.leading, 54)
-
             StatRow(icon: "square.on.square",
                     title: String(localized: "Total Photos"),
                     value: totalPhotosDisplayText)
 
-            Divider().padding(.leading, 54)
-
             cleanablePhotosRow
-
-            Divider().padding(.leading, 54)
 
             StatRow(icon: "trash",
                     title: String(localized: "Deleted Photos"),
                     value: statisticsManager.deletedPhotosText)
-
-            Divider().padding(.leading, 54)
 
             StatRow(icon: "externaldrive",
                     title: String(localized: "Space Saved"),
@@ -160,12 +157,12 @@ struct SettingsView: View {
 
     private func layoutSection(gridSettings: GridSettings) -> some View {
         sectionCard(title: String(localized: "Layout")) {
-            HStack {
-                Image(systemName: "square.grid.2x2")
-                    .foregroundColor(.blue)
-                    .frame(width: 30)
+            HStack(spacing: 12) {
+                SettingsIconView(systemName: "square.grid.2x2")
 
                 Text(String(localized: "Grid Layout"))
+                    .font(.system(.callout, design: .rounded))
+                    .foregroundColor(.primary)
 
                 Spacer()
 
@@ -182,6 +179,7 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text("\(gridSettings.columnCount)")
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(.caption2, design: .rounded))
@@ -190,16 +188,14 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
+            .frame(minHeight: 52)
 
-            Divider().padding(.leading, 54)
-
-            HStack {
-                Image(systemName: "rectangle.split.3x1")
-                    .foregroundColor(.blue)
-                    .frame(width: 30)
+            HStack(spacing: 12) {
+                SettingsIconView(systemName: "rectangle.split.3x1")
 
                 Text(String(localized: "Photo Ratio"))
+                    .font(.system(.callout, design: .rounded))
+                    .foregroundColor(.primary)
 
                 Spacer()
 
@@ -222,6 +218,7 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(ratioDisplayText)
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(.caption2, design: .rounded))
@@ -230,117 +227,154 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
+            .frame(minHeight: 52)
         }
     }
 
     private var aboutSection: some View {
         sectionCard(title: String(localized: "About")) {
-            HStack {
-                Image(systemName: "info.circle")
-                    .foregroundColor(.blue)
-                    .frame(width: 30)
+            Button {
+                showFeedback = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "envelope")
+
+                    Text(String(localized: "Send Feedback"))
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 52)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 12) {
+                SettingsIconView(systemName: "info.circle")
 
                 Text(String(localized: "Version"))
+                    .font(.system(.callout, design: .rounded))
+                    .foregroundColor(.primary)
                 Spacer()
                 Text(appVersion)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
-
-            Divider().padding(.leading, 54)
+            .frame(minHeight: 52)
 
             Link(destination: ReviewPromptManager.appStoreReviewURL) {
-                HStack {
-                    Image(systemName: "star")
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "star")
 
                     Text(String(localized: "Rate Photato"))
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 48)
+                .frame(minHeight: 52)
                 .contentShape(Rectangle())
             }
-            .foregroundColor(.primary)
-
-            Divider().padding(.leading, 54)
+            .buttonStyle(.plain)
 
             Link(destination: privacyPolicyURL) {
-                HStack {
-                    Image(systemName: "hand.raised")
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "hand.raised")
 
                     Text(String(localized: "Privacy Policy"))
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 48)
+                .frame(minHeight: 52)
                 .contentShape(Rectangle())
             }
-            .foregroundColor(.primary)
-
-            Divider().padding(.leading, 54)
+            .buttonStyle(.plain)
 
             Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
-                HStack {
-                    Image(systemName: "doc.text")
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "doc.text")
 
                     Text(String(localized: "Terms of Use"))
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 48)
+                .frame(minHeight: 52)
                 .contentShape(Rectangle())
             }
-            .foregroundColor(.primary)
+            .buttonStyle(.plain)
         }
     }
 
     #if DEBUG
     private var debugSection: some View {
         sectionCard(title: "Debug") {
-            Toggle("Simulate Pro Member", isOn: $membershipManager.isDebugPremium)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 48)
-
-            Divider().padding(.leading, 16)
+            Toggle(isOn: $membershipManager.isDebugPremium) {
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "crown")
+                    Text("Simulate Pro Member")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.primary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
 
             Button {
                 membershipManager.resetFreeQuotaForTesting()
             } label: {
-                Text("Reset Free Quota (100 left)")
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "arrow.counterclockwise")
+                    Text("Reset Free Quota (100 left)")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.blue)
+                    Spacer()
+                }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
-
-            Divider().padding(.leading, 16)
+            .frame(minHeight: 52)
 
             Button {
                 membershipManager.exhaustFreeQuotaForTesting()
             } label: {
-                Text("Exhaust Free Quota (0 left)")
-                    .foregroundColor(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "xmark.circle")
+                    Text("Exhaust Free Quota (0 left)")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.red)
+                    Spacer()
+                }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
+            .frame(minHeight: 52)
+
+            Button {
+                photoManager.lastCleanupResult = CleanupResult(deletedCount: 24, freedBytes: 256_000_000)
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIconView(systemName: "sparkles")
+                    Text("Test Cleanup Result Page")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
         }
     }
     #endif
@@ -378,12 +412,11 @@ struct SettingsView: View {
         Button {
             onNavigateToOrganize?()
         } label: {
-            HStack {
-                Image(systemName: "eraser")
-                    .foregroundColor(.blue)
-                    .frame(width: 30)
+            HStack(spacing: 12) {
+                SettingsIconView(systemName: "eraser")
 
                 Text(String(localized: "Cleanable Photos"))
+                    .font(.system(.callout, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -391,31 +424,34 @@ struct SettingsView: View {
                 if let manager = organizeManager, manager.hasCompletedFullScan {
                     HStack(spacing: 4) {
                         Text(cleanablePhotosDisplayText)
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.right")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundColor(.secondary.opacity(0.6))
+                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .foregroundColor(Color(uiColor: .secondaryLabel))
                     }
                 } else if let manager = organizeManager, manager.isAnalyzing {
                     HStack(spacing: 4) {
                         Text(String(localized: "Scanning..."))
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(.blue)
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(.blue)
+                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .foregroundColor(Color(uiColor: .secondaryLabel))
                     }
                 } else {
                     HStack(spacing: 4) {
                         Text(String(localized: "To Scan"))
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(.blue)
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(.blue)
+                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .foregroundColor(Color(uiColor: .secondaryLabel))
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 48)
+            .frame(minHeight: 52)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -477,20 +513,37 @@ struct StatRow: View {
     let value: String
 
     var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-                .frame(width: 30)
+        HStack(spacing: 12) {
+            SettingsIconView(systemName: icon)
 
             Text(title)
+                .font(.system(.callout, design: .rounded))
                 .foregroundColor(.primary)
 
             Spacer()
 
             Text(value)
+                .font(.system(.subheadline, design: .rounded))
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 48)
+        .frame(minHeight: 52)
+    }
+}
+
+// MARK: - Settings Icon Component
+struct SettingsIconView: View {
+    let systemName: String
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(uiColor: .systemGray6))
+                .frame(width: 36, height: 36)
+
+            Image(systemName: systemName)
+                .font(.system(.callout, design: .rounded))
+                .foregroundColor(.primary)
+        }
     }
 }

@@ -12,7 +12,10 @@ struct ProductCard: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            SoundManager.playAction()
+            onTap()
+        }) {
             HStack(spacing: 12) {
                 // 左侧：产品名称与精炼标签
                 VStack(alignment: .leading, spacing: 6) {

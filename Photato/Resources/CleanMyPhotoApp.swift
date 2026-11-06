@@ -11,6 +11,11 @@ struct CleanMyPhotoApp: App {
     @State private var gridSettings = GridSettings()
 
     init() {
+        AppAnalytics.setup()
+        AirCrashReports.start(apiKey: "ak_production_e4Z6W5XtlFs6tPGdsQaub3Sc6WMSVHI-G0kMv9BPcNs",
+                              endpoint: "https://apps.air.build/v1/ingest/crashes")
+        PurchaseReporter.start()
+        SoundManager.shared.preloadSounds()
         let stats = StatisticsManager()
         let membership = MembershipManager()
         let photoManager = PhotoManager(statisticsManager: stats)

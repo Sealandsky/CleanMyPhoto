@@ -35,11 +35,11 @@ struct WelcomePage: View {
                 // 欢迎文字
                 VStack(spacing: 8) {
                     Text(String(localized: "Welcome to Photato"))
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(.system(.title3, design: .rounded).weight(.semibold))
                         .foregroundColor(.primary)
 
                     Text(String(localized: "Maximize Your Photo Storage", defaultValue: "轻松整理照片"))
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .font(.system(.title, design: .rounded).weight(.semibold))
                         .frame(maxWidth: 280)
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.center)

@@ -182,24 +182,56 @@ struct SwipeToTrashModifier: ViewModifier {
     @State private var isDismissing: Bool = false
     @State private var cardOpacity: CGFloat = 1.0
     @State private var hasTriggeredArmedHaptic: Bool = false
+    @State private var measuredHeight: CGFloat? = nil
+    @State private var isCollapsing: Bool = false
 
     /// 触发删除的位移阈值（约 85pt，接近双列网格卡片宽度的 45%）
     private static let triggerDistance: CGFloat = 85
     /// 触发轻甩删除的速度阈值（550 pt/s）
     private static let flickVelocity: CGFloat = 550
 
+    /// 卡片解析高度：未塌陷时为真实测量高度（未就绪前由 aspect ratio 兜底），塌陷时平滑缩为 0
+    private var resolvedHeight: CGFloat? {
+        if isCollapsing {
+            return 0
+        }
+        return measuredHeight
+    }
+
+    /// 兜底高度计算（在首帧 onGeometryChange 完成前提供防御性高度）
+    private var fallbackHeight: CGFloat {
+        let columns = CGFloat(GridColumnHelper.defaultCount)
+        let totalSpacing = GridColumnHelper.spacing * (columns - 1)
+        let columnWidth = (ScreenSizeHelper.screenSize.width - GridColumnHelper.horizontalPadding - totalSpacing) / columns
+        let ratio = photo.pixelAspectRatio > 0 ? photo.pixelAspectRatio : GridColumnHelper.defaultRatio
+        return columnWidth / ratio
+    }
+
     func body(content: Content) -> some View {
         content
+            // 实时测量未受 frame 限制时的卡片真实高度
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height
+            } action: { newHeight in
+                if !isDismissing && !isCollapsing && newHeight > 0 {
+                    measuredHeight = newHeight
+                }
+            }
+            // 垂直高度与塌陷控制（在 offset 内层，垂直裁切不会影响卡片水平滑出屏幕）
+            .frame(height: resolvedHeight, alignment: .top)
+            .clipped()
+            .padding(.bottom, isCollapsing ? -GridColumnHelper.spacing : 0)
+            // 水平滑动、旋转与淡出
             .offset(x: dragOffset)
             .rotationEffect(.degrees(Double(dragOffset / 180.0) * 3.5))
             .opacity(cardOpacity)
             .scaleEffect(isDragging ? 0.98 : 1.0)
             .zIndex(isDragging || isDismissing ? 2 : 0)
-            .allowsHitTesting(!isDismissing && (!isDragging || abs(dragOffset) < 5))
+            .allowsHitTesting(!isDismissing && !isCollapsing && (!isDragging || abs(dragOffset) < 5))
             .gesture(
                 CardSwipePanGesture(
                     isEnabled: {
-                        isEnabled && !isDismissing
+                        isEnabled && !isDismissing && !isCollapsing
                     },
                     onChanged: { translation, _ in
                         handlePanChanged(translation: translation)
@@ -259,21 +291,31 @@ struct SwipeToTrashModifier: ViewModifier {
 
         if isOverDistance || isFlick {
             isDismissing = true
+            SoundManager.playSwipeDelete()
             // 顺应滑行方向加速飞出屏幕
             let direction: CGFloat = (translation.x > 0 || (abs(translation.x) <= 20 && velocity.x > 0)) ? 1 : -1
             let flyOutTarget = direction * (ScreenSizeHelper.screenSize.width + 120)
 
-            withAnimation(.easeOut(duration: 0.22)) {
+            // 第一阶段：卡片快速平滑飞出视野 (0.18s)
+            withAnimation(.easeOut(duration: 0.18)) {
                 dragOffset = flyOutTarget
                 cardOpacity = 0
             }
 
-            // 飞出后派发删除，驱动网格流体补位
+            // 第二阶段：飞出屏幕后，高度与间距平滑弹性塌陷，驱动同列下方照片顺滑上移补位
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 180_000_000)
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                    onTrash(photo)
+                // 等待卡片水平主体移出屏幕（约 140ms）
+                try? await Task.sleep(nanoseconds: 140_000_000)
+
+                // 启动高度与间距弹性塌陷动画：同列下方照片在此期间以平滑弹性向上滑动顶替空位
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    isCollapsing = true
                 }
+
+                // 第三阶段：等待高度完全归零后（约 260ms），静默移除数据源
+                // 此时占位已为 0，数据移除瞬间产生 0 像素位移突变，彻底告别闪烁
+                try? await Task.sleep(nanoseconds: 260_000_000)
+                onTrash(photo)
             }
         } else {
             // 未越过阈值：弹性平滑回弹归位

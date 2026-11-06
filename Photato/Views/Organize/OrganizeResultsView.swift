@@ -7,7 +7,6 @@ struct OrganizeResultsView: View {
     @ObservedObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
     @State private var selectionManager = SelectionManager()
-    @State private var showDeleteConfirm = false
     @State private var selectedSizeText = ByteFormatter.format(0)
     @State private var categorySizeText = ""
 
@@ -166,18 +165,6 @@ struct OrganizeResultsView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .navigationDestination(isPresented: $isFullscreenMode) {
             fullscreenBrowserDestination
-        }
-        .confirmationDialog(
-            String(localized: "Add \(selectionManager.count) photos to Pending Photos?"),
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button(String(localized: "Add to Pending Photos"), role: .destructive) {
-                deleteSelected()
-            }
-            Button(String(localized: "Cancel"), role: .cancel) { }
-        } message: {
-            Text(String(localized: "\(selectionManager.count) photos will be moved to the Trash and can be restored there. Total \(selectedSizeText)"))
         }
         .onAppear {
             if dateSections.isEmpty {
@@ -688,7 +675,7 @@ struct OrganizeResultsView: View {
     ) -> String {
         let dates = photos.compactMap { $0.asset.creationDate }.sorted()
         guard let first = dates.first else {
-            return String(localized: "Unknown Date")
+            return String(localized: "Unknown date")
         }
         guard let last = dates.last else {
             let timeStyle: Date.FormatStyle.TimeStyle = includeSeconds ? .standard : .shortened
@@ -770,6 +757,7 @@ struct OrganizeResultsView: View {
 
 
     private func toggleSelectAll() {
+        SoundManager.playAction()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if selectionManager.count == allPhotos.count {
             selectionManager.clearSelection()
@@ -791,7 +779,8 @@ struct OrganizeResultsView: View {
 
     private var deleteFloatingButton: some View {
         Button {
-            showDeleteConfirm = true
+            SoundManager.playAction()
+            deleteSelected()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "trash.fill")
@@ -814,6 +803,7 @@ struct OrganizeResultsView: View {
     /// AI 帮选：每组自动选中除最优照片外的全部成员（保留最优，其余待删），单次批量更新并触觉反馈
     private func aiAutoSelect() {
         guard isGroupedMode else { return }
+        SoundManager.playAction()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         var idsToSelect: [String] = []
         for group in displayedGroups {

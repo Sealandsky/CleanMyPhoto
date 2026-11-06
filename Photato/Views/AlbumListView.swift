@@ -4,34 +4,54 @@ import Photos
 
 struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
+    @ObservedObject var onThisDayManager: OnThisDayManager
     let onAlbumSelect: (AlbumModel) -> Void
+    var onYearGroupSelect: ((OnThisDayYearGroup) -> Void)? = nil
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
 
     var body: some View {
         ScrollView {
-            if albumManager.isLoadingAlbums {
-                skeletonGrid
-            } else if albumManager.albums.isEmpty {
-                emptyAlbumsView
-            } else {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(albumManager.albums) { album in
-                        // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
-                        AlbumStackCell(album: album)
-                            .onTapGesture {
-                                onAlbumSelect(album)
-                            }
-                    }
+            VStack(spacing: 0) {
+                // 1. 顶部「过去的今天」年份卡片区
+                OnThisDaySectionView(manager: onThisDayManager) { group in
+                    onYearGroupSelect?(group)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 24)
+
+                // 2. 相簿网格内容
+                if albumManager.isLoadingAlbums {
+                    skeletonGrid
+                } else if albumManager.albums.isEmpty {
+                    emptyAlbumsView
+                } else {
+                    albumsGrid
+                }
             }
         }
         .background(Color.pageBackground)
         .scrollIndicators(.hidden)  // 隐藏滚动条
         .scrollEdgeEffectStyle(.soft, for: .bottom)
+        .refreshable {
+            async let refreshAlbums: () = albumManager.fetchUserAlbums()
+            async let refreshOnThisDay: () = onThisDayManager.fetchOnThisDay(forceRefresh: true)
+            _ = await (refreshAlbums, refreshOnThisDay)
+        }
+    }
+
+    // MARK: - Albums Grid
+    private var albumsGrid: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(albumManager.albums) { album in
+                // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
+                AlbumStackCell(album: album)
+                    .onTapGesture {
+                        onAlbumSelect(album)
+                    }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 24)
     }
 
     // MARK: - Skeleton Grid
@@ -98,5 +118,8 @@ struct AlbumCellSkeleton: View {
 }
 
 #Preview {
-    AlbumListView(albumManager: AlbumManager(photoManager: PhotoManager())) { _ in }
+    AlbumListView(
+        albumManager: AlbumManager(photoManager: PhotoManager()),
+        onThisDayManager: OnThisDayManager()
+    ) { _ in }
 }

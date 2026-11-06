@@ -195,6 +195,7 @@ class MembershipManager: ObservableObject {
 
     private func handleTransactionUpdate(_ result: VerificationResult<StoreKit.Transaction>) {
         do {
+            PurchaseReporter.report(result)
             let transaction = try checkVerified(result)
 
             // 检查是否是我们的产品
@@ -231,6 +232,8 @@ class MembershipManager: ObservableObject {
             switch result {
             case .success(let verification):
                 print("✅ Purchase successful")
+                PurchaseReporter.report(verification)
+                AppAnalytics.event("purchase_completed")
                 let transaction = try checkVerified(verification)
                 await refreshEntitlements()
 

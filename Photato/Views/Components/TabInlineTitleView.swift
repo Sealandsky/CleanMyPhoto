@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Tab 首页通用左侧大标题视图与修饰器：
 /// 在 inline 吸顶模式下，于左侧呈现原生 .largeTitle 粗体圆角大标题，
@@ -37,48 +38,100 @@ extension View {
     }
 }
 
+// MARK: - 真实渐变高斯模糊视图（100% 官方公开 API）
+/// 通过 UIKit 的 UIVisualEffectView.maskView 机制，
+/// 完美克服 SwiftUI .mask 会强制抹除 Material 高斯模糊的底层限制，
+/// 真正实现：既有真实高斯模糊，又自上而下平滑衰减至完全透明！
+public struct GradientBlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemThinMaterial
+    var solidCoverageRatio: NSNumber = 0.25 // 顶部状态栏保持 100% 饱满模糊的比例
+
+    public init(style: UIBlurEffect.Style = .systemThinMaterial, solidCoverageRatio: NSNumber = 0.25) {
+        self.style = style
+        self.solidCoverageRatio = solidCoverageRatio
+    }
+
+    public func makeUIView(context: Context) -> UIGradientBlurEffectView {
+        let view = UIGradientBlurEffectView(effect: UIBlurEffect(style: style))
+        view.solidCoverageRatio = solidCoverageRatio
+        return view
+    }
+
+    public func updateUIView(_ uiView: UIGradientBlurEffectView, context: Context) {
+        uiView.effect = UIBlurEffect(style: style)
+        uiView.solidCoverageRatio = solidCoverageRatio
+        uiView.setNeedsLayout()
+    }
+}
+
+public class UIGradientBlurEffectView: UIVisualEffectView {
+    var solidCoverageRatio: NSNumber = 0.25
+
+    private let maskContainerView = UIView()
+    private let gradientLayer = CAGradientLayer()
+
+    override init(effect: UIVisualEffect?) {
+        super.init(effect: effect)
+        setupMask()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupMask()
+    }
+
+    private func setupMask() {
+        maskContainerView.backgroundColor = .clear
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        maskContainerView.layer.addSublayer(gradientLayer)
+        self.mask = maskContainerView
+    }
+
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        maskContainerView.frame = self.bounds
+        gradientLayer.frame = maskContainerView.bounds
+
+        // 核心技术：在 UIKit 中，向 maskView 赋予黑到透明的 gradientLayer，
+        // 能在完整保留真实高斯模糊计算的前提下，实现平滑渐进衰减！
+        gradientLayer.colors = [
+            UIColor.black.cgColor,
+            UIColor.black.cgColor,
+            UIColor.clear.cgColor
+        ]
+        gradientLayer.locations = [
+            0.0,
+            solidCoverageRatio,
+            1.0
+        ]
+    }
+}
+
+// MARK: - Tab Inline 导航栏修饰器
 struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
     let title: String
     var titleColor: Color = .primary
     @ViewBuilder let trailing: () -> Trailing
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var scrollOffsetY: CGFloat = 0
-
-    /// 随滚动位移（0 ~ 20pt）平滑线性淡入淡出（0.0 -> 1.0）
-    private var scrollProgress: CGFloat {
-        min(1.0, max(0.0, scrollOffsetY / 20.0))
-    }
-
-    /// 当指定顶部为白色标题时，滚动超过阈值平滑过渡至深色 primary 确保可读性
-    private var activeHeaderColor: Color {
-        if titleColor == .white {
-            return scrollProgress > 0.5 ? .primary : .white
-        }
-        return titleColor
-    }
 
     func body(content: Content) -> some View {
         content
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y + geo.contentInsets.top
-            } action: { _, newOffset in
-                scrollOffsetY = max(0, newOffset)
-            }
             .toolbar(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack(alignment: .center, spacing: 12) {
                     Text(title)
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .foregroundColor(activeHeaderColor)
+                        .foregroundColor(titleColor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
 
                     Spacer(minLength: 8)
 
                     trailing()
-                        .foregroundColor(activeHeaderColor)
+                        .foregroundColor(titleColor)
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 54)
@@ -88,26 +141,21 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
             }
     }
 
-    /// 滚动动态毛玻璃背景：
-    /// 1. 静止置顶状态（scrollOffsetY == 0）：完全透明，0 遮挡内容，卡片与页面底色 100% 清晰纯净呈现；
-    /// 2. 随手势连续过渡（0 ~ 20pt）：透明度随上滑位移平滑渐显（opacity: 0.0 -> 1.0）；
-    /// 3. 无边框无延伸（Borderless）：严格锁定在状态栏 + 54pt 标题栏主体内，彻底消除向下 16pt 延伸遮挡；
-    /// 4. 低版本/降低透明度模式：平滑淡入纯色 Color.pageBackground (#F3F3F3) 实体底色。
+    /// 真实渐进式高斯模糊背景：
+    /// 既保持 100% 真实的磨砂高斯模糊折射，又从屏幕顶端向底沿平滑衰减至完全透明！
+    /// 严格贴合 54pt 标题栏底边，无任何向下多余延伸，彻底杜绝遮挡下方卡片。
     @ViewBuilder
     private var headerDynamicBlurBackground: some View {
-        if #available(iOS 15.0, *), !reduceTransparency {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .colorMultiply(Color.pageBackground.opacity(0.35))
-                .opacity(scrollProgress)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-        } else {
-            Color.pageBackground
-                .opacity(scrollProgress)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
+        Group {
+            if #available(iOS 15.0, *), !reduceTransparency {
+                GradientBlurView(style: .systemThinMaterial, solidCoverageRatio: 0.25)
+                    .overlay(Color.pageBackground.opacity(0.08))
+            } else {
+                Color.pageBackground
+            }
         }
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
     }
 }
 

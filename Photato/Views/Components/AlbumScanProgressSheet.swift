@@ -212,6 +212,7 @@ struct AlbumScanProgressSheet: View {
         Group {
             if isCompleted {
                 Button {
+                    SoundManager.playAction()
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onConfirm(foundPhotos)
                     dismiss()
