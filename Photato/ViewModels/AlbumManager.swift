@@ -42,14 +42,32 @@ class AlbumManager: ObservableObject {
         var albums: [AlbumModel] = []
         userAlbums.enumerateObjects { collection, _, _ in
             let album = AlbumModel(collection: collection)
-            // 只显示有照片的相簿
-            if album.assetCount > 0 {
-                albums.append(album)
-            }
+            albums.append(album)
         }
 
         // 按标题排序
         self.albums = albums.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    /// 创建新相簿并刷新用户相簿列表
+    @discardableResult
+    func createAlbum(title: String) async throws -> AlbumModel? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        var createdID: String?
+        try await PHPhotoLibrary.shared().performChanges {
+            let request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: trimmed)
+            createdID = request.placeholderForCreatedAssetCollection.localIdentifier
+        }
+
+        await fetchUserAlbums()
+
+        if let id = createdID {
+            RecentAlbumsStore.shared.recordAlbumAdded(albumID: id)
+            return albums.first(where: { $0.id == id })
+        }
+        return nil
     }
 
     // 获取指定相簿的照片
