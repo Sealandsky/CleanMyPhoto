@@ -175,7 +175,7 @@ struct OrganizeMetricCard: View {
     /// 卡片底板：统一纯白底色，无描边，配柔和悬浮投影
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(Color.white)
+            .fill(Color.cardBackground)
             .shadow(
                 color: Color.black.opacity(0.04),
                 radius: 8,
@@ -248,7 +248,7 @@ struct TrashMetricCard: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(Color.white)
+            .fill(Color.cardBackground)
             .shadow(
                 color: Color.black.opacity(0.04),
                 radius: 8,
