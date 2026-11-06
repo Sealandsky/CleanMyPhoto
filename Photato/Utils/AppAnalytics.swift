@@ -7,7 +7,7 @@ import SwiftUI
 enum AppAnalytics {
     /// 启动时调用一次。
     static func setup() {
-        let config = PostHogConfig(apiKey: "ak_production_e4Z6W5XtlFs6tPGdsQaub3Sc6WMSVHI-G0kMv9BPcNs",
+        let config = PostHogConfig(projectToken: "ak_production_e4Z6W5XtlFs6tPGdsQaub3Sc6WMSVHI-G0kMv9BPcNs",
                                    host: "https://apps.air.build/traffic")
         config.captureApplicationLifecycleEvents = true
         config.captureScreenViews = false

@@ -47,7 +47,7 @@ enum PurchaseReporter {
     /// Call right after a successful `product.purchase()`, before finishing.
     /// Only StoreKit-verified results are sent; anything else would be
     /// refused by the backend anyway.
-    static func report(_ result: VerificationResult<Transaction>) {
+    nonisolated static func report(_ result: VerificationResult<Transaction>) {
         guard case .verified(let transaction) = result else { return }
         Task { await send(result.jwsRepresentation, id: String(transaction.id)) }
     }
