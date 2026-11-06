@@ -1550,7 +1550,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加到相簿"
+            "value": "添加到相册"
           }
         },
         "zh-Hant": {
@@ -1735,7 +1735,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "相簿名称"
+            "value": "相册名称"
           }
         },
         "zh-Hant": {
@@ -1781,7 +1781,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "相簿已整理完毕"
+            "value": "相册已整理完毕"
           }
         },
         "zh-Hant": {
@@ -1827,7 +1827,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "相簿"
+            "value": "相册"
           }
         },
         "zh-Hant": {
@@ -1966,7 +1966,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有相簿已解锁！当前相簿内容已很完整。"
+            "value": "所有相册已解锁！当前相册内容已很完整。"
           }
         },
         "zh-Hant": {
@@ -2012,7 +2012,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有相簿已解锁！已为当前相簿发现 %lld 张照片。"
+            "value": "所有相册已解锁！已为当前相册发现 %lld 张照片。"
           }
         },
         "zh-Hant": {
@@ -2058,7 +2058,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "图库中相似的照片已全部收录，当前相簿内容很完整。"
+            "value": "图库中相似的照片已全部收录，当前相册内容很完整。"
           }
         },
         "zh-Hant": {
@@ -2289,7 +2289,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "深度分析画面特征与场景，为所有相簿解锁专属推荐"
+            "value": "深度分析画面特征与场景，为所有相册解锁专属推荐"
           }
         },
         "zh-Hant": {
@@ -2657,7 +2657,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 帮你补齐相簿"
+            "value": "AI 帮你补齐相册"
           }
         },
         "zh-Hant": {
@@ -3578,7 +3578,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "端侧 AI 将为图库建立智能索引。只需分析一次，所有相簿即可自动解锁专属照片推荐与相似检索。"
+            "value": "端侧 AI 将为图库建立智能索引。只需分析一次，所有相册即可自动解锁专属照片推荐与相似检索。"
           }
         },
         "zh-Hant": {
@@ -5399,7 +5399,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "输入此相簿的名称。"
+            "value": "输入此相册的名称。"
           }
         },
         "zh-Hant": {
@@ -5491,7 +5491,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "创建相簿失败"
+            "value": "创建相册失败"
           }
         },
         "zh-Hant": {
@@ -5680,6 +5680,7 @@
         }
       }
     },
+    "Filter: %@": {},
     "Find duplicate, similar, and low-quality photos": {
       "extractionState": "stale",
       "localizations": {
@@ -5949,7 +5950,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为你发现 %lld 张适合放入此相簿的照片"
+            "value": "已为你发现 %lld 张适合放入此相册的照片"
           }
         },
         "zh-Hant": {
@@ -7617,7 +7618,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在智能匹配相簿照片…"
+            "value": "正在智能匹配相册照片…"
           }
         },
         "zh-Hant": {
@@ -8073,7 +8074,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "更多适合这个相簿的照片"
+            "value": "更多适合这个相册的照片"
           }
         },
         "zh-Hant": {
@@ -8257,7 +8258,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "我的相簿"
+            "value": "我的相册"
           }
         },
         "zh-Hant": {
@@ -8303,7 +8304,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新建相簿"
+            "value": "新建相册"
           }
         },
         "zh-Hant": {
@@ -8396,7 +8397,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未找到相簿"
+            "value": "未找到相册"
           }
         },
         "zh-Hant": {
@@ -8581,7 +8582,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "相簿内暂无照片"
+            "value": "相册内暂无照片"
           }
         },
         "zh-Hant": {
@@ -8627,7 +8628,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "还没有相簿，创建一个开始吧。"
+            "value": "还没有相册，创建一个开始吧。"
           }
         },
         "zh-Hant": {
@@ -9315,7 +9316,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一次分析 · 全相簿解锁"
+            "value": "一次分析 · 全相册解锁"
           }
         },
         "zh-Hant": {
@@ -9976,6 +9977,7 @@
       }
     },
     "Personal Albums": {
+      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -10010,7 +10012,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "个人相簿"
+            "value": "个人相册"
           }
         },
         "zh-Hant": {
@@ -11182,7 +11184,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从相簿移除"
+            "value": "从相册移除"
           }
         },
         "zh-Hant": {
@@ -14131,7 +14133,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "照片将添加到新相簿。"
+            "value": "照片将添加到新相册。"
           }
         },
         "zh-Hant": {
@@ -14654,7 +14656,6 @@
       }
     },
     "Unknown date": {
-      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -15013,7 +15014,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未命名相簿"
+            "value": "未命名相册"
           }
         },
         "zh-Hant": {
@@ -15192,7 +15193,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "利用端侧 AI 分析图库，智能找回可能适合放入此相簿的相似精彩照片。"
+            "value": "利用端侧 AI 分析图库，智能找回可能适合放入此相册的相似精彩照片。"
           }
         },
         "zh-Hant": {
@@ -15693,7 +15694,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "还没有创建任何相簿。"
+            "value": "还没有创建任何相册。"
           }
         },
         "zh-Hant": {
