@@ -14,7 +14,7 @@ struct ScatteredPhotoCard: View {
 
     @State private var imageLoaded = false
 
-    private static let cornerRadius: CGFloat = 10
+    private static let cornerRadius: CGFloat = 9
     private static let imageCornerRadius: CGFloat = 7
 
     var body: some View {
@@ -22,7 +22,7 @@ struct ScatteredPhotoCard: View {
             // 纯白外卡底基
             Color.white
 
-            // 照片内容（四周均匀 3.5pt 细白边包裹，无厚下巴）
+            // 照片内容（四周均匀 2pt 细白边包裹，精致无厚下巴）
             ZStack {
                 Color(UIColor.secondarySystemFill)
 
@@ -43,21 +43,21 @@ struct ScatteredPhotoCard: View {
                     }
                 )
                 .scaledToFill()
-                .frame(width: max(0, width - 7), height: max(0, height - 7))
+                .frame(width: max(0, width - 4), height: max(0, height - 4))
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: Self.imageCornerRadius, style: .continuous))
                 .opacity(imageLoaded ? 1 : 0)
             }
-            .frame(width: max(0, width - 7), height: max(0, height - 7))
-            .padding(3.5)
+            .frame(width: max(0, width - 4), height: max(0, height - 4))
+            .padding(2)
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.9), lineWidth: 1)
+                .strokeBorder(Color.white.opacity(0.85), lineWidth: 0.75)
         )
-        .shadow(color: Color.black.opacity(0.20), radius: 7, x: 0, y: 3.5)
+        .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
         .rotationEffect(rotation)
     }
 }
@@ -107,25 +107,25 @@ struct OnThisDayYearPageView: View {
         let count = photos.count
 
         if count >= 5 {
-            // 5 张照片版式：大特写 + 瘦竖图 + 横宽图 + 小方图 + 侧边微图
-            // 1. p2 (左侧瘦身竖图): 62×92pt，居左下，+4° 倾斜，大幅露出减少遮挡
+            // 5 张照片版式：主图适度缩小(92×102) + 瘦竖图(56×84) + 横宽图(108×74) + 小方图(68×68) + 侧边微图(58×72)
+            // 1. p2 (左侧瘦身竖图): 56×84pt，居左下，+4° 倾斜，大幅露出减少遮挡
             ScatteredPhotoCard(
                 asset: photos[1],
-                width: 62,
-                height: 92,
+                width: 56,
+                height: 84,
                 rotation: .degrees(4)
             )
-            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
+            .offset(x: 66 + parallax.inner, y: containerHeight - 84 + 8)
             .zIndex(1)
 
-            // 2. p1 (左侧大特写主图): 106×116pt，往上移(y: -24)、不贴左边(x: 10)，-6° 倾斜，底图大半完整露出
+            // 2. p1 (左侧大特写主图): 92×102pt，体量适中、上提(y: -18)、不贴左边(x: 14)，-6° 倾斜，底图大半完整露出
             ScatteredPhotoCard(
                 asset: photos[0],
-                width: 106,
-                height: 116,
+                width: 92,
+                height: 102,
                 rotation: .degrees(-6)
             )
-            .offset(x: 10 + parallax.outer, y: -24)
+            .offset(x: 14 + parallax.outer, y: -18)
             .zIndex(2)
 
             // 3. p4 (右侧小品方图): 68×68pt，居右下，+5° 倾斜
@@ -155,26 +155,26 @@ struct OnThisDayYearPageView: View {
                 height: 72,
                 rotation: .degrees(7)
             )
-            .offset(x: (containerWidth - 58 - 8) + parallax.outer, y: 12)
+            .offset(x: (containerWidth - 58 - 10) + parallax.outer, y: 12)
             .zIndex(3)
         } else if count == 4 {
             // 4 张照片版式
             ScatteredPhotoCard(
                 asset: photos[1],
-                width: 62,
-                height: 92,
+                width: 56,
+                height: 84,
                 rotation: .degrees(4)
             )
-            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
+            .offset(x: 66 + parallax.inner, y: containerHeight - 84 + 8)
             .zIndex(1)
 
             ScatteredPhotoCard(
                 asset: photos[0],
-                width: 106,
-                height: 116,
+                width: 92,
+                height: 102,
                 rotation: .degrees(-6)
             )
-            .offset(x: 10 + parallax.outer, y: -24)
+            .offset(x: 14 + parallax.outer, y: -18)
             .zIndex(2)
 
             ScatteredPhotoCard(
@@ -198,20 +198,20 @@ struct OnThisDayYearPageView: View {
             // 3 张照片版式
             ScatteredPhotoCard(
                 asset: photos[1],
-                width: 62,
-                height: 92,
+                width: 56,
+                height: 84,
                 rotation: .degrees(4)
             )
-            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
+            .offset(x: 66 + parallax.inner, y: containerHeight - 84 + 8)
             .zIndex(1)
 
             ScatteredPhotoCard(
                 asset: photos[0],
-                width: 106,
-                height: 116,
+                width: 92,
+                height: 102,
                 rotation: .degrees(-6)
             )
-            .offset(x: 10 + parallax.outer, y: -24)
+            .offset(x: 14 + parallax.outer, y: -18)
             .zIndex(2)
 
             ScatteredPhotoCard(
@@ -226,11 +226,11 @@ struct OnThisDayYearPageView: View {
             // 2 张照片版式
             ScatteredPhotoCard(
                 asset: photos[0],
-                width: 106,
-                height: 116,
+                width: 92,
+                height: 102,
                 rotation: .degrees(-5)
             )
-            .offset(x: 12 + parallax.outer, y: -6)
+            .offset(x: 14 + parallax.outer, y: -4)
 
             ScatteredPhotoCard(
                 asset: photos[1],
@@ -243,8 +243,8 @@ struct OnThisDayYearPageView: View {
             // 1 张照片
             ScatteredPhotoCard(
                 asset: photos[0],
-                width: 106,
-                height: 116,
+                width: 92,
+                height: 102,
                 rotation: .degrees(-4)
             )
             .offset(x: 18 + parallax.outer, y: 2)

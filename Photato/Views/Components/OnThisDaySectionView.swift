@@ -109,7 +109,7 @@ struct OnThisDaySectionView: View {
             if colorScheme == .dark {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.141, green: 0.133, blue: 0.125),
+                        Color(red: 0.150, green: 0.137, blue: 0.125),
                         Color(red: 0.102, green: 0.098, blue: 0.094)
                     ],
                     startPoint: .top,
@@ -118,7 +118,7 @@ struct OnThisDaySectionView: View {
             } else {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.937, green: 0.910, blue: 0.875),
+                        Color(red: 0.965, green: 0.920, blue: 0.845),
                         Color(red: 0.871, green: 0.839, blue: 0.796)
                     ],
                     startPoint: .top,
@@ -131,8 +131,8 @@ struct OnThisDaySectionView: View {
     // MARK: - Center Overlay (底层文字层：印在卡片底板中央，位于照片层下方)
     private func centerOverlay(containerHeight: CGFloat) -> some View {
         VStack(spacing: 3) {
-            // 年份行：例如 "2025" 翻转，"年" 固定不动
-            HStack(alignment: .firstTextBaseline, spacing: 1) {
+            // 年份行：例如 "2025" 翻转，"年" 与数字字号严格一致（均为 24pt 粗体圆体）
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(verbatim: "\(animatedYear)")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(colorScheme == .dark ? .white : Color(red: 0.11, green: 0.11, blue: 0.12))
@@ -141,7 +141,7 @@ struct OnThisDaySectionView: View {
                 let yearSuffix = String(localized: "year_suffix", defaultValue: "")
                 if !yearSuffix.isEmpty {
                     Text(yearSuffix)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(colorScheme == .dark ? .white : Color(red: 0.11, green: 0.11, blue: 0.12))
                 }
             }
@@ -175,7 +175,6 @@ struct OnThisDaySectionView: View {
                         reduceMotion: reduceMotion
                     )
                     .frame(width: containerWidth, height: bannerHeight)
-                    .clipped()
                     .id(group.id)
                     .contentShape(Rectangle())
                     .onTapGesture {
