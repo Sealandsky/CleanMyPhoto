@@ -175,6 +175,7 @@ struct OnThisDaySectionView: View {
                         reduceMotion: reduceMotion
                     )
                     .frame(width: containerWidth, height: bannerHeight)
+                    .clipped()
                     .id(group.id)
                     .contentShape(Rectangle())
                     .onTapGesture {

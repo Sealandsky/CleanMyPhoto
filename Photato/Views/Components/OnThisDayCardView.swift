@@ -76,14 +76,17 @@ struct OnThisDayYearPageView: View {
     let scrollOffsetX: CGFloat
     let reduceMotion: Bool
 
-    /// 平滑视差位移量：对滚动偏移进行严格截断（±28pt），平滑微移，彻底杜绝远端未进场页面的过度拉扯
+    /// 平滑视差位移量：仅在当前页与邻页的翻页过渡区间产生微动，在静止或远端时严格衰减为 0，彻底杜绝跨页偷跑
     private var parallax: (outer: CGFloat, inner: CGFloat) {
         guard !reduceMotion else { return (0, 0) }
         let pageHomeX = CGFloat(pageIndex) * containerWidth
-        let rawDelta = scrollOffsetX - pageHomeX
-        // 限制在 -28...+28 范围内微调，杜绝跨页过度拉扯导致提前闪现
-        let clampedDelta = max(-28, min(28, rawDelta))
-        return (outer: clampedDelta * 0.24, inner: clampedDelta * 0.16)
+        let offsetFromCenter = scrollOffsetX - pageHomeX
+        guard abs(offsetFromCenter) < containerWidth else { return (0, 0) }
+        let progress = offsetFromCenter / containerWidth
+        // 钟形平滑过渡：翻页正中 (progress = ±0.5) 达到最大微弱视差位移 (约 ±6pt / ±3.5pt)，
+        // 当页面在中央落定 (progress = 0) 或邻页落定 (progress = ±1) 时，视差严格归零，杜绝任何静止残留偏移
+        let bell = progress * (1.0 - abs(progress))
+        return (outer: bell * 24, inner: bell * 14)
     }
 
     var body: some View {
@@ -105,24 +108,24 @@ struct OnThisDayYearPageView: View {
 
         if count >= 5 {
             // 5 张照片版式：大特写 + 瘦竖图 + 横宽图 + 小方图 + 侧边微图
-            // 1. p2 (左侧瘦身竖图): 62×92pt，居左下，+4° 倾斜，仅轻搭 p1 右后侧
+            // 1. p2 (左侧瘦身竖图): 62×92pt，居左下，+4° 倾斜，大幅露出减少遮挡
             ScatteredPhotoCard(
                 asset: photos[1],
                 width: 62,
                 height: 92,
                 rotation: .degrees(4)
             )
-            .offset(x: 62 + parallax.inner, y: containerHeight - 92 + 6)
+            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
             .zIndex(1)
 
-            // 2. p1 (左侧大特写主图): 106×116pt，居左上，-6° 倾斜，视觉焦点
+            // 2. p1 (左侧大特写主图): 106×116pt，往上移(y: -24)、不贴左边(x: 10)，-6° 倾斜，底图大半完整露出
             ScatteredPhotoCard(
                 asset: photos[0],
                 width: 106,
                 height: 116,
                 rotation: .degrees(-6)
             )
-            .offset(x: -4 + parallax.outer, y: -8)
+            .offset(x: 10 + parallax.outer, y: -24)
             .zIndex(2)
 
             // 3. p4 (右侧小品方图): 68×68pt，居右下，+5° 倾斜
@@ -132,27 +135,27 @@ struct OnThisDayYearPageView: View {
                 height: 68,
                 rotation: .degrees(5)
             )
-            .offset(x: (containerWidth - 68 - 42) + parallax.inner, y: containerHeight - 68 + 6)
+            .offset(x: (containerWidth - 68 - 44) + parallax.inner, y: containerHeight - 68 + 6)
             .zIndex(1)
 
-            // 4. p3 (右侧横幅宽图): 108×74pt，居右上，-3° 倾斜，右移确保中心文字（含“年”字）完全避让不遮挡
+            // 4. p3 (右侧横幅宽图): 108×74pt，居右上，-3° 倾斜，确保中心文字完全避让不遮挡
             ScatteredPhotoCard(
                 asset: photos[2],
                 width: 108,
                 height: 74,
                 rotation: .degrees(-3)
             )
-            .offset(x: (containerWidth - 108 - 24) + parallax.inner, y: -8)
+            .offset(x: (containerWidth - 108 - 26) + parallax.inner, y: -8)
             .zIndex(2)
 
-            // 5. p5 (右外侧边微图): 58×72pt，居最右侧，+7° 倾斜，微露出血呼应
+            // 5. p5 (右外侧边微图): 58×72pt，居最右侧，+7° 倾斜，内收留出边距彻底不溢出下一页
             ScatteredPhotoCard(
                 asset: photos[4],
                 width: 58,
                 height: 72,
                 rotation: .degrees(7)
             )
-            .offset(x: (containerWidth - 58 + 4) + parallax.outer, y: 12)
+            .offset(x: (containerWidth - 58 - 8) + parallax.outer, y: 12)
             .zIndex(3)
         } else if count == 4 {
             // 4 张照片版式
@@ -162,7 +165,7 @@ struct OnThisDayYearPageView: View {
                 height: 92,
                 rotation: .degrees(4)
             )
-            .offset(x: 62 + parallax.inner, y: containerHeight - 92 + 6)
+            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
             .zIndex(1)
 
             ScatteredPhotoCard(
@@ -171,7 +174,7 @@ struct OnThisDayYearPageView: View {
                 height: 116,
                 rotation: .degrees(-6)
             )
-            .offset(x: -4 + parallax.outer, y: -8)
+            .offset(x: 10 + parallax.outer, y: -24)
             .zIndex(2)
 
             ScatteredPhotoCard(
@@ -180,7 +183,7 @@ struct OnThisDayYearPageView: View {
                 height: 68,
                 rotation: .degrees(5)
             )
-            .offset(x: (containerWidth - 68 - 28) + parallax.inner, y: containerHeight - 68 + 6)
+            .offset(x: (containerWidth - 68 - 36) + parallax.inner, y: containerHeight - 68 + 6)
             .zIndex(1)
 
             ScatteredPhotoCard(
@@ -189,7 +192,7 @@ struct OnThisDayYearPageView: View {
                 height: 74,
                 rotation: .degrees(-3)
             )
-            .offset(x: (containerWidth - 108 - 14) + parallax.inner, y: -8)
+            .offset(x: (containerWidth - 108 - 18) + parallax.inner, y: -8)
             .zIndex(2)
         } else if count == 3 {
             // 3 张照片版式
@@ -199,7 +202,7 @@ struct OnThisDayYearPageView: View {
                 height: 92,
                 rotation: .degrees(4)
             )
-            .offset(x: 62 + parallax.inner, y: containerHeight - 92 + 6)
+            .offset(x: 68 + parallax.inner, y: containerHeight - 92 + 8)
             .zIndex(1)
 
             ScatteredPhotoCard(
@@ -208,7 +211,7 @@ struct OnThisDayYearPageView: View {
                 height: 116,
                 rotation: .degrees(-6)
             )
-            .offset(x: -2 + parallax.outer, y: -8)
+            .offset(x: 10 + parallax.outer, y: -24)
             .zIndex(2)
 
             ScatteredPhotoCard(
@@ -217,7 +220,7 @@ struct OnThisDayYearPageView: View {
                 height: 74,
                 rotation: .degrees(-3)
             )
-            .offset(x: (containerWidth - 108 - 12) + parallax.outer, y: 12)
+            .offset(x: (containerWidth - 108 - 16) + parallax.outer, y: 12)
             .zIndex(2)
         } else if count == 2 {
             // 2 张照片版式
@@ -227,7 +230,7 @@ struct OnThisDayYearPageView: View {
                 height: 116,
                 rotation: .degrees(-5)
             )
-            .offset(x: 6 + parallax.outer, y: 2)
+            .offset(x: 12 + parallax.outer, y: -6)
 
             ScatteredPhotoCard(
                 asset: photos[1],
@@ -235,7 +238,7 @@ struct OnThisDayYearPageView: View {
                 height: 74,
                 rotation: .degrees(4)
             )
-            .offset(x: (containerWidth - 108 - 8) + parallax.outer, y: 18)
+            .offset(x: (containerWidth - 108 - 14) + parallax.outer, y: 18)
         } else if count == 1 {
             // 1 张照片
             ScatteredPhotoCard(
@@ -244,7 +247,7 @@ struct OnThisDayYearPageView: View {
                 height: 116,
                 rotation: .degrees(-4)
             )
-            .offset(x: 14 + parallax.outer, y: 2)
+            .offset(x: 18 + parallax.outer, y: 2)
         }
     }
 }
