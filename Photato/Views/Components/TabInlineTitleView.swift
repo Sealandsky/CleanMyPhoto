@@ -9,7 +9,7 @@ struct TabInlineTitleView: View {
 
     var body: some View {
         Text(title)
-            .font(.system(.largeTitle, design: .rounded).weight(.bold))
+            .font(.system(.title, design: .rounded).weight(.bold))
             .foregroundColor(.primary)
     }
 }
@@ -123,7 +123,7 @@ struct TabInlineHeaderModifier<Trailing: View>: ViewModifier {
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack(alignment: .center, spacing: 12) {
                     Text(title)
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                        .font(.system(.title, design: .rounded).weight(.bold))
                         .foregroundColor(titleColor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)

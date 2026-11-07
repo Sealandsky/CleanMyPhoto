@@ -142,7 +142,7 @@ struct AlbumPhotoListView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : album.title)
-                    .font(.title1)
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)

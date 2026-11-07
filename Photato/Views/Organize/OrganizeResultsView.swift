@@ -119,7 +119,7 @@ struct OrganizeResultsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(category.localizedText)
-                    .font(.title1)
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
