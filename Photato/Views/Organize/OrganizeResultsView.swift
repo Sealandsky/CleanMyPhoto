@@ -347,7 +347,7 @@ struct OrganizeResultsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(section.title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
                     .foregroundColor(.primary)
 
                 Spacer()

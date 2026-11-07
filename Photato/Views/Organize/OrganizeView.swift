@@ -147,8 +147,8 @@ struct OrganizeView: View {
     // MARK: - 分组标题组件
     private func sectionHeader(title: String) -> some View {
         Text(title)
-            .font(.system(size: 14, weight: .medium, design: .rounded))
-            .foregroundColor(Color(.secondaryLabel))
+            .font(.system(.title3, design: .rounded).weight(.semibold))
+            .foregroundColor(.primary)
             .padding(.horizontal, 4)
             .padding(.top, 4)
     }

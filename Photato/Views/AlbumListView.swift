@@ -77,8 +77,8 @@ struct AlbumListView: View {
     private var albumsSectionHeader: some View {
         HStack(alignment: .center) {
             Text(String(localized: "My Albums"))
-                .font(.system(.subheadline, design: .rounded).weight(.medium))
-                .foregroundColor(Color(.secondaryLabel))
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .foregroundColor(.primary)
                 .accessibilityAddTraits(.isHeader)
 
             Spacer()

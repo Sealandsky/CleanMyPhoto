@@ -24,8 +24,8 @@ struct OnThisDaySectionView: View {
     private var headerView: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(manager.isMonthFallback ? String(localized: "Past Month Highlights") : String(localized: "On This Day"))
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundColor(Color(.secondaryLabel))
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .foregroundColor(.primary)
 
             Text(currentDateText)
                 .font(.system(size: 13, weight: .regular, design: .rounded))
