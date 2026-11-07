@@ -135,21 +135,25 @@ struct SettingsView: View {
 
     private var statisticsSection: some View {
         sectionCard(title: String(localized: "Statistics")) {
-            StatRow(icon: "checkmark.seal",
+            StatRow(icon: "checkmark.seal.fill",
+                    iconColor: .orange,
                     title: String(localized: "Free Deletion Quota"),
                     value: quotaDisplayText)
 
-            StatRow(icon: "square.on.square",
+            StatRow(icon: "photo.stack.fill",
+                    iconColor: .blue,
                     title: String(localized: "Total Photos"),
                     value: totalPhotosDisplayText)
 
             cleanablePhotosRow
 
-            StatRow(icon: "trash",
+            StatRow(icon: "trash.fill",
+                    iconColor: .red,
                     title: String(localized: "Deleted Photos"),
                     value: statisticsManager.deletedPhotosText)
 
-            StatRow(icon: "externaldrive",
+            StatRow(icon: "internaldrive.fill",
+                    iconColor: .green,
                     title: String(localized: "Space Saved"),
                     value: statisticsManager.storageSpaceSavedText)
         }
@@ -158,10 +162,10 @@ struct SettingsView: View {
     private func layoutSection(gridSettings: GridSettings) -> some View {
         sectionCard(title: String(localized: "Layout")) {
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "square.grid.2x2")
+                SettingsIconView(systemName: "square.grid.2x2.fill", color: .cyan)
 
                 Text(String(localized: "Grid Layout"))
-                    .font(.system(.callout, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -179,7 +183,7 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text("\(gridSettings.columnCount)")
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(.caption2, design: .rounded))
@@ -191,10 +195,10 @@ struct SettingsView: View {
             .frame(minHeight: 52)
 
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "rectangle.split.3x1")
+                SettingsIconView(systemName: "aspectratio.fill", color: .orange)
 
                 Text(String(localized: "Photo Ratio"))
-                    .font(.system(.callout, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -218,7 +222,7 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(ratioDisplayText)
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(.caption2, design: .rounded))
@@ -237,10 +241,10 @@ struct SettingsView: View {
                 showFeedback = true
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "envelope")
+                    SettingsIconView(systemName: "envelope.fill", color: .pink)
 
                     Text(String(localized: "Send Feedback"))
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                 }
@@ -251,14 +255,14 @@ struct SettingsView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "info.circle")
+                SettingsIconView(systemName: "info.circle.fill", color: .gray)
 
                 Text(String(localized: "Version"))
-                    .font(.system(.callout, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(appVersion)
-                    .font(.system(.subheadline, design: .rounded))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
@@ -266,10 +270,10 @@ struct SettingsView: View {
 
             Link(destination: ReviewPromptManager.appStoreReviewURL) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "star")
+                    SettingsIconView(systemName: "star.fill", color: .yellow)
 
                     Text(String(localized: "Rate Photato"))
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -284,10 +288,10 @@ struct SettingsView: View {
 
             Link(destination: privacyPolicyURL) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "hand.raised")
+                    SettingsIconView(systemName: "hand.raised.fill", color: .green)
 
                     Text(String(localized: "Privacy Policy"))
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -302,10 +306,10 @@ struct SettingsView: View {
 
             Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "doc.text")
+                    SettingsIconView(systemName: "doc.text.fill", color: .blue)
 
                     Text(String(localized: "Terms of Use"))
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -325,9 +329,9 @@ struct SettingsView: View {
         sectionCard(title: "Debug") {
             Toggle(isOn: $membershipManager.isDebugPremium) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "crown")
+                    SettingsIconView(systemName: "crown.fill", color: .yellow)
                     Text("Simulate Pro Member")
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                 }
             }
@@ -338,9 +342,9 @@ struct SettingsView: View {
                 membershipManager.resetFreeQuotaForTesting()
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "arrow.counterclockwise")
+                    SettingsIconView(systemName: "arrow.counterclockwise.circle.fill", color: .blue)
                     Text("Reset Free Quota (100 left)")
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.blue)
                     Spacer()
                 }
@@ -352,9 +356,9 @@ struct SettingsView: View {
                 membershipManager.exhaustFreeQuotaForTesting()
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "xmark.circle")
+                    SettingsIconView(systemName: "xmark.circle.fill", color: .red)
                     Text("Exhaust Free Quota (0 left)")
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.red)
                     Spacer()
                 }
@@ -366,9 +370,9 @@ struct SettingsView: View {
                 photoManager.lastCleanupResult = CleanupResult(deletedCount: 24, freedBytes: 256_000_000)
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "sparkles")
+                    SettingsIconView(systemName: "sparkles", color: .purple)
                     Text("Test Cleanup Result Page")
-                        .font(.system(.callout, design: .rounded))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.green)
                     Spacer()
                 }
@@ -413,10 +417,10 @@ struct SettingsView: View {
             onNavigateToOrganize?()
         } label: {
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "eraser")
+                SettingsIconView(systemName: "sparkles", color: .purple)
 
                 Text(String(localized: "Cleanable Photos"))
-                    .font(.system(.callout, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -424,7 +428,7 @@ struct SettingsView: View {
                 if let manager = organizeManager, manager.hasCompletedFullScan {
                     HStack(spacing: 4) {
                         Text(cleanablePhotosDisplayText)
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(.secondary)
                         Image(systemName: "chevron.right")
                             .font(.system(.caption, design: .rounded).weight(.semibold))
@@ -433,7 +437,7 @@ struct SettingsView: View {
                 } else if let manager = organizeManager, manager.isAnalyzing {
                     HStack(spacing: 4) {
                         Text(String(localized: "Scanning..."))
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(.blue)
                         Image(systemName: "chevron.right")
                             .font(.system(.caption, design: .rounded).weight(.semibold))
@@ -442,7 +446,7 @@ struct SettingsView: View {
                 } else {
                     HStack(spacing: 4) {
                         Text(String(localized: "To Scan"))
-                            .font(.system(.subheadline, design: .rounded))
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundColor(.blue)
                         Image(systemName: "chevron.right")
                             .font(.system(.caption, design: .rounded).weight(.semibold))
@@ -509,21 +513,22 @@ struct SettingsView: View {
 // MARK: - Stat Row Component
 struct StatRow: View {
     let icon: String
+    let iconColor: Color
     let title: String
     let value: String
 
     var body: some View {
         HStack(spacing: 12) {
-            SettingsIconView(systemName: icon)
+            SettingsIconView(systemName: icon, color: iconColor)
 
             Text(title)
-                .font(.system(.callout, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
 
             Spacer()
 
             Text(value)
-                .font(.system(.subheadline, design: .rounded))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
@@ -534,16 +539,12 @@ struct StatRow: View {
 // MARK: - Settings Icon Component
 struct SettingsIconView: View {
     let systemName: String
+    let color: Color
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(uiColor: .systemGray6))
-                .frame(width: 36, height: 36)
-
-            Image(systemName: systemName)
-                .font(.system(.callout, design: .rounded))
-                .foregroundColor(.primary)
-        }
+        Image(systemName: systemName)
+            .font(.system(size: 22, weight: .semibold, design: .rounded))
+            .foregroundColor(color)
+            .frame(width: 28, height: 28, alignment: .center)
     }
 }
