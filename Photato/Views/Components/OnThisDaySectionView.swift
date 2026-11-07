@@ -164,7 +164,7 @@ struct OnThisDaySectionView: View {
     // MARK: - Paging Scroll View (照片横滑层：位于文字上层，照片滑过文字上方)
     private func pagingScrollView(containerWidth: CGFloat, bannerHeight: CGFloat) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 0) {
+            HStack(spacing: 0) {
                 ForEach(Array(manager.yearGroups.enumerated()), id: \.element.id) { index, group in
                     OnThisDayYearPageView(
                         group: group,
