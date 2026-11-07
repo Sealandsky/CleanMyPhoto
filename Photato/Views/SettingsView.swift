@@ -77,7 +77,7 @@ struct SettingsView: View {
                 content()
             }
             .padding(.vertical, 6)
-            .background(Color.cardBackground)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
@@ -165,7 +165,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "square.grid.2x2.fill", color: .cyan)
 
                 Text(String(localized: "Grid Layout"))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -192,13 +192,13 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
 
             HStack(spacing: 12) {
                 SettingsIconView(systemName: "aspectratio.fill", color: .orange)
 
                 Text(String(localized: "Photo Ratio"))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -231,7 +231,7 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
         }
     }
 
@@ -244,12 +244,12 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "envelope.fill", color: .pink)
 
                     Text(String(localized: "Send Feedback"))
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 52)
+                .frame(minHeight: 60)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -258,7 +258,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "info.circle.fill", color: .gray)
 
                 Text(String(localized: "Version"))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(appVersion)
@@ -266,14 +266,14 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
 
             Link(destination: ReviewPromptManager.appStoreReviewURL) {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "star.fill", color: .yellow)
 
                     Text(String(localized: "Rate Photato"))
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -281,7 +281,7 @@ struct SettingsView: View {
                         .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 52)
+                .frame(minHeight: 60)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -291,7 +291,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "hand.raised.fill", color: .green)
 
                     Text(String(localized: "Privacy Policy"))
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -299,7 +299,7 @@ struct SettingsView: View {
                         .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 52)
+                .frame(minHeight: 60)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -309,7 +309,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "doc.text.fill", color: .blue)
 
                     Text(String(localized: "Terms of Use"))
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -317,7 +317,7 @@ struct SettingsView: View {
                         .foregroundColor(Color(uiColor: .secondaryLabel))
                 }
                 .padding(.horizontal, 16)
-                .frame(minHeight: 52)
+                .frame(minHeight: 60)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -331,12 +331,12 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "crown.fill", color: .yellow)
                     Text("Simulate Pro Member")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.primary)
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
 
             Button {
                 membershipManager.resetFreeQuotaForTesting()
@@ -344,13 +344,13 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "arrow.counterclockwise.circle.fill", color: .blue)
                     Text("Reset Free Quota (100 left)")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.blue)
                     Spacer()
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
 
             Button {
                 membershipManager.exhaustFreeQuotaForTesting()
@@ -358,13 +358,13 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "xmark.circle.fill", color: .red)
                     Text("Exhaust Free Quota (0 left)")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.red)
                     Spacer()
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
 
             Button {
                 photoManager.lastCleanupResult = CleanupResult(deletedCount: 24, freedBytes: 256_000_000)
@@ -372,13 +372,13 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "sparkles", color: .purple)
                     Text("Test Cleanup Result Page")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(.green)
                     Spacer()
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
         }
     }
     #endif
@@ -420,7 +420,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "sparkles", color: .purple)
 
                 Text(String(localized: "Cleanable Photos"))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -455,7 +455,7 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 60)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -522,7 +522,7 @@ struct StatRow: View {
             SettingsIconView(systemName: icon, color: iconColor)
 
             Text(title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.system(size: 17, weight: .regular, design: .rounded))
                 .foregroundColor(.primary)
 
             Spacer()
@@ -532,7 +532,7 @@ struct StatRow: View {
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 52)
+        .frame(minHeight: 60)
     }
 }
 
