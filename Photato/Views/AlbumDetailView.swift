@@ -98,15 +98,19 @@ struct AlbumDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 36) {
-                // 模块一：【你的照片】
-                yourPhotosSection
+            if albumPhotos.isEmpty {
+                emptyAlbumStateView
+            } else {
+                VStack(spacing: 36) {
+                    // 模块一：【你的照片】
+                    yourPhotosSection
 
-                // 模块二：【更多适合这个相簿的照片】
-                morePhotosSection
+                    // 模块二：【更多适合这个相簿的照片】
+                    morePhotosSection
+                }
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
-            .padding(.top, 4)
-            .padding(.bottom, 24)
         }
         .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
         .refreshable {
@@ -237,32 +241,27 @@ struct AlbumDetailView: View {
             .padding(.horizontal, 16)
 
             // 横向滑动照片列表
-            if albumPhotos.isEmpty {
-                emptyAlbumPlaceholder
-                    .padding(.horizontal, 16)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        ForEach(Array(albumPhotos.prefix(50))) { photo in
-                            yourPhotoCard(photo)
-                                .padding(.trailing, 10)
-                                .transition(.pushOpen)
-                                .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
-                                    source.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                }
-                                .onTapGesture {
-                                    guard canSelectPhoto && !isFullscreenMode else { return }
-                                    canSelectPhoto = false
-                                    fullscreenPhotos = albumPhotos
-                                    currentPhotoID = photo.id
-                                    isFullscreenMode = true
-                                }
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(Array(albumPhotos.prefix(50))) { photo in
+                        yourPhotoCard(photo)
+                            .padding(.trailing, 10)
+                            .transition(.pushOpen)
+                            .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                                source.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .onTapGesture {
+                                guard canSelectPhoto && !isFullscreenMode else { return }
+                                canSelectPhoto = false
+                                fullscreenPhotos = albumPhotos
+                                currentPhotoID = photo.id
+                                isFullscreenMode = true
+                            }
                     }
                 }
-                .contentMargins(.horizontal, 16, for: .scrollContent)
-                .defaultScrollAnchor(.leading)
             }
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .defaultScrollAnchor(.leading)
         }
     }
 
@@ -304,24 +303,106 @@ struct AlbumDetailView: View {
         .frame(width: 86, height: 108)
     }
 
-    private var emptyAlbumPlaceholder: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 6) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 28))
-                    .foregroundColor(.secondary)
-                Text(String(localized: "No Photos in Album"))
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundColor(.secondary)
+    // MARK: - Empty State (相册空状态全新全局组件)
+    private var emptyAlbumStateView: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 40)
+
+            // 柔和蓝紫微光相册图标徽章
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.cyan.opacity(0.24),
+                                Color.accentColor.opacity(0.10)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 44
+                        )
+                    )
+                    .frame(width: 88, height: 88)
+                    .shadow(color: Color.accentColor.opacity(0.18), radius: 16, x: 0, y: 8)
+
+                Image(systemName: "photo.stack.fill")
+                    .font(.system(size: 38, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.cyan, Color.accentColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
-            .padding(.vertical, 24)
-            Spacer()
+            .padding(.bottom, 24)
+
+            // 主标题
+            Text(String(localized: "This Album is Empty"))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+                .padding(.bottom, 10)
+
+            // 说明副标题
+            Text(String(localized: "Add photos to this album, and Photato will automatically recommend matching photos from your library."))
+                .font(.system(size: 14, weight: .regular, design: .rounded))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .frame(maxWidth: 280)
+                .padding(.bottom, 32)
+
+            // 核心行动按钮：调起系统相册选择器
+            PhotosPicker(
+                selection: $selectedPickerItems,
+                matching: .any(of: [.images, .videos]),
+                photoLibrary: .shared()
+            ) {
+                HStack(spacing: 8) {
+                    if isProcessingPickedPhotos {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.9)
+                    } else {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+
+                    Text(isProcessingPickedPhotos
+                         ? String(localized: "Adding Photos...")
+                         : String(localized: "Add Photos from Library"))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: 260)
+                .frame(height: 50)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: Color.accentColor.opacity(0.28), radius: 10, x: 0, y: 5)
+            }
+            .buttonStyle(.plain)
+            .disabled(isProcessingPickedPhotos)
+
+            // 底部特性小胶囊
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 11, weight: .medium))
+                Text(String(localized: "On-Device & Private"))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.accentColor.opacity(0.08))
+            .clipShape(Capsule())
+            .padding(.top, 24)
+
+            Spacer(minLength: 80)
+            Spacer(minLength: 40)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(UIColor.secondarySystemFill))
-        )
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 520)
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Module 2: More Photos for This Album

@@ -109,8 +109,8 @@ struct OnThisDaySectionView: View {
             if colorScheme == .dark {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.150, green: 0.137, blue: 0.125),
-                        Color(red: 0.102, green: 0.098, blue: 0.094)
+                        Color(red: 50 / 255.0, green: 39 / 255.0, blue: 29 / 255.0), // #32271D 0%
+                        Color(red: 28 / 255.0, green: 28 / 255.0, blue: 30 / 255.0)  // #1C1C1E 100%
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -118,8 +118,8 @@ struct OnThisDaySectionView: View {
             } else {
                 LinearGradient(
                     colors: [
-                        Color(red: 0.965, green: 0.920, blue: 0.845),
-                        Color(red: 0.871, green: 0.839, blue: 0.796)
+                        Color(red: 234 / 255.0, green: 199 / 255.0, blue: 153 / 255.0), // #EAC799 0%
+                        Color(red: 229 / 255.0, green: 229 / 255.0, blue: 227 / 255.0)  // #E5E5E3 100%
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -146,16 +146,16 @@ struct OnThisDaySectionView: View {
                 }
             }
 
-            // 照片张数行：例如 "12" 翻转，" 张照片" / " Photos" 固定不动
+            // 照片张数行：例如 "12" 翻转，" 张照片" / " Photos" 固定不动，统一 14.5pt 半粗圆体
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 Text(verbatim: "\(animatedCount)")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(colorScheme == .dark ? Color(red: 0.60, green: 0.60, blue: 0.62) : Color(red: 0.55, green: 0.55, blue: 0.57))
+                    .font(.system(size: 14.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(colorScheme == .dark ? Color(red: 0.65, green: 0.65, blue: 0.67) : Color(red: 0.48, green: 0.48, blue: 0.50))
                     .contentTransition(.numericText())
 
                 Text(String(localized: "photos_count_suffix", defaultValue: " Photos"))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(colorScheme == .dark ? Color(red: 0.60, green: 0.60, blue: 0.62) : Color(red: 0.55, green: 0.55, blue: 0.57))
+                    .font(.system(size: 14.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(colorScheme == .dark ? Color(red: 0.65, green: 0.65, blue: 0.67) : Color(red: 0.48, green: 0.48, blue: 0.50))
             }
         }
         .allowsHitTesting(false)
