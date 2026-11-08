@@ -165,7 +165,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "square.grid.2x2.fill", color: .cyan)
 
                 Text(String(localized: "Grid Layout"))
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -198,7 +198,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "aspectratio.fill", color: .orange)
 
                 Text(String(localized: "Photo Ratio"))
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -244,7 +244,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "envelope.fill", color: .pink)
 
                     Text(String(localized: "Send Feedback"))
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                 }
@@ -258,7 +258,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "info.circle.fill", color: .gray)
 
                 Text(String(localized: "Version"))
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(appVersion)
@@ -273,7 +273,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "star.fill", color: .yellow)
 
                     Text(String(localized: "Rate Photato"))
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -291,7 +291,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "hand.raised.fill", color: .green)
 
                     Text(String(localized: "Privacy Policy"))
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -309,7 +309,7 @@ struct SettingsView: View {
                     SettingsIconView(systemName: "doc.text.fill", color: .blue)
 
                     Text(String(localized: "Terms of Use"))
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -331,7 +331,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "crown.fill", color: .yellow)
                     Text("Simulate Pro Member")
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
                 }
             }
@@ -344,7 +344,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "arrow.counterclockwise.circle.fill", color: .blue)
                     Text("Reset Free Quota (100 left)")
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.blue)
                     Spacer()
                 }
@@ -358,7 +358,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "xmark.circle.fill", color: .red)
                     Text("Exhaust Free Quota (0 left)")
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.red)
                     Spacer()
                 }
@@ -372,7 +372,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     SettingsIconView(systemName: "sparkles", color: .purple)
                     Text("Test Cleanup Result Page")
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.green)
                     Spacer()
                 }
@@ -420,7 +420,7 @@ struct SettingsView: View {
                 SettingsIconView(systemName: "sparkles", color: .purple)
 
                 Text(String(localized: "Cleanable Photos"))
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
 
                 Spacer()
@@ -522,7 +522,7 @@ struct StatRow: View {
             SettingsIconView(systemName: icon, color: iconColor)
 
             Text(title)
-                .font(.system(size: 17, weight: .regular, design: .rounded))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
 
             Spacer()
@@ -536,14 +536,40 @@ struct StatRow: View {
     }
 }
 
-// MARK: - Settings Icon Component
+// MARK: - Settings Icon Component (Optical Balanced)
 struct SettingsIconView: View {
     let systemName: String
     let color: Color
 
+    /// 针对不同外形、宽高比与实心度的 SF Symbol 进行光学尺寸微调，
+    /// 确保视觉面积、高度与密度在 28x28 槽位中完全均衡统一。
+    private var opticalPointSize: CGFloat {
+        switch systemName {
+        case "sparkles":
+            return 25 // 镂空细线条符号：提升字阶增加视觉占比
+        case "internaldrive.fill":
+            return 23.5 // 扁平横向符号：增大字阶拉高视觉纵深
+        case "hand.raised.fill", "doc.text.fill":
+            return 22.5 // 纵向偏窄符号：微调放大增强视觉体量
+        case "checkmark.seal.fill", "info.circle.fill", "square.grid.2x2.fill":
+            return 20 // 密集圆/方实心饱满符号：微降字阶避免压迫感
+        default:
+            return 21 // 标准平衡符号（photo.stack.fill, trash.fill, star.fill, aspectratio.fill, envelope.fill 等）
+        }
+    }
+
+    private var opticalWeight: Font.Weight {
+        switch systemName {
+        case "sparkles":
+            return .bold // 细线符号加粗线宽，匹配实心 fill 的质感与墨量
+        default:
+            return .semibold
+        }
+    }
+
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 22, weight: .semibold, design: .rounded))
+            .font(.system(size: opticalPointSize, weight: opticalWeight, design: .rounded))
             .foregroundColor(color)
             .frame(width: 28, height: 28, alignment: .center)
     }
