@@ -23,7 +23,12 @@ struct OnThisDaySectionView: View {
     @State private var scrollOffsetX: CGFloat = 0
 
     var body: some View {
-        if !manager.yearGroups.isEmpty {
+        if !manager.hasLoadedOnce {
+            // 首载骨架占位：保持相同宽高比与外边距，首屏完全不跳变
+            OnThisDaySkeletonBanner()
+                .padding(.top, 4)
+                .padding(.bottom, 6)
+        } else if !manager.yearGroups.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 headerView
                 bannerCarouselView
@@ -31,7 +36,6 @@ struct OnThisDaySectionView: View {
             }
             .padding(.top, 4)
             .padding(.bottom, 6)
-            .transition(.opacity.combined(with: .move(edge: .top)))
             .onAppear {
                 syncActiveGroupIfNeeded()
             }
@@ -277,5 +281,47 @@ struct OnThisDaySectionView: View {
         let yearStr = "\(animatedYear)"
         let countStr = String(localized: "\(animatedCount) Photos")
         return "\(prefix), \(yearStr), \(countStr)"
+    }
+}
+
+// MARK: - On This Day Skeleton Banner
+struct OnThisDaySkeletonBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 分区标题占位
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.gray.opacity(0.18))
+                    .frame(width: 100, height: 22)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.gray.opacity(0.12))
+                    .frame(width: 60, height: 14)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            // 3.15:1 横幅占位
+            GeometryReader { geometry in
+                let containerWidth = geometry.size.width
+                let bannerHeight = min(126, max(114, containerWidth / 3.15))
+
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(colorScheme == .dark ? Color(white: 0.12) : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.45), lineWidth: 1)
+                    )
+                    .frame(width: containerWidth, height: bannerHeight)
+                    .shimmering(cornerRadius: 22)
+            }
+            .aspectRatio(3.15, contentMode: .fit)
+            .padding(.horizontal, 16)
+
+            // 指示器占位高度
+            Spacer().frame(height: 18)
+        }
     }
 }

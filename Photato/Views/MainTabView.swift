@@ -119,13 +119,20 @@ struct MainTabView: View {
             try? await Task.sleep(nanoseconds: 150_000_000)
             PhotoSimilarityMatcher.shared.prewarm()
 
-            // 2. 待首屏交互彻底稳定后（2s），后台低优先级预热整理页快速缓存
+            // 2. 预热「过去的今天」与相册列表，确保用户切到相册 Tab 时秒出、零跳变
+            Task(priority: .userInitiated) {
+                if !onThisDayManager.hasLoadedOnce {
+                    await onThisDayManager.fetchOnThisDay()
+                }
+            }
+
+            // 3. 待首屏交互彻底稳定后（2s），后台低优先级预热整理页快速缓存
             try? await Task.sleep(nanoseconds: 1_850_000_000)
             Task(priority: .utility) {
                 await organizeManager.quickAnalysis()
             }
 
-            // 3. 梯次延迟（3s）启动后台全相册 AI 特征静默建库，零卡顿、不抢占前台算力
+            // 4. 梯次延迟（3s）启动后台全相册 AI 特征静默建库，零卡顿、不抢占前台算力
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
         }
@@ -192,15 +199,22 @@ struct MainTabView: View {
                 if albumManager == nil {
                     albumManager = AlbumManager(photoManager: photoManager)
                 }
-                if let albumMgr = albumManager {
-                    await albumMgr.fetchUserAlbums()
-                }
-                if !onThisDayManager.hasLoadedOnce {
-                    await onThisDayManager.fetchOnThisDay()
-                }
-                if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
-                    await organizeManager.quickAnalysis()
-                }
+                guard let albumMgr = albumManager else { return }
+
+                // 并行并发拉取，互不等待阻塞
+                async let albumsTask: () = albumMgr.fetchUserAlbums()
+                async let onThisDayTask: () = {
+                    if !onThisDayManager.hasLoadedOnce {
+                        await onThisDayManager.fetchOnThisDay()
+                    }
+                }()
+                async let organizeTask: () = {
+                    if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
+                        await organizeManager.quickAnalysis()
+                    }
+                }()
+
+                _ = await (albumsTask, onThisDayTask, organizeTask)
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
                 switch destination {

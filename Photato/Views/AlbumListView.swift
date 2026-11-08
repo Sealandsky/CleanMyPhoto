@@ -29,7 +29,7 @@ struct AlbumListView: View {
                 albumsSectionHeader
 
                 // 3. 相簿网格内容
-                if albumManager.isLoadingAlbums {
+                if !albumManager.hasLoadedOnce || albumManager.isLoadingAlbums {
                     skeletonGrid
                 } else if albumManager.albums.isEmpty {
                     emptyAlbumsView
@@ -213,7 +213,6 @@ struct AlbumListView: View {
         count: Int
     ) -> some View {
         Button {
-            SoundManager.playAction()
             onCategorySelect?(category)
         } label: {
             HStack(spacing: 14) {

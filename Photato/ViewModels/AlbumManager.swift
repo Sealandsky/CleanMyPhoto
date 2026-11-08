@@ -15,6 +15,7 @@ class AlbumManager: ObservableObject {
     @Published var albums: [AlbumModel] = []
     @Published var currentAlbumPhotos: [PhotoAsset] = []
     @Published var isLoadingAlbums = false
+    @Published var hasLoadedOnce = false
     @Published var isLoadingPhotos = false
 
     let photoManager: PhotoManager
@@ -30,7 +31,10 @@ class AlbumManager: ObservableObject {
     // 获取用户相簿（排除智能相簿）
     func fetchUserAlbums() async {
         isLoadingAlbums = true
-        defer { isLoadingAlbums = false }
+        defer {
+            isLoadingAlbums = false
+            hasLoadedOnce = true
+        }
 
         let options = PHFetchOptions()
         let userAlbums = PHAssetCollection.fetchAssetCollections(
