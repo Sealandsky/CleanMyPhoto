@@ -78,34 +78,73 @@ struct MainTabView: View {
     @State private var selectedAlbum: AlbumModel?
 
     init() {
+        Self.configureTabBarAppearance()
+    }
+
+    static func configureTabBarAppearance(_ tabBar: UITabBar? = nil) {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
 
-        // 1. 未选中项样式：图标与文字均为二级中灰
+        let unselectedColor = UIColor.systemGray // #8E8E93 中灰
+        let selectedColor = UIColor.label        // 浅色纯黑 #000000，深色纯白 #FFFFFF
+
         let normal = appearance.stackedLayoutAppearance.normal
-        normal.iconColor = UIColor.secondaryLabel
+        normal.iconColor = unselectedColor
         normal.titleTextAttributes = [
-            .foregroundColor: UIColor.secondaryLabel,
+            .foregroundColor: unselectedColor,
             .font: UIFont.systemFont(ofSize: 10, weight: .regular)
         ]
 
-        // 2. 选中项样式：图标与文字均为 label（浅色黑、深色白）
         let selected = appearance.stackedLayoutAppearance.selected
-        selected.iconColor = UIColor.label
+        selected.iconColor = selectedColor
         selected.titleTextAttributes = [
-            .foregroundColor: UIColor.label,
+            .foregroundColor: selectedColor,
             .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
         ]
 
-        // 3. 各种布局形式对齐
-        appearance.inlineLayoutAppearance = appearance.stackedLayoutAppearance
-        appearance.compactInlineLayoutAppearance = appearance.stackedLayoutAppearance
+        appearance.inlineLayoutAppearance.normal.iconColor = unselectedColor
+        appearance.inlineLayoutAppearance.normal.titleTextAttributes = normal.titleTextAttributes
+        appearance.inlineLayoutAppearance.selected.iconColor = selectedColor
+        appearance.inlineLayoutAppearance.selected.titleTextAttributes = selected.titleTextAttributes
 
-        // 4. 应用到系统全局 TabBar
+        appearance.compactInlineLayoutAppearance.normal.iconColor = unselectedColor
+        appearance.compactInlineLayoutAppearance.normal.titleTextAttributes = normal.titleTextAttributes
+        appearance.compactInlineLayoutAppearance.selected.iconColor = selectedColor
+        appearance.compactInlineLayoutAppearance.selected.titleTextAttributes = selected.titleTextAttributes
+
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
-        UITabBar.appearance().tintColor = UIColor.label
-        UITabBar.appearance().unselectedItemTintColor = UIColor.secondaryLabel
+        UITabBar.appearance().tintColor = selectedColor
+        UITabBar.appearance().unselectedItemTintColor = unselectedColor
+
+        if let tabBar {
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = appearance
+            tabBar.tintColor = selectedColor
+            tabBar.unselectedItemTintColor = unselectedColor
+
+            if let items = tabBar.items {
+                let tabs = AppTab.allCases
+                for (index, item) in items.enumerated() {
+                    item.setTitleTextAttributes([
+                        .foregroundColor: unselectedColor,
+                        .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+                    ], for: .normal)
+                    item.setTitleTextAttributes([
+                        .foregroundColor: selectedColor,
+                        .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+                    ], for: .selected)
+
+                    if index < tabs.count {
+                        let sysName = tabs[index].systemImage
+                        if let base = UIImage(systemName: sysName) {
+                            item.image = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
+                            item.selectedImage = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -113,6 +152,7 @@ struct MainTabView: View {
             ContentView(
                 isFullscreenMode: $isFullscreenMode
             )
+            .background(TabBarConfigurator())
             .tint(Color.accentColor)
             .toolbar(isFullscreenMode ? .hidden : .visible, for: .tabBar)
             .tabItem {
@@ -121,6 +161,7 @@ struct MainTabView: View {
             .tag(AppTab.photos)
 
             albumsTabContent
+                .background(TabBarConfigurator())
                 .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
@@ -128,6 +169,7 @@ struct MainTabView: View {
                 .tag(AppTab.albums)
 
             organizeTabContent
+                .background(TabBarConfigurator())
                 .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
@@ -140,16 +182,24 @@ struct MainTabView: View {
                 }
             )
             .environment(organizeManager)
+            .background(TabBarConfigurator())
             .tint(Color.accentColor)
             .tabItem {
                 Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
             }
             .tag(AppTab.settings)
         }
-        .tint(.primary)
+        .background(TabBarConfigurator())
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
+            TabBarConfiguratorManager.shared.apply()
+        }
+        .task {
+            for delay in [0.05, 0.15, 0.3, 0.6, 1.0] {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                TabBarConfiguratorManager.shared.apply()
+            }
         }
         .task {
             AppAnalytics.screen(selectedTab.analyticsName)
@@ -401,3 +451,67 @@ struct MainTabView: View {
         .environmentObject(StatisticsManager())
         .environment(GridSettings())
 }
+
+// MARK: - TabBar Configurator Manager
+@MainActor
+final class TabBarConfiguratorManager {
+    static let shared = TabBarConfiguratorManager()
+    weak var tabBar: UITabBar?
+
+    func apply() {
+        guard let tabBar else { return }
+        MainTabView.configureTabBarAppearance(tabBar)
+    }
+}
+
+// MARK: - TabBar Configurator
+private struct TabBarConfigurator: UIViewRepresentable {
+    func makeUIView(context: Context) -> TabBarConfiguratorView {
+        TabBarConfiguratorView()
+    }
+
+    func updateUIView(_ uiView: TabBarConfiguratorView, context: Context) {
+        uiView.scheduleApply()
+    }
+}
+
+private class TabBarConfiguratorView: UIView {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        scheduleApply()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        scheduleApply()
+    }
+
+    func scheduleApply() {
+        applyConfiguration()
+        DispatchQueue.main.async { [weak self] in
+            self?.applyConfiguration()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.applyConfiguration()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.applyConfiguration()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.applyConfiguration()
+        }
+    }
+
+    func applyConfiguration() {
+        var responder: UIResponder? = self
+        while let r = responder {
+            if let tc = r as? UITabBarController {
+                TabBarConfiguratorManager.shared.tabBar = tc.tabBar
+                TabBarConfiguratorManager.shared.apply()
+                return
+            }
+            responder = r.next
+        }
+    }
+}
+

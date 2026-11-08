@@ -1,17 +1,10 @@
 import SwiftUI
 import Photos
 
-// MARK: - Photo Date Section Model
-struct PhotoDateSection: Identifiable {
-    let id: String
-    let title: String
-    let photos: [PhotoAsset]
-}
-
 // MARK: - Photo Stream View
-/// 现代全量图片流视图（适用于「所有照片」与「时光归档月份相册」）：
-/// 1. 支持 2 列 / 3 列 / 4 列自由切换（默认 3 列标准紧凑浸润）；
-/// 2. 38pt 高度吸顶日期段（ultraThinMaterial 毛玻璃底板）；
+/// 纯粹沉浸式全量图片流视图（适用于「所有照片」与「时光归档月份相册」）：
+/// 1. 采用 AdaptivePhotoGrid 连续沉浸瀑布流，完全跟随用户在设置中选择的原图比例/固定比例；
+/// 2. 移除日期切断吸顶头，整屏无缝沉浸浏览；
 /// 3. 单手交互：PhotoCell -> matchedTransitionSource -> swipeToTrash；
 /// 4. 点击照片无缝 Zoom 放大进入 FullscreenPhotoBrowser；
 /// 5. 右上角「选择」按钮支持滑动多选与批量放入废纸篓。
@@ -22,10 +15,10 @@ struct PhotoStreamView: View {
     var fetchPhotos: (() async -> [PhotoAsset])? = nil
 
     @ObservedObject var photoManager: PhotoManager
+    @Environment(GridSettings.self) private var gridSettings
 
     @State private var localPhotos: [PhotoAsset] = []
     @State private var isLoading = false
-    @State private var streamColumnCount: Int = 3
     @State private var selectionManager = SelectionManager()
     @State private var isFullscreenMode = false
     @State private var currentPhotoID: String? = nil
@@ -36,11 +29,6 @@ struct PhotoStreamView: View {
     /// 响应式过滤掉已放入待删除废纸篓的素材
     private var displayedPhotos: [PhotoAsset] {
         localPhotos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
-    }
-
-    /// 按天聚合的分组列表
-    private var sections: [PhotoDateSection] {
-        Self.groupPhotosByDay(displayedPhotos)
     }
 
     var body: some View {
@@ -118,21 +106,16 @@ struct PhotoStreamView: View {
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
                 } else {
-                    HStack(spacing: 4) {
-                        // 密度切换菜单（2列 / 3列 / 4列）
-                        columnSwitcherMenu
-
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectionManager.enterSelectMode()
-                            }
-                        } label: {
-                            Text(String(localized: "Select"))
-                                .font(.system(.body, design: .rounded))
-                                .foregroundColor(.primary)
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectionManager.enterSelectMode()
                         }
+                    } label: {
+                        Text(String(localized: "Select"))
+                            .font(.system(.body, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                 }
             }
@@ -182,152 +165,54 @@ struct PhotoStreamView: View {
         return streamTitle
     }
 
-    // MARK: - Photo Stream Content
+    // MARK: - Continuous Adaptive Waterfall Grid
     private var photoStreamContent: some View {
-        LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
-            ForEach(sections) { section in
-                Section {
-                    let columns = Array(repeating: GridItem(.flexible(), spacing: gridSpacing), count: streamColumnCount)
-                    LazyVGrid(columns: columns, spacing: gridSpacing) {
-                        ForEach(section.photos) { photo in
-                            cellForPhoto(photo)
-                        }
+        AdaptivePhotoGrid(photos: displayedPhotos) { photo, index in
+            let cell = PhotoCell(
+                photo: photo,
+                isSelected: selectionManager.isSelected(photo.id),
+                isSelectMode: selectionManager.isSelectMode
+            )
+            .id(photo.id)
+            .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
+                source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if selectionManager.isSelectMode {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectionManager.toggle(photo.id)
                     }
-                    .padding(.horizontal, gridPadding)
-                } header: {
-                    stickySectionHeader(title: section.title, count: section.photos.count)
+                } else {
+                    guard canSelectPhoto && !isFullscreenMode else { return }
+                    canSelectPhoto = false
+                    currentPhotoID = photo.id
+                    isFullscreenMode = true
                 }
             }
-        }
-        .padding(.bottom, 24)
-    }
-
-    // MARK: - Sticky Date Header
-    private func stickySectionHeader(title: String, count: Int) -> some View {
-        HStack(alignment: .center) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Text(String(localized: "\(count) Photos"))
-                .font(.system(size: 12.5, weight: .regular, design: .rounded))
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 38)
-        .background(.ultraThinMaterial)
-    }
-
-    // MARK: - Photo Cell
-    @ViewBuilder
-    private func cellForPhoto(_ photo: PhotoAsset) -> some View {
-        let isSelected = selectionManager.isSelected(photo.id)
-        let isSelectMode = selectionManager.isSelectMode
-        let isFav = photoManager.isFavorite(photo)
-        let cornerRadius: CGFloat = streamColumnCount == 2 ? 10 : (streamColumnCount == 3 ? 4 : 0)
-
-        let cell = PhotoCell(
-            photo: photo,
-            isSelected: isSelected,
-            isSelectMode: isSelectMode,
-            usesSquareRatio: true,
-            cornerRadius: cornerRadius
-        )
-        .id(photo.id)
-        .matchedTransitionSource(id: photo.id, in: photoTransitionNamespace) { source in
-            source.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if selectionManager.isSelectMode {
-                withAnimation(.easeInOut(duration: 0.15)) {
+            .onLongPressGesture(minimumDuration: 0.3) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     selectionManager.toggle(photo.id)
                 }
-            } else {
-                guard canSelectPhoto && !isFullscreenMode else { return }
-                canSelectPhoto = false
-                currentPhotoID = photo.id
-                isFullscreenMode = true
             }
-        }
-        .onLongPressGesture(minimumDuration: 0.3) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectionManager.toggle(photo.id)
+            .onAppear {
+                photoManager.preheatAssets(around: index, in: displayedPhotos, columnCount: gridSettings.columnCount)
             }
-        }
 
-        cell.swipeToTrash(
-            photo: photo,
-            isEnabled: !isSelectMode && !isFullscreenMode,
-            isFavorite: isFav,
-            onTrash: { targetPhoto in
-                photoManager.addToTrash(targetPhoto)
-            },
-            onBlocked: {
-                showFavoriteDeleteAlert = true
-            }
-        )
-    }
-
-    // MARK: - Column Switcher Menu
-    private var columnSwitcherMenu: some View {
-        Menu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    streamColumnCount = 2
+            cell.swipeToTrash(
+                photo: photo,
+                isEnabled: !selectionManager.isSelectMode && !isFullscreenMode,
+                isFavorite: photoManager.isFavorite(photo),
+                onTrash: { targetPhoto in
+                    photoManager.addToTrash(targetPhoto)
+                },
+                onBlocked: {
+                    showFavoriteDeleteAlert = true
                 }
-            } label: {
-                Label(String(localized: "2 Columns"), systemImage: "square.grid.2x2")
-            }
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    streamColumnCount = 3
-                }
-            } label: {
-                Label(String(localized: "3 Columns"), systemImage: "square.grid.3x3")
-            }
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    streamColumnCount = 4
-                }
-            } label: {
-                Label(String(localized: "4 Columns"), systemImage: "square.grid.4x3.fill")
-            }
-        } label: {
-            Image(systemName: columnIcon(for: streamColumnCount))
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundColor(.primary)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+            )
         }
-    }
-
-    private func columnIcon(for count: Int) -> String {
-        switch count {
-        case 2: return "square.grid.2x2"
-        case 4: return "square.grid.4x3.fill"
-        default: return "square.grid.3x3"
-        }
-    }
-
-    private var gridSpacing: CGFloat {
-        switch streamColumnCount {
-        case 2: return 8
-        case 4: return 2
-        default: return 3
-        }
-    }
-
-    private var gridPadding: CGFloat {
-        switch streamColumnCount {
-        case 2: return 12
-        case 4: return 1
-        default: return 2
-        }
+        .padding(.horizontal, 4)
+        .padding(.bottom, 24)
     }
 
     // MARK: - Data Loading
@@ -345,50 +230,9 @@ struct PhotoStreamView: View {
         }
     }
 
-    // MARK: - Grouping Helper
-    private static func groupPhotosByDay(_ photos: [PhotoAsset]) -> [PhotoDateSection] {
-        let calendar = Calendar.current
-        var sections: [PhotoDateSection] = []
-        var currentKey = ""
-        var currentTitle = ""
-        var currentPhotos: [PhotoAsset] = []
-
-        for photo in photos {
-            let date = photo.asset.creationDate ?? Date()
-            let key = date.formatted(.dateTime.year().month().day())
-            if key == currentKey {
-                currentPhotos.append(photo)
-            } else {
-                if !currentPhotos.isEmpty {
-                    sections.append(PhotoDateSection(id: currentKey, title: currentTitle, photos: currentPhotos))
-                }
-                currentKey = key
-                currentTitle = formatDateHeader(date, calendar: calendar)
-                currentPhotos = [photo]
-            }
-        }
-        if !currentPhotos.isEmpty {
-            sections.append(PhotoDateSection(id: currentKey, title: currentTitle, photos: currentPhotos))
-        }
-        return sections
-    }
-
-    private static func formatDateHeader(_ date: Date, calendar: Calendar) -> String {
-        if calendar.isDateInToday(date) {
-            let monthDay = date.formatted(.dateTime.month().day())
-            return "\(monthDay) · \(String(localized: "Today"))"
-        } else if calendar.isDateInYesterday(date) {
-            let monthDay = date.formatted(.dateTime.month().day())
-            return "\(monthDay) · \(String(localized: "Yesterday"))"
-        } else {
-            return date.formatted(.dateTime.year().month().day().weekday(.short))
-        }
-    }
-
     // MARK: - Loading & Empty States
     private var loadingGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: streamColumnCount)
-        return LazyVGrid(columns: columns, spacing: 4) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: gridSettings.columnCount), spacing: 4) {
             ForEach(0..<18, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(Color(.systemGray5))

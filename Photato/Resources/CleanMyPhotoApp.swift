@@ -16,6 +16,7 @@ struct CleanMyPhotoApp: App {
                               endpoint: "https://apps.air.build/v1/ingest/crashes")
         PurchaseReporter.start()
         SoundManager.shared.preloadSounds()
+        MainTabView.configureTabBarAppearance()
         let stats = StatisticsManager()
         let membership = MembershipManager()
         let photoManager = PhotoManager(statisticsManager: stats)

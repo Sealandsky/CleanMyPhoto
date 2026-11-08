@@ -56,7 +56,7 @@ struct OnThisDaySectionView: View {
                 .foregroundColor(.primary)
 
             Text(currentDateText)
-                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundColor(Color(.secondaryLabel))
 
             Spacer()

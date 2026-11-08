@@ -94,6 +94,15 @@ final class TimelineArchiveManager: ObservableObject {
         }
     }
 
+    /// 一次性预加载所有年份数据（供「全部年份」日历总览网格使用）
+    func loadAllYears() async {
+        for year in availableYears {
+            if monthsByYear[year] == nil {
+                await loadMonths(for: year)
+            }
+        }
+    }
+
     /// 提取指定年份的 12 个月份归档（仅保留照片数 > 0 的月份）
     private func loadMonths(for year: Int) async {
         if monthsByYear[year] != nil { return }
