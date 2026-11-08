@@ -27,46 +27,29 @@ struct AllPhotosCardView: View {
             SoundManager.playAction()
             onTap()
         } label: {
-            ZStack(alignment: .topLeading) {
-                // 1. 卡片主内容排版（与 AlbumStackCell 垂直间距对齐）
-                VStack(spacing: 0) {
-                    Spacer().frame(height: 12)
+            VStack(spacing: 0) {
+                Spacer().frame(height: 12)
 
-                    stackArea
-                        .frame(width: 88, height: 72)
+                stackArea
+                    .frame(width: 88, height: 72)
 
-                    Spacer(minLength: 6)
+                Spacer(minLength: 6)
 
-                    VStack(spacing: 3) {
-                        Text(String(localized: "All Photos"))
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 8)
+                VStack(spacing: 3) {
+                    Text(String(localized: "All Photos"))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
 
-                        Text(String(localized: "\(totalCount) Photos"))
-                            .font(.system(size: 13, weight: .regular, design: .rounded))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Spacer().frame(height: 12)
+                    Text(String(localized: "\(totalCount) Photos"))
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 152)
 
-                // 2. 左上角浅蓝微徽章：「全部」
-                HStack(spacing: 2) {
-                    Text(String(localized: "All"))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color.accentColor)
-                }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Color.accentColor.opacity(0.12), in: Capsule())
-                .padding(.top, 10)
-                .padding(.leading, 10)
+                Spacer().frame(height: 12)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 152)

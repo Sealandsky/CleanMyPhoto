@@ -17,6 +17,8 @@ struct CleanMyPhotoApp: App {
         PurchaseReporter.start()
         SoundManager.shared.preloadSounds()
         MainTabView.configureTabBarAppearance()
+        UITabBarItem.swizzleItemSettersOnce()
+        UITabBar.swizzleLayoutSubviewsOnce()
         let stats = StatisticsManager()
         let membership = MembershipManager()
         let photoManager = PhotoManager(statisticsManager: stats)

@@ -32,11 +32,11 @@ struct AlbumListView: View {
                 // 2. 个人相簿分区小标题与新建入口
                 albumsSectionHeader
 
-                // 3. 相簿网格内容（首位常驻「所有照片」卡片）
+                // 3. 相簿横滑列表（首位常驻「所有照片」卡片）
                 if !albumManager.hasLoadedOnce || albumManager.isLoadingAlbums {
-                    skeletonGrid
+                    skeletonRow
                 } else {
-                    albumsGrid
+                    albumsScrollRow
                 }
 
                 // 4. 时光归档模块
@@ -152,28 +152,32 @@ struct AlbumListView: View {
         }
     }
 
-    // MARK: - Albums Grid (首位常驻「所有照片」卡片)
-    private var albumsGrid: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            // 1. 首位固定卡片：「所有照片」
-            AllPhotosCardView(
-                totalCount: albumManager.photoManager.totalPhotoCount
-            ) {
-                onAllPhotosSelect?()
-            }
+    // MARK: - Albums Horizontal Scroll Row (首位常驻「所有照片」卡片)
+    private var albumsScrollRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 10) {
+                // 1. 首位固定卡片：「所有照片」
+                AllPhotosCardView(
+                    totalCount: albumManager.photoManager.totalPhotoCount
+                ) {
+                    onAllPhotosSelect?()
+                }
+                .frame(width: 140, height: 152)
 
-            // 2. 其余用户相册
-            ForEach(albumManager.albums) { album in
-                // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
-                AlbumStackCell(album: album)
-                    .onTapGesture {
-                        onAlbumSelect?(album)
-                    }
+                // 2. 其余用户相册
+                ForEach(albumManager.albums) { album in
+                    // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
+                    AlbumStackCell(album: album)
+                        .frame(width: 140, height: 152)
+                        .onTapGesture {
+                            onAlbumSelect?(album)
+                        }
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
     }
 
     // MARK: - 媒体类型板块
@@ -266,22 +270,26 @@ struct AlbumListView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Skeleton Grid
-    private var skeletonGrid: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            AllPhotosCardView(
-                totalCount: albumManager.photoManager.totalPhotoCount
-            ) {
-                onAllPhotosSelect?()
-            }
+    // MARK: - Skeleton Horizontal Row
+    private var skeletonRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                AllPhotosCardView(
+                    totalCount: albumManager.photoManager.totalPhotoCount
+                ) {
+                    onAllPhotosSelect?()
+                }
+                .frame(width: 140, height: 152)
 
-            ForEach(0..<3, id: \.self) { _ in
-                AlbumCellSkeleton()
+                ForEach(0..<3, id: \.self) { _ in
+                    AlbumCellSkeleton()
+                        .frame(width: 140, height: 152)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
     }
 
     private var emptyAlbumsView: some View {

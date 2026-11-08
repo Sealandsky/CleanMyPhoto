@@ -140,10 +140,10 @@ struct TimelineArchiveSectionView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(0..<4, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(Color.cardBackground)
-                        .frame(width: 112, height: 112)
-                        .shimmering(cornerRadius: 14)
+                        .frame(width: 102, height: 136)
+                        .shimmering(cornerRadius: 12)
                 }
             }
             .padding(.horizontal, 16)
@@ -162,9 +162,9 @@ struct TimelineArchiveSectionView: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 112)
+        .frame(height: 136)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.cardBackground)
         )
         .padding(.horizontal, 16)
@@ -172,7 +172,7 @@ struct TimelineArchiveSectionView: View {
 }
 
 // MARK: - Timeline Month Card
-/// 单个 112×112pt 方正月份微卡片
+/// 单个 102×136pt (3:4 比例) 月份封面微卡片（与二级页日历网格比例完全一致）
 private struct TimelineMonthCard: View {
     let item: TimelineMonthItem
 
@@ -191,36 +191,44 @@ private struct TimelineMonthCard: View {
                         .fill(Color(.systemGray5))
                 }
             }
-            .frame(width: 112, height: 112)
+            .frame(width: 102, height: 136)
             .clipped()
 
-            // 2. 底部保护渐变：底部 44pt 黑 0.7 -> 透明
+            // 2. 底部保护渐变：底部 55% 黑色渐变遮罩
             LinearGradient(
-                colors: [.black.opacity(0.72), .black.opacity(0.35), .clear],
-                startPoint: .bottom,
-                endPoint: .top
+                stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .black.opacity(0.4), location: 0.35),
+                    .init(color: .black.opacity(0.85), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .frame(height: 48)
+            .frame(height: 60)
             .allowsHitTesting(false)
 
             // 3. 底部文字排版（月份加粗 + 照片张数）
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.monthName)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.35), radius: 2, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
 
                 Text(String(localized: "\(item.photoCount) Photos"))
-                    .font(.system(size: 11.5, weight: .regular, design: .rounded))
+                    .font(.system(size: 10.5, weight: .regular, design: .rounded))
                     .foregroundColor(.white.opacity(0.85))
-                    .shadow(color: .black.opacity(0.35), radius: 2, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 7)
         }
-        .frame(width: 112, height: 112)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: 102, height: 136)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+        )
         .onAppear {
             loadCover()
         }
@@ -228,7 +236,7 @@ private struct TimelineMonthCard: View {
 
     private func loadCover() {
         guard let asset = item.coverAsset, coverImage == nil else { return }
-        let targetSize = CGSize(width: 300, height: 300)
+        let targetSize = CGSize(width: 300, height: 400)
         let key = "timeline_\(item.id)"
 
         if let cached = PhotoImageCache.shared.get(for: key, targetSize: targetSize, isHighQuality: false) {

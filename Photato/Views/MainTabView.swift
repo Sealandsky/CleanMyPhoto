@@ -79,72 +79,38 @@ struct MainTabView: View {
 
     init() {
         Self.configureTabBarAppearance()
+        UITabBarItem.swizzleItemSettersOnce()
+        UITabBar.swizzleLayoutSubviewsOnce()
     }
 
-    static func configureTabBarAppearance(_ tabBar: UITabBar? = nil) {
+    static func configureTabBarAppearance() {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
 
         let unselectedColor = UIColor.systemGray // #8E8E93 中灰
         let selectedColor = UIColor.label        // 浅色纯黑 #000000，深色纯白 #FFFFFF
 
-        let normal = appearance.stackedLayoutAppearance.normal
-        normal.iconColor = unselectedColor
-        normal.titleTextAttributes = [
-            .foregroundColor: unselectedColor,
-            .font: UIFont.systemFont(ofSize: 10, weight: .regular)
-        ]
-
-        let selected = appearance.stackedLayoutAppearance.selected
-        selected.iconColor = selectedColor
-        selected.titleTextAttributes = [
-            .foregroundColor: selectedColor,
-            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
-        ]
-
-        appearance.inlineLayoutAppearance.normal.iconColor = unselectedColor
-        appearance.inlineLayoutAppearance.normal.titleTextAttributes = normal.titleTextAttributes
-        appearance.inlineLayoutAppearance.selected.iconColor = selectedColor
-        appearance.inlineLayoutAppearance.selected.titleTextAttributes = selected.titleTextAttributes
-
-        appearance.compactInlineLayoutAppearance.normal.iconColor = unselectedColor
-        appearance.compactInlineLayoutAppearance.normal.titleTextAttributes = normal.titleTextAttributes
-        appearance.compactInlineLayoutAppearance.selected.iconColor = selectedColor
-        appearance.compactInlineLayoutAppearance.selected.titleTextAttributes = selected.titleTextAttributes
+        for layout in [
+            appearance.stackedLayoutAppearance,
+            appearance.inlineLayoutAppearance,
+            appearance.compactInlineLayoutAppearance
+        ] {
+            layout.normal.iconColor = unselectedColor
+            layout.normal.titleTextAttributes = [
+                .foregroundColor: unselectedColor,
+                .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+            ]
+            layout.selected.iconColor = selectedColor
+            layout.selected.titleTextAttributes = [
+                .foregroundColor: selectedColor,
+                .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+            ]
+        }
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
         UITabBar.appearance().tintColor = selectedColor
         UITabBar.appearance().unselectedItemTintColor = unselectedColor
-
-        if let tabBar {
-            tabBar.standardAppearance = appearance
-            tabBar.scrollEdgeAppearance = appearance
-            tabBar.tintColor = selectedColor
-            tabBar.unselectedItemTintColor = unselectedColor
-
-            if let items = tabBar.items {
-                let tabs = AppTab.allCases
-                for (index, item) in items.enumerated() {
-                    item.setTitleTextAttributes([
-                        .foregroundColor: unselectedColor,
-                        .font: UIFont.systemFont(ofSize: 10, weight: .regular)
-                    ], for: .normal)
-                    item.setTitleTextAttributes([
-                        .foregroundColor: selectedColor,
-                        .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
-                    ], for: .selected)
-
-                    if index < tabs.count {
-                        let sysName = tabs[index].systemImage
-                        if let base = UIImage(systemName: sysName) {
-                            item.image = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
-                            item.selectedImage = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     var body: some View {
@@ -152,7 +118,6 @@ struct MainTabView: View {
             ContentView(
                 isFullscreenMode: $isFullscreenMode
             )
-            .background(TabBarConfigurator())
             .tint(Color.accentColor)
             .toolbar(isFullscreenMode ? .hidden : .visible, for: .tabBar)
             .tabItem {
@@ -161,7 +126,6 @@ struct MainTabView: View {
             .tag(AppTab.photos)
 
             albumsTabContent
-                .background(TabBarConfigurator())
                 .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
@@ -169,7 +133,6 @@ struct MainTabView: View {
                 .tag(AppTab.albums)
 
             organizeTabContent
-                .background(TabBarConfigurator())
                 .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
@@ -182,24 +145,15 @@ struct MainTabView: View {
                 }
             )
             .environment(organizeManager)
-            .background(TabBarConfigurator())
             .tint(Color.accentColor)
             .tabItem {
                 Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
             }
             .tag(AppTab.settings)
         }
-        .background(TabBarConfigurator())
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
-            TabBarConfiguratorManager.shared.apply()
-        }
-        .task {
-            for delay in [0.05, 0.15, 0.3, 0.6, 1.0] {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                TabBarConfiguratorManager.shared.apply()
-            }
         }
         .task {
             AppAnalytics.screen(selectedTab.analyticsName)
@@ -452,65 +406,92 @@ struct MainTabView: View {
         .environment(GridSettings())
 }
 
-// MARK: - TabBar Configurator Manager
-@MainActor
-final class TabBarConfiguratorManager {
-    static let shared = TabBarConfiguratorManager()
-    weak var tabBar: UITabBar?
+// MARK: - Native TabBar Item Appearance Swizzling
+extension UITabBarItem {
+    private static var hasSwizzledItem = false
 
-    func apply() {
-        guard let tabBar else { return }
-        MainTabView.configureTabBarAppearance(tabBar)
+    static func swizzleItemSettersOnce() {
+        guard !hasSwizzledItem else { return }
+        hasSwizzledItem = true
+
+        let origSel = #selector(setter: UITabBarItem.image)
+        let swizSel = #selector(photato_setImage(_:))
+
+        if let orig = class_getInstanceMethod(UITabBarItem.self, origSel),
+           let swiz = class_getInstanceMethod(UITabBarItem.self, swizSel) {
+            method_exchangeImplementations(orig, swiz)
+        }
+    }
+
+    @objc private func photato_setImage(_ image: UIImage?) {
+        guard let image else {
+            photato_setImage(nil)
+            return
+        }
+
+        if image.renderingMode == .alwaysOriginal {
+            photato_setImage(image)
+            return
+        }
+
+        let unselectedColor = UIColor.systemGray
+        let selectedColor = UIColor.label
+
+        let grayImage = image.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
+        let blackImage = image.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
+
+        photato_setImage(grayImage)
+        self.selectedImage = blackImage
+
+        setTitleTextAttributes([
+            .foregroundColor: unselectedColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+        ], for: .normal)
+        setTitleTextAttributes([
+            .foregroundColor: selectedColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+        ], for: .selected)
     }
 }
 
-// MARK: - TabBar Configurator
-private struct TabBarConfigurator: UIViewRepresentable {
-    func makeUIView(context: Context) -> TabBarConfiguratorView {
-        TabBarConfiguratorView()
+extension UITabBar {
+    private static var hasSwizzled = false
+
+    static func swizzleLayoutSubviewsOnce() {
+        guard !hasSwizzled else { return }
+        hasSwizzled = true
+
+        let originalSelector = #selector(layoutSubviews)
+        let swizzledSelector = #selector(photato_layoutSubviews)
+
+        guard let originalMethod = class_getInstanceMethod(UITabBar.self, originalSelector),
+              let swizzledMethod = class_getInstanceMethod(UITabBar.self, swizzledSelector) else { return }
+
+        method_exchangeImplementations(originalMethod, swizzledMethod)
     }
 
-    func updateUIView(_ uiView: TabBarConfiguratorView, context: Context) {
-        uiView.scheduleApply()
-    }
-}
+    @objc func photato_layoutSubviews() {
+        photato_layoutSubviews()
 
-private class TabBarConfiguratorView: UIView {
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        scheduleApply()
-    }
+        guard let items = self.items else { return }
+        let unselectedColor = UIColor.systemGray
+        let selectedColor = UIColor.label
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        scheduleApply()
-    }
-
-    func scheduleApply() {
-        applyConfiguration()
-        DispatchQueue.main.async { [weak self] in
-            self?.applyConfiguration()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.applyConfiguration()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.applyConfiguration()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            self?.applyConfiguration()
-        }
-    }
-
-    func applyConfiguration() {
-        var responder: UIResponder? = self
-        while let r = responder {
-            if let tc = r as? UITabBarController {
-                TabBarConfiguratorManager.shared.tabBar = tc.tabBar
-                TabBarConfiguratorManager.shared.apply()
-                return
+        for item in items {
+            if let base = item.image, base.renderingMode != .alwaysOriginal {
+                let gray = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
+                let black = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
+                item.image = gray
+                item.selectedImage = black
+                item.setTitleTextAttributes([
+                    .foregroundColor: unselectedColor,
+                    .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+                ], for: .normal)
+                item.setTitleTextAttributes([
+                    .foregroundColor: selectedColor,
+                    .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+                ], for: .selected)
             }
-            responder = r.next
         }
     }
 }
