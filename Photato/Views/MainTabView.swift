@@ -161,6 +161,7 @@ struct MainTabView: View {
                     AlbumListView(
                         albumManager: albumMgr,
                         onThisDayManager: onThisDayManager,
+                        organizeManager: organizeManager,
                         onAlbumSelect: { album in
                             selectedAlbum = album
                             Task { [album] in
@@ -171,6 +172,9 @@ struct MainTabView: View {
                         },
                         onYearGroupSelect: { group in
                             albumsPath.append(AlbumsDestination.onThisDay(group))
+                        },
+                        onCategorySelect: { category in
+                            albumsPath.append(AlbumsDestination.categoryResults(category))
                         }
                     )
                 } else {
@@ -193,6 +197,9 @@ struct MainTabView: View {
                 }
                 if !onThisDayManager.hasLoadedOnce {
                     await onThisDayManager.fetchOnThisDay()
+                }
+                if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
+                    await organizeManager.quickAnalysis()
                 }
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
@@ -222,6 +229,12 @@ struct MainTabView: View {
                 case .onThisDay(let group):
                     OnThisDayPhotoListView(
                         group: group,
+                        photoManager: photoManager
+                    )
+                case .categoryResults(let category):
+                    OrganizeResultsView(
+                        organizeManager: organizeManager,
+                        category: category,
                         photoManager: photoManager
                     )
                 }

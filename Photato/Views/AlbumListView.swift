@@ -5,8 +5,10 @@ import Photos
 struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     @ObservedObject var onThisDayManager: OnThisDayManager
+    var organizeManager: PhotoOrganizeManager? = nil
     let onAlbumSelect: (AlbumModel) -> Void
     var onYearGroupSelect: ((OnThisDayYearGroup) -> Void)? = nil
+    var onCategorySelect: ((OrganizeCategory) -> Void)? = nil
 
     @State private var showNewAlbumAlert = false
     @State private var newAlbumName = ""
@@ -34,6 +36,9 @@ struct AlbumListView: View {
                 } else {
                     albumsGrid
                 }
+
+                // 4. 媒体类型板块（从清理页迁移至此）
+                mediaTypesSection
             }
         }
         .background(Color.pageBackground)
@@ -42,7 +47,12 @@ struct AlbumListView: View {
         .refreshable {
             async let refreshAlbums: () = albumManager.fetchUserAlbums()
             async let refreshOnThisDay: () = onThisDayManager.fetchOnThisDay(forceRefresh: true)
-            _ = await (refreshAlbums, refreshOnThisDay)
+            async let refreshOrganize: () = {
+                if let organizeManager {
+                    await organizeManager.quickAnalysis()
+                }
+            }()
+            _ = await (refreshAlbums, refreshOnThisDay, refreshOrganize)
         }
         .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
             TextField(String(localized: "Album Name"), text: $newAlbumName)
@@ -141,7 +151,98 @@ struct AlbumListView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
-        .padding(.bottom, 24)
+        .padding(.bottom, 8)
+    }
+
+    // MARK: - 媒体类型板块
+    private var mediaTypesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 模块大标题：统一 20pt 半粗圆体
+            Text(String(localized: "Media Types"))
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 4)
+                .padding(.top, 16)
+
+            // 纯白浮空分组列表卡
+            VStack(spacing: 0) {
+                mediaTypeRow(
+                    category: .videos,
+                    title: String(localized: "Videos"),
+                    icon: "video.fill",
+                    color: Color(red: 0.38, green: 0.38, blue: 0.94),
+                    count: organizeManager?.stat(for: .videos) ?? 0
+                )
+
+                Divider()
+                    .padding(.leading, 54)
+
+                mediaTypeRow(
+                    category: .livePhotos,
+                    title: String(localized: "Live Photos"),
+                    icon: "livephoto",
+                    color: Color(red: 0.96, green: 0.28, blue: 0.58),
+                    count: organizeManager?.stat(for: .livePhotos) ?? 0
+                )
+
+                Divider()
+                    .padding(.leading, 54)
+
+                mediaTypeRow(
+                    category: .screenshots,
+                    title: String(localized: "Screenshots"),
+                    icon: "camera.viewfinder",
+                    color: Color(red: 0.04, green: 0.72, blue: 0.82),
+                    count: organizeManager?.stat(for: .screenshots) ?? 0
+                )
+            }
+            .background(Color.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 28)
+    }
+
+    // 单行列表项组件
+    private func mediaTypeRow(
+        category: OrganizeCategory,
+        title: String,
+        icon: String,
+        color: Color,
+        count: Int
+    ) -> some View {
+        Button {
+            SoundManager.playAction()
+            onCategorySelect?(category)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundColor(color)
+                    .frame(width: 24, height: 24, alignment: .center)
+
+                Text(title)
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Text(count.formatted())
+                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                        .foregroundColor(.secondary)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(uiColor: .tertiaryLabel))
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 54)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Skeleton Grid
@@ -153,7 +254,7 @@ struct AlbumListView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
-        .padding(.bottom, 24)
+        .padding(.bottom, 8)
     }
 
     private var emptyAlbumsView: some View {
@@ -198,9 +299,9 @@ struct AlbumCellSkeleton: View {
             Spacer().frame(height: 16)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 200)
+        .frame(height: 152)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(AlbumStackCell.cardBackgroundColor)
         )
         .shimmering()

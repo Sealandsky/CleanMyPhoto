@@ -11,13 +11,6 @@ struct OrganizeView: View {
     @State private var totalLibraryCount = 0
 
     // MARK: - 分类分组定义
-    /// 媒体类型：属于格式类型筛选
-    private static let mediaTypeCategories: [OrganizeCategory] = [
-        .screenshots,
-        .videos,
-        .livePhotos
-    ]
-
     /// 功能类型：智能清理核心分类，计入可清理照片统计
     private static let functionCategories: [OrganizeCategory] = [
         .similar,
@@ -57,23 +50,6 @@ struct OrganizeView: View {
                         spacing: 12
                     ) {
                         ForEach(Self.functionCategories) { category in
-                            metricCard(for: category)
-                        }
-                    }
-                }
-
-                // 4. 媒体类型 (2列网格纯白卡片)
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader(title: String(localized: "Media Types"))
-
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ],
-                        spacing: 12
-                    ) {
-                        ForEach(Self.mediaTypeCategories) { category in
                             metricCard(for: category)
                         }
                     }

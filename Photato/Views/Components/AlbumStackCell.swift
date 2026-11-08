@@ -18,32 +18,32 @@ struct AlbumStackCell: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: 20)
+            Spacer().frame(height: 12)
             stackArea
-                .frame(width: 115.3, height: 95.3)
-            Spacer(minLength: 8)
-            VStack(spacing: 4) {
+                .frame(width: 88, height: 72)
+            Spacer(minLength: 6)
+            VStack(spacing: 3) {
                 Text(album.title)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 8)
                 // 数量展示
                 Text("\(album.assetCount)")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 12)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 200)
+        .frame(height: 152)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Self.cardBackgroundColor)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - 堆叠规格定义（精准对齐 Figma 686:1312 组件集）
