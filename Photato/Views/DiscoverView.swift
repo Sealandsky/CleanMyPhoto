@@ -262,7 +262,7 @@ struct DiscoverView: View {
     // MARK: - Photo Cell View
     @ViewBuilder
     private func photoCellView(_ photo: PhotoAsset) -> some View {
-        let cell = PhotoCell(photo: photo)
+        let baseCell = PhotoCell(photo: photo)
             .id(photo.id)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -276,7 +276,16 @@ struct DiscoverView: View {
                 }
             }
 
-        let swipeableCell = cell.swipeToTrash(
+        Group {
+            if let transitionNamespace {
+                baseCell.matchedTransitionSource(id: photo.id, in: transitionNamespace) { source in
+                    source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            } else {
+                baseCell
+            }
+        }
+        .swipeToTrash(
             photo: photo,
             isEnabled: isAuthorized,
             isFavorite: photoManager.isFavorite(photo),
@@ -288,14 +297,6 @@ struct DiscoverView: View {
                 showFavoriteDeleteAlert = true
             }
         )
-
-        if let transitionNamespace {
-            swipeableCell.matchedTransitionSource(id: photo.id, in: transitionNamespace) { source in
-                source.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-        } else {
-            swipeableCell
-        }
     }
 
     // MARK: - 下拉刷新（含最小时长保障）
