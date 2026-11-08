@@ -32,59 +32,11 @@ private nonisolated struct QualityData: Sendable {
 }
 
 /// 一条待分析任务:全量分析(库中无行)或回填(已有行,仅模糊带照片补 aesthetics)
-nonisolated private struct QualityWorkItem {
+nonisolated private struct QualityWorkItem: Sendable {
     let asset: PHAsset
     let cachedBlur: Double
     let cachedFace: Double
     let isBackfill: Bool
-}
-
-private nonisolated final class BatchCancellation: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _cancelled = false
-
-    nonisolated var isCancelled: Bool {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return _cancelled
-        }
-        set {
-            lock.lock()
-            _cancelled = newValue
-            lock.unlock()
-        }
-    }
-
-    nonisolated func cancel() {
-        lock.lock()
-        _cancelled = true
-        lock.unlock()
-    }
-}
-
-private nonisolated final class BatchAccumulator: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _output: [QualityData] = []
-    private var _doneInBatch: Int = 0
-
-    init(capacity: Int) {
-        _output.reserveCapacity(capacity)
-    }
-
-    nonisolated func record(data: QualityData) -> (done: Int, totalInBatch: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        _output.append(data)
-        _doneInBatch += 1
-        return (_doneInBatch, _output.count)
-    }
-
-    nonisolated var results: [QualityData] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _output
-    }
 }
 
 // MARK: - PhotoQualityAnalyzer
@@ -269,59 +221,48 @@ final class PhotoQualityAnalyzer {
         allResults.reserveCapacity(total)
 
         for batchStart in stride(from: 0, to: total, by: batchSize) {
-            // 用户取消分析后立即停止后续批次，已完成批次已落盘可复用
+            // 用户取消分析或切入后台后立即停止后续批次，已完成批次已落盘可复用
             if Task.isCancelled { break }
             let batchEnd = min(batchStart + batchSize, total)
             let batch = Array(workItems[batchStart..<batchEnd])
 
-            let batchCancellation = BatchCancellation()
+            var batchResults: [QualityData] = []
+            batchResults.reserveCapacity(batch.count)
 
-            let results = await withTaskCancellationHandler {
-                await withCheckedContinuation { (continuation: CheckedContinuation<[QualityData], Never>) in
-                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                        let group = DispatchGroup()
-                        let semaphore = DispatchSemaphore(value: maxConcurrency)
-                        let accumulator = BatchAccumulator(capacity: batch.count)
+            await withTaskGroup(of: QualityData.self) { group in
+                var iterator = batch.makeIterator()
 
-                        for item in batch {
-                            guard !Task.isCancelled && !batchCancellation.isCancelled else { break }
-                            semaphore.wait()
-                            group.enter()
-                            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                                defer {
-                                    semaphore.signal()
-                                    group.leave()
-                                }
-
-                                guard !Task.isCancelled && !batchCancellation.isCancelled else { return }
-
-                                let data = PhotoQualityAnalyzer.analyze(item: item)
-
-                                let (done, _) = accumulator.record(data: data)
-                                let currentTotal = batchStart + done
-                                let shouldUpdate = (currentTotal % 10 == 0) || (currentTotal == total) || (done == batch.count)
-
-                                // Throttled progress update to keep UI responsive and avoid main thread starvation
-                                if shouldUpdate {
-                                    DispatchQueue.main.async { [weak self] in
-                                        guard let self = self else { return }
-                                        self.computingProgress = Double(currentTotal) / Double(total)
-                                        self.currentStep = String(localized: "Analyzing \(currentTotal)/\(total)...")
-                                    }
-                                }
-                            }
+                // 启动初始并发任务（受 maxConcurrency 控制，避免抢占过多线程和 ANE 算力）
+                for _ in 0..<maxConcurrency {
+                    if let item = iterator.next() {
+                        group.addTask {
+                            await PhotoQualityAnalyzer.analyze(item: item)
                         }
-
-                        group.wait()
-                        continuation.resume(returning: accumulator.results)
                     }
                 }
-            } onCancel: {
-                batchCancellation.cancel()
+
+                // 每完成一个任务，存入结果并派发下一个，同时节流刷新 UI 进度
+                while let result = await group.next() {
+                    batchResults.append(result)
+
+                    let currentTotal = batchStart + batchResults.count
+                    let shouldUpdate = (currentTotal % 10 == 0) || (currentTotal == total) || (batchResults.count == batch.count)
+                    if shouldUpdate {
+                        self.computingProgress = Double(currentTotal) / Double(total)
+                        self.currentStep = String(localized: "Analyzing \(currentTotal)/\(total)...")
+                    }
+
+                    if !Task.isCancelled, let nextItem = iterator.next() {
+                        group.addTask {
+                            await PhotoQualityAnalyzer.analyze(item: nextItem)
+                        }
+                    }
+                }
             }
 
-            saveQuality(results, existing: cached.objects)
-            allResults.append(contentsOf: results)
+            guard !Task.isCancelled else { break }
+            saveQuality(batchResults, existing: cached.objects)
+            allResults.append(contentsOf: batchResults)
         }
 
         #if DEBUG
@@ -431,12 +372,19 @@ final class PhotoQualityAnalyzer {
 
     // MARK: - Analysis (background-safe)
 
-    nonisolated private static func analyze(item: QualityWorkItem) -> QualityData {
+    nonisolated private static func analyze(item: QualityWorkItem) async -> QualityData {
         let id = item.asset.localIdentifier
+
+        if Task.isCancelled {
+            return QualityData(
+                localIdentifier: id, blurScore: -1, faceQuality: -1,
+                aestheticsScore: -1, isUtility: false
+            )
+        }
 
         // 回填:模糊带照片只补 aesthetics,已落库的 Laplacian / face 直接沿用
         if item.isBackfill {
-            let (aesthetics, isUtility) = aestheticsAnalysis(for: item.asset)
+            let (aesthetics, isUtility) = await aestheticsAnalysis(for: item.asset)
             return QualityData(
                 localIdentifier: id,
                 blurScore: item.cachedBlur,
@@ -459,8 +407,8 @@ final class PhotoQualityAnalyzer {
         // 分辨"真糊"与"景深虚化/干净背景";两端明确的直接定性
         var aesthetics: Double = -1
         var isUtility = false
-        if blur >= blurBandLow, blur <= blurBandHigh {
-            (aesthetics, isUtility) = aestheticsAnalysis(for: item.asset)
+        if blur >= blurBandLow, blur <= blurBandHigh, !Task.isCancelled {
+            (aesthetics, isUtility) = await aestheticsAnalysis(for: item.asset)
         }
 
         return QualityData(
@@ -562,28 +510,18 @@ final class PhotoQualityAnalyzer {
     /// receipts / documents). Runs on a larger thumbnail than the Laplacian
     /// pass because the score needs real detail. Returns -1 on failure — such
     /// photos simply keep their Laplacian verdict.
-    nonisolated private static func aestheticsAnalysis(for asset: PHAsset) -> (score: Double, isUtility: Bool) {
+    nonisolated private static func aestheticsAnalysis(for asset: PHAsset) async -> (score: Double, isUtility: Bool) {
+        guard !Task.isCancelled else { return (-1, false) }
         guard let cgImage = requestThumbnail(for: asset, dimension: aestheticsDimension) else {
             return (-1, false)
         }
 
-        // 新 Swift Vision API 只有 async 入口,而批处理管线是同步派发块,
-        // 用信号量把工作线程停在这里;并发上限已由外层信号量约束,不会压垮协作池
-        nonisolated(unsafe) var result: (score: Double, isUtility: Bool) = (-1, false)
-        let semaphore = DispatchSemaphore(value: 0)
-
-        Task {
-            do {
-                let observation = try await CalculateImageAestheticsScoresRequest().perform(on: cgImage)
-                result = (Double(observation.overallScore), observation.isUtility)
-            } catch {
-                result = (-1, false)
-            }
-            semaphore.signal()
+        do {
+            let observation = try await CalculateImageAestheticsScoresRequest().perform(on: cgImage)
+            return (Double(observation.overallScore), observation.isUtility)
+        } catch {
+            return (-1, false)
         }
-
-        semaphore.wait()
-        return result
     }
 
     #if DEBUG

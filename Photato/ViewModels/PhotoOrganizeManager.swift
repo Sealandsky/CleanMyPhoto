@@ -1,5 +1,6 @@
 import Foundation
 import Photos
+import UIKit
 
 @MainActor
 @Observable
@@ -20,6 +21,24 @@ final class PhotoOrganizeManager {
     let qualityAnalyzer = PhotoQualityAnalyzer()
 
     private var analysisTask: Task<Void, Never>?
+    private nonisolated(unsafe) var backgroundObserver: NSObjectProtocol?
+
+    init() {
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.isAnalyzing else { return }
+            self.cancelAnalysis()
+        }
+    }
+
+    deinit {
+        if let observer = backgroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     var totalGroupCount: Int {
         scanResults.values.reduce(0) { $0 + $1.count }
