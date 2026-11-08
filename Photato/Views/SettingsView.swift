@@ -77,7 +77,7 @@ struct SettingsView: View {
                 content()
             }
             .padding(.vertical, 6)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .background(Color.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
