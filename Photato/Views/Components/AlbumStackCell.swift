@@ -133,7 +133,7 @@ struct AlbumStackCell: View {
 /// 堆叠单张封面：按资产维度加载并做内存缓存
 /// （CachedAlbumCoverView 以相簿 ID 为缓存键，无法区分同一相簿的多张堆叠图，
 /// 因此这里单独按 asset.localIdentifier 缓存）
-private struct AlbumStackCoverImage: View {
+struct AlbumStackCoverImage: View {
     let asset: PHAsset
 
     @State private var image: UIImage?

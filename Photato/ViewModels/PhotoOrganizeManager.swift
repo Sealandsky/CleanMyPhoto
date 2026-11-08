@@ -21,6 +21,7 @@ final class PhotoOrganizeManager {
     let qualityAnalyzer = PhotoQualityAnalyzer()
 
     private var analysisTask: Task<Void, Never>?
+    @ObservationIgnored
     private nonisolated(unsafe) var backgroundObserver: NSObjectProtocol?
 
     init() {
@@ -29,8 +30,10 @@ final class PhotoOrganizeManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, self.isAnalyzing else { return }
-            self.cancelAnalysis()
+            Task { @MainActor [weak self] in
+                guard let self, self.isAnalyzing else { return }
+                self.cancelAnalysis()
+            }
         }
     }
 

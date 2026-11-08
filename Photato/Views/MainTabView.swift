@@ -1,5 +1,6 @@
 import SwiftUI
 import StoreKit
+import Photos
 
 enum AppTab: String, CaseIterable {
     case photos
@@ -72,14 +73,47 @@ struct MainTabView: View {
 
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @StateObject private var onThisDayManager = OnThisDayManager()
+    @StateObject private var timelineArchiveManager = TimelineArchiveManager()
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
+
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+
+        // 1. 未选中项样式：图标与文字均为二级中灰
+        let normal = appearance.stackedLayoutAppearance.normal
+        normal.iconColor = UIColor.secondaryLabel
+        normal.titleTextAttributes = [
+            .foregroundColor: UIColor.secondaryLabel,
+            .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+        ]
+
+        // 2. 选中项样式：图标与文字均为 label（浅色黑、深色白）
+        let selected = appearance.stackedLayoutAppearance.selected
+        selected.iconColor = UIColor.label
+        selected.titleTextAttributes = [
+            .foregroundColor: UIColor.label,
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+        ]
+
+        // 3. 各种布局形式对齐
+        appearance.inlineLayoutAppearance = appearance.stackedLayoutAppearance
+        appearance.compactInlineLayoutAppearance = appearance.stackedLayoutAppearance
+
+        // 4. 应用到系统全局 TabBar
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().tintColor = UIColor.label
+        UITabBar.appearance().unselectedItemTintColor = UIColor.secondaryLabel
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
             ContentView(
                 isFullscreenMode: $isFullscreenMode
             )
+            .tint(Color.accentColor)
             .toolbar(isFullscreenMode ? .hidden : .visible, for: .tabBar)
             .tabItem {
                 Label(AppTab.photos.localizedText, systemImage: AppTab.photos.systemImage)
@@ -87,12 +121,14 @@ struct MainTabView: View {
             .tag(AppTab.photos)
 
             albumsTabContent
+                .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
                 }
                 .tag(AppTab.albums)
 
             organizeTabContent
+                .tint(Color.accentColor)
                 .tabItem {
                     Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
                 }
@@ -104,11 +140,13 @@ struct MainTabView: View {
                 }
             )
             .environment(organizeManager)
+            .tint(Color.accentColor)
             .tabItem {
                 Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
             }
             .tag(AppTab.settings)
         }
+        .tint(.primary)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
@@ -168,6 +206,7 @@ struct MainTabView: View {
                     AlbumListView(
                         albumManager: albumMgr,
                         onThisDayManager: onThisDayManager,
+                        timelineArchiveManager: timelineArchiveManager,
                         organizeManager: organizeManager,
                         onAlbumSelect: { album in
                             selectedAlbum = album
@@ -182,6 +221,15 @@ struct MainTabView: View {
                         },
                         onCategorySelect: { category in
                             albumsPath.append(AlbumsDestination.categoryResults(category))
+                        },
+                        onAllPhotosSelect: {
+                            albumsPath.append(AlbumsDestination.allPhotos)
+                        },
+                        onMonthArchiveSelect: { item in
+                            albumsPath.append(AlbumsDestination.monthArchive(item))
+                        },
+                        onAllYearsSelect: {
+                            albumsPath.append(AlbumsDestination.allYearsArchive)
                         }
                     )
                 } else {
@@ -202,19 +250,16 @@ struct MainTabView: View {
                 guard let albumMgr = albumManager else { return }
 
                 // 并行并发拉取，互不等待阻塞
-                async let albumsTask: () = albumMgr.fetchUserAlbums()
-                async let onThisDayTask: () = {
-                    if !onThisDayManager.hasLoadedOnce {
-                        await onThisDayManager.fetchOnThisDay()
-                    }
-                }()
-                async let organizeTask: () = {
-                    if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
-                        await organizeManager.quickAnalysis()
-                    }
-                }()
-
-                _ = await (albumsTask, onThisDayTask, organizeTask)
+                if !onThisDayManager.hasLoadedOnce {
+                    Task { await onThisDayManager.fetchOnThisDay() }
+                }
+                if !timelineArchiveManager.hasLoadedOnce {
+                    Task { await timelineArchiveManager.loadTimeline() }
+                }
+                if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
+                    Task { await organizeManager.quickAnalysis() }
+                }
+                await albumMgr.fetchUserAlbums()
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
                 switch destination {
@@ -250,6 +295,53 @@ struct MainTabView: View {
                         organizeManager: organizeManager,
                         category: category,
                         photoManager: photoManager
+                    )
+                case .allPhotos:
+                    PhotoStreamView(
+                        streamTitle: String(localized: "All Photos"),
+                        fetchPhotos: {
+                            await Task.detached(priority: .userInitiated) {
+                                let options = PHFetchOptions()
+                                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                                options.predicate = NSPredicate(format: "isHidden == false")
+                                let result = PHAsset.fetchAssets(with: options)
+                                var list: [PhotoAsset] = []
+                                result.enumerateObjects { asset, _, _ in
+                                    list.append(PhotoAsset(asset: asset))
+                                }
+                                return list
+                            }.value
+                        },
+                        photoManager: photoManager
+                    )
+                case .monthArchive(let item):
+                    PhotoStreamView(
+                        streamTitle: "\(item.yearTitle) · \(item.monthName)",
+                        fetchPhotos: {
+                            await Task.detached(priority: .userInitiated) {
+                                let options = PHFetchOptions()
+                                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                                options.predicate = NSPredicate(
+                                    format: "creationDate >= %@ AND creationDate < %@ AND isHidden == false",
+                                    item.startDate as NSDate,
+                                    item.endDate as NSDate
+                                )
+                                let result = PHAsset.fetchAssets(with: options)
+                                var list: [PhotoAsset] = []
+                                result.enumerateObjects { asset, _, _ in
+                                    list.append(PhotoAsset(asset: asset))
+                                }
+                                return list
+                            }.value
+                        },
+                        photoManager: photoManager
+                    )
+                case .allYearsArchive:
+                    AllYearsArchiveView(
+                        manager: timelineArchiveManager,
+                        onMonthSelect: { item in
+                            albumsPath.append(AlbumsDestination.monthArchive(item))
+                        }
                     )
                 }
             }

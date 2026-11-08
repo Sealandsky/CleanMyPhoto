@@ -5,10 +5,14 @@ import Photos
 struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     @ObservedObject var onThisDayManager: OnThisDayManager
+    @ObservedObject var timelineArchiveManager: TimelineArchiveManager
     var organizeManager: PhotoOrganizeManager? = nil
-    let onAlbumSelect: (AlbumModel) -> Void
+    var onAlbumSelect: ((AlbumModel) -> Void)? = nil
     var onYearGroupSelect: ((OnThisDayYearGroup) -> Void)? = nil
     var onCategorySelect: ((OrganizeCategory) -> Void)? = nil
+    var onAllPhotosSelect: (() -> Void)? = nil
+    var onMonthArchiveSelect: ((TimelineMonthItem) -> Void)? = nil
+    var onAllYearsSelect: (() -> Void)? = nil
 
     @State private var showNewAlbumAlert = false
     @State private var newAlbumName = ""
@@ -20,7 +24,7 @@ struct AlbumListView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // 1. 顶部「过去的今天」年份卡片区
+                // 1. 顶部「往年今日」年份卡片区
                 OnThisDaySectionView(manager: onThisDayManager) { group in
                     onYearGroupSelect?(group)
                 }
@@ -28,16 +32,25 @@ struct AlbumListView: View {
                 // 2. 个人相簿分区小标题与新建入口
                 albumsSectionHeader
 
-                // 3. 相簿网格内容
+                // 3. 相簿网格内容（首位常驻「所有照片」卡片）
                 if !albumManager.hasLoadedOnce || albumManager.isLoadingAlbums {
                     skeletonGrid
-                } else if albumManager.albums.isEmpty {
-                    emptyAlbumsView
                 } else {
                     albumsGrid
                 }
 
-                // 4. 媒体类型板块（从清理页迁移至此）
+                // 4. 时光归档模块
+                TimelineArchiveSectionView(
+                    manager: timelineArchiveManager,
+                    onMonthSelect: { item in
+                        onMonthArchiveSelect?(item)
+                    },
+                    onViewAllYears: {
+                        onAllYearsSelect?()
+                    }
+                )
+
+                // 5. 媒体类型板块（从清理页迁移至此）
                 mediaTypesSection
             }
         }
@@ -47,12 +60,13 @@ struct AlbumListView: View {
         .refreshable {
             async let refreshAlbums: () = albumManager.fetchUserAlbums()
             async let refreshOnThisDay: () = onThisDayManager.fetchOnThisDay(forceRefresh: true)
+            async let refreshTimeline: () = timelineArchiveManager.loadTimeline(forceRefresh: true)
             async let refreshOrganize: () = {
                 if let organizeManager {
                     await organizeManager.quickAnalysis()
                 }
             }()
-            _ = await (refreshAlbums, refreshOnThisDay, refreshOrganize)
+            _ = await (refreshAlbums, refreshOnThisDay, refreshTimeline, refreshOrganize)
         }
         .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
             TextField(String(localized: "Album Name"), text: $newAlbumName)
@@ -138,14 +152,22 @@ struct AlbumListView: View {
         }
     }
 
-    // MARK: - Albums Grid
+    // MARK: - Albums Grid (首位常驻「所有照片」卡片)
     private var albumsGrid: some View {
         LazyVGrid(columns: columns, spacing: 8) {
+            // 1. 首位固定卡片：「所有照片」
+            AllPhotosCardView(
+                totalCount: albumManager.photoManager.totalPhotoCount
+            ) {
+                onAllPhotosSelect?()
+            }
+
+            // 2. 其余用户相册
             ForEach(albumManager.albums) { album in
                 // 堆叠相簿卡片：最多 3 张封面堆叠 + 名称/数量
                 AlbumStackCell(album: album)
                     .onTapGesture {
-                        onAlbumSelect(album)
+                        onAlbumSelect?(album)
                     }
             }
         }
@@ -247,7 +269,13 @@ struct AlbumListView: View {
     // MARK: - Skeleton Grid
     private var skeletonGrid: some View {
         LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(0..<6, id: \.self) { _ in
+            AllPhotosCardView(
+                totalCount: albumManager.photoManager.totalPhotoCount
+            ) {
+                onAllPhotosSelect?()
+            }
+
+            ForEach(0..<3, id: \.self) { _ in
                 AlbumCellSkeleton()
             }
         }
@@ -310,6 +338,8 @@ struct AlbumCellSkeleton: View {
 #Preview {
     AlbumListView(
         albumManager: AlbumManager(photoManager: PhotoManager()),
-        onThisDayManager: OnThisDayManager()
-    ) { _ in }
+        onThisDayManager: OnThisDayManager(),
+        timelineArchiveManager: TimelineArchiveManager(),
+        organizeManager: PhotoOrganizeManager()
+    )
 }

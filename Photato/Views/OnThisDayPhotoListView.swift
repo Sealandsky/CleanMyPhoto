@@ -28,7 +28,6 @@ struct OnThisDayPhotoListView: View {
     @State private var showFavoriteDeleteAlert = false
     @State private var localPhotos: [PhotoAsset]
     @State private var coverImage: UIImage?
-    @State private var scrollOffsetY: CGFloat = 0
     @Namespace private var photoTransitionNamespace
 
     init(
@@ -57,25 +56,24 @@ struct OnThisDayPhotoListView: View {
         localPhotos.filter { !photoManager.pendingDeletionIDs.contains($0.id) }
     }
 
-    private static let heroHeight: CGFloat = 320
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    // 1. 沉浸式高斯模糊 Hero 头部
-                    heroHeaderView
+                    // 1. 顶部日期与信息展示
+                    if !selectionManager.isSelectMode {
+                        headerInfoView
+                    }
 
                     // 2. 照片内容区
                     if displayedPhotos.isEmpty {
                         emptyStateView
                     } else {
                         photoGridView
-                            .padding(.top, 8)
+                            .padding(.top, 4)
                     }
                 }
             }
-            .ignoresSafeArea(edges: .top)
             .background(Color.pageBackground)
             .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
             .onChange(of: scrollToPhotoID) { _, newValue in
@@ -96,24 +94,14 @@ struct OnThisDayPhotoListView: View {
             }
             .scrollIndicators(.hidden)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y
-            } action: { _, newOffset in
-                scrollOffsetY = max(0, newOffset)
-            }
-        }
-        .overlay(alignment: .top) {
-            topScrollGradientBlur
         }
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue
         }
         .background(Color.pageBackground)
-        // 普通模式下导航栏标题置空，上滑后标题不进入 titlebar；仅多选时展示勾选数
-        .navigationTitle(selectionManager.isSelectMode ? String(localized: "\(selectionManager.count) Selected") : "")
+        .navigationTitle(navigationBarTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(selectionManager.isSelectMode)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 if selectionManager.isSelectMode {
@@ -124,15 +112,21 @@ struct OnThisDayPhotoListView: View {
                     }
                     .font(.system(.body, design: .rounded))
                     .foregroundColor(.primary)
-                } else {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
+                }
+            }
+
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text(navigationBarTitle)
+                        .font(.system(.headline, design: .rounded).weight(.semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    if !selectionManager.isSelectMode && !photoCountAndSizeText.isEmpty {
+                        Text(photoCountAndSizeText)
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
             }
@@ -173,6 +167,7 @@ struct OnThisDayPhotoListView: View {
                 }
             }
         }
+        .dynamicSecondaryNavigationBar()
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(isPresented: $isFullscreenMode) {
             if let photoID = currentPhotoID {
@@ -207,117 +202,40 @@ struct OnThisDayPhotoListView: View {
         }
     }
 
-    // MARK: - Top Scroll Dynamic Gradient Blur
-    /// 随上滑平滑过渡（0 ~ 50pt）的柔和渐变毛玻璃，静止置顶时完全透明（0 遮挡、0 闪烁）
-    private var topFadeOpacity: CGFloat {
-        min(1.0, max(0.0, scrollOffsetY / 50.0))
+    // MARK: - Navigation Bar Title
+    private var navigationBarTitle: String {
+        selectionManager.isSelectMode
+            ? String(localized: "\(selectionManager.count) Selected")
+            : "\(mainDateText) · \(yearText)"
     }
 
-    private var topScrollGradientBlur: some View {
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            // 采用垂直渐变遮罩，向下自然衰减，替代生硬的矩形色块
-            .mask {
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0.0),
-                        .init(color: .black, location: 0.45),
-                        .init(color: .black.opacity(0.0), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .frame(height: 110)
-            .ignoresSafeArea(edges: .top)
-            .opacity(topFadeOpacity)
-            .allowsHitTesting(false)
-    }
+    // MARK: - Header Info View
+    private var headerInfoView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(String(localized: "On This Day"))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(Color.accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.accentColor.opacity(0.12), in: Capsule())
 
-    // MARK: - Hero Header View
-    private var heroHeaderView: some View {
-        ZStack(alignment: .bottomLeading) {
-            // 1. 首张图片大半径高斯模糊 + 毛玻璃质感背景（第 0 帧直出内存缓存）
-            ZStack {
-                if let image = coverImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Self.heroHeight)
-                        .scaleEffect(1.4)
-                        .blur(radius: 64, opaque: true)
-                        .clipped()
-                } else {
-                    Color.clear
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Self.heroHeight)
-                }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(mainDateText)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
 
-                // 叠加轻量原生系统毛玻璃材质，增强质感细腻度与漫反射
-                Rectangle()
-                    .fill(.ultraThinMaterial.opacity(0.3))
-            }
-            // 使用平滑 Sigmoid / Ease 曲线遮罩，自上而下自然过渡到透明底色
-            .mask {
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0.0),
-                        .init(color: .black, location: 0.28),
-                        .init(color: .black.opacity(0.92), location: 0.45),
-                        .init(color: .black.opacity(0.72), location: 0.62),
-                        .init(color: .black.opacity(0.42), location: 0.78),
-                        .init(color: .black.opacity(0.16), location: 0.90),
-                        .init(color: .black.opacity(0.0), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                Text(yearText)
+                    .font(.system(size: 24, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+
+                Spacer()
             }
 
-            // 2. 页面底色渐变融合层：多阶缓动曲线，杜绝分界感与杂色
-            LinearGradient(
-                stops: [
-                    .init(color: Color.pageBackground.opacity(0.0), location: 0.0),
-                    .init(color: Color.pageBackground.opacity(0.0), location: 0.28),
-                    .init(color: Color.pageBackground.opacity(0.08), location: 0.45),
-                    .init(color: Color.pageBackground.opacity(0.28), location: 0.62),
-                    .init(color: Color.pageBackground.opacity(0.58), location: 0.78),
-                    .init(color: Color.pageBackground.opacity(0.84), location: 0.90),
-                    .init(color: Color.pageBackground, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
-
-            // 3. 大标题与信息排版（对齐参考图：大日期加粗 + 年份浅色）
-            VStack(alignment: .leading, spacing: 6) {
-                if group.isMonthFallback {
-                    Text(String(localized: "Same Month"))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(Color.accentColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(mainDateText)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-
-                    Text(yearText)
-                        .font(.system(size: 30, weight: .medium, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
-
-                subtitleInfoView
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            subtitleInfoView
         }
-        .frame(height: Self.heroHeight)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Photo Grid View

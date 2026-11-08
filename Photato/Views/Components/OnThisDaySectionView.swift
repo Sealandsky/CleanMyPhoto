@@ -51,7 +51,7 @@ struct OnThisDaySectionView: View {
     // MARK: - Header
     private var headerView: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(manager.isMonthFallback ? String(localized: "Past Month Highlights") : String(localized: "On This Day"))
+            Text(String(localized: "On This Day"))
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
 
@@ -277,7 +277,7 @@ struct OnThisDaySectionView: View {
     }
 
     private var accessibilitySummary: String {
-        let prefix = manager.isMonthFallback ? String(localized: "Past Month Highlights") : String(localized: "On This Day")
+        let prefix = String(localized: "On This Day")
         let yearStr = "\(animatedYear)"
         let countStr = String(localized: "\(animatedCount) Photos")
         return "\(prefix), \(yearStr), \(countStr)"
