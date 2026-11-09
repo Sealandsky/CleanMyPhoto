@@ -17,12 +17,13 @@ struct PendingPhotosEntryButton: View {
             } label: {
                 buttonContent
                     .foregroundColor(.primary)
-                    .padding(.horizontal, photoManager.trashCount > 0 ? 12 : 0)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .frame(width: photoManager.trashCount > 0 ? nil : 44, height: 44)
+                    .padding(.horizontal, photoManager.trashCount > 0 ? 10 : 0)
+                    .frame(minWidth: 38, minHeight: 38)
+                    .frame(width: photoManager.trashCount > 0 ? nil : 38, height: 38)
                     .modifier(HeaderLiquidGlassModifier())
                     .contentShape(Capsule())
             }
+            .frame(minWidth: 44, minHeight: 44)
             .buttonStyle(.plain)
             // VoiceOver：读出“待处理照片”，有数量时一并读出
             .accessibilityElement(children: .combine)
@@ -43,7 +44,7 @@ struct PendingPhotosEntryButton: View {
         HStack(spacing: 5) {
             if photoManager.trashCount == 0 {
                 Image(systemName: "trash")
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
+                    .font(.system(size: 16.5, weight: .regular, design: .rounded))
                     .transition(.scale.combined(with: .opacity))
             } else {
                 TrashPhotoStackIcon(recentPhotos: Array(photoManager.trashedAssets.suffix(2)))

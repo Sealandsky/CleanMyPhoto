@@ -130,17 +130,19 @@ struct OnThisDayPhotoListView: View {
             }
 
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(navigationBarTitle)
-                        .font(.system(.headline, design: .rounded).weight(.semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    if !selectionManager.isSelectMode {
-                        Text(isCanvasMode ? String(localized: "Freeform Canvas") : photoCountAndSizeText)
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundColor(.secondary)
+                if !isCanvasMode {
+                    VStack(spacing: 2) {
+                        Text(navigationBarTitle)
+                            .font(.system(.headline, design: .rounded).weight(.semibold))
+                            .foregroundColor(.primary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        if !selectionManager.isSelectMode {
+                            Text(photoCountAndSizeText)
+                                .font(.system(size: 11, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
@@ -166,25 +168,19 @@ struct OnThisDayPhotoListView: View {
                     }
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
+                } else if isCanvasMode {
+                    PendingPhotosEntryButton(isLiquidGlass: true)
                 } else {
-                    HStack(spacing: 6) {
-                        ViewModeSwitcher(isCanvasMode: $isCanvasMode)
-
-                        if !isCanvasMode {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectionManager.enterSelectMode()
-                                }
-                            } label: {
-                                Text(String(localized: "Select"))
-                                    .font(.system(.body, design: .rounded))
-                                    .foregroundColor(.primary)
-                                    .frame(minWidth: 44, minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                        } else {
-                            PendingPhotosEntryButton(isLiquidGlass: false)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectionManager.enterSelectMode()
                         }
+                    } label: {
+                        Text(String(localized: "Select"))
+                            .font(.system(.body, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                 }
             }
@@ -222,13 +218,24 @@ struct OnThisDayPhotoListView: View {
         } message: {
             Text(String(localized: "This photo is in your favorites. Remove from favorites first before deleting."))
         }
+        .overlay(alignment: .bottomLeading) {
+            if !selectionManager.isSelectMode {
+                ViewModeSwitcher(isCanvasMode: $isCanvasMode)
+                    .padding(.leading, 18)
+                    .padding(.bottom, 20)
+            }
+        }
     }
 
     // MARK: - Navigation Bar Title
     private var navigationBarTitle: String {
-        selectionManager.isSelectMode
-            ? String(localized: "\(selectionManager.count) Selected")
-            : "\(mainDateText) · \(yearText)"
+        if selectionManager.isSelectMode {
+            return String(localized: "\(selectionManager.count) Selected")
+        } else if isCanvasMode {
+            return ""
+        } else {
+            return "\(mainDateText) · \(yearText)"
+        }
     }
 
     // MARK: - Header Info View

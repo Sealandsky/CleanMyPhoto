@@ -5,7 +5,19 @@ struct MinimalCleanupStatCard: View {
     @ObservedObject var statisticsManager: StatisticsManager
     @ObservedObject var membershipManager: MembershipManager
     let totalLibraryCount: Int
-    let onUpgradePro: () -> Void
+    let onUpgradePro: (() -> Void)?
+
+    init(
+        statisticsManager: StatisticsManager,
+        membershipManager: MembershipManager,
+        totalLibraryCount: Int,
+        onUpgradePro: (() -> Void)? = nil
+    ) {
+        self.statisticsManager = statisticsManager
+        self.membershipManager = membershipManager
+        self.totalLibraryCount = totalLibraryCount
+        self.onUpgradePro = onUpgradePro
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -60,35 +72,13 @@ struct MinimalCleanupStatCard: View {
                 .fill(Color.primary.opacity(0.06))
                 .frame(height: 0.8)
 
-            // 3. 底部轻量辅助行
+            // 3. 底部轻量辅助行：全图库总量
             HStack {
                 Text(String(format: String(localized: "Total Photos: %@"), totalLibraryCount.formatted()))
                     .font(.system(size: 12, design: .rounded))
                     .foregroundColor(Color(.secondaryLabel))
 
                 Spacer()
-
-                if membershipManager.isPremiumMember {
-                    HStack(spacing: 3) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.yellow)
-                        Text(String(localized: "Pro Unlimited"))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(.primary)
-                    }
-                } else {
-                    Button(action: onUpgradePro) {
-                        HStack(spacing: 3) {
-                            Text(String(format: String(localized: "Free quota: %d/%d remaining"), membershipManager.freeDeletionQuotaRemaining, membershipManager.freeDeletionQuotaTotal))
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundColor(.accentColor)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
         .padding(.horizontal, 18)

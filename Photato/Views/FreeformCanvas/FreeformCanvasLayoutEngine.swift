@@ -17,10 +17,11 @@ struct CanvasPhotoLayout: Identifiable, Equatable {
 
 // MARK: - 确定性散落布局计算器 (Deterministic Archimedean Spiral)
 final class FreeformCanvasLayoutEngine {
-    /// 核心算法：以 (0, 0) 为世界坐标原点，沿阿基米德螺旋线寻找第一个不与已有卡片重叠的位置
+    /// 核心算法：以 (0, 0) 为世界坐标原点，沿阿基米德螺旋线寻找第一个不与已有卡片及中心标题重叠的位置
     static func generateLayout(
         photos: [PhotoAsset],
-        canvasSize: CGSize = .zero
+        canvasSize: CGSize = .zero,
+        centerExclusionSize: CGSize = CGSize(width: 250, height: 160)
     ) -> [CanvasPhotoLayout] {
         var placedRects: [CGRect] = []
         var results: [CanvasPhotoLayout] = []
@@ -28,6 +29,17 @@ final class FreeformCanvasLayoutEngine {
         // 以 (0, 0) 为中心
         let center = CGPoint.zero
         let safetyPadding: CGFloat = 20.0 // 卡片之间的安全空隙，确保绝对不贴死或重叠
+
+        // 预留正中心回忆标题卡片区域，使所有照片围绕中心标题螺旋环绕
+        if centerExclusionSize.width > 0 && centerExclusionSize.height > 0 {
+            let centerRect = CGRect(
+                x: -centerExclusionSize.width / 2,
+                y: -centerExclusionSize.height / 2,
+                width: centerExclusionSize.width,
+                height: centerExclusionSize.height
+            )
+            placedRects.append(centerRect)
+        }
 
         for (index, photo) in photos.enumerated() {
             // 1. 确定性随机数（基于 photo.id 哈希，退出重进完全一致）
@@ -52,14 +64,16 @@ final class FreeformCanvasLayoutEngine {
             let angleDeg = Double((hashVal % 130) - 65) / 10.0
             let angle = Angle(degrees: angleDeg)
 
-            // 2. 阿基米德螺旋搜索碰撞：r = b * theta
-            var theta: CGFloat = CGFloat(index) * 1.6
+            // 2. 阿基米德螺旋搜索碰撞：围绕中心外围展开
+            // 利用黄金分割角 2.39996 (137.5°) 使相邻照片在空间上均匀散射分布
+            var theta: CGFloat = CGFloat(index) * 2.39996
             var foundPos = center
             var collision = true
             var attempts = 0
+            let minRadius: CGFloat = (centerExclusionSize.width > 0) ? 120.0 : 0.0
 
-            while collision && attempts < 300 {
-                let r: CGFloat = (attempts == 0 && index == 0) ? 0.0 : (32.0 * sqrt(CGFloat(attempts) + 1.0))
+            while collision && attempts < 400 {
+                let r: CGFloat = minRadius + 26.0 * sqrt(CGFloat(attempts) + 1.0)
                 let x = center.x + r * cos(theta)
                 let y = center.y + r * sin(theta)
 
@@ -71,13 +85,13 @@ final class FreeformCanvasLayoutEngine {
                     height: cardSize.height + safetyPadding
                 )
 
-                // 检查是否与所有已放置卡片发生几何相交
+                // 检查是否与所有已放置卡片（含中心标题保留区）发生几何相交
                 collision = placedRects.contains { $0.intersects(candidateRect) }
                 if !collision {
                     foundPos = CGPoint(x: x, y: y)
                     placedRects.append(candidateRect)
                 } else {
-                    theta += 0.42
+                    theta += 0.35
                     attempts += 1
                 }
             }

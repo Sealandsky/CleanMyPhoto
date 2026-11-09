@@ -73,7 +73,7 @@ struct OnThisDayFreeformCanvasView: View {
                         Spacer()
                         undoToastView
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 24)
+                            .padding(.bottom, 76)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -109,6 +109,10 @@ struct OnThisDayFreeformCanvasView: View {
     // MARK: - 2D 画布内容
     private func canvasContent(viewportSize: CGSize) -> some View {
         ZStack {
+            // 0. 画布正中心回忆焦点卡片 (居于世界坐标原点 (0, 0))
+            centerMemoryHeaderCard
+
+            // 1. 照片卡片阵列 (围绕中心回忆标题阿基米德螺旋发散排布)
             ForEach(visibleLayouts) { layout in
                 let isTossed = tossingPhotoIDs.contains(layout.id)
 
@@ -127,8 +131,8 @@ struct OnThisDayFreeformCanvasView: View {
             }
         }
         .frame(width: viewportSize.width, height: viewportSize.height)
-        .scaleEffect(effectiveScale)
         .offset(effectiveOffset)
+        .scaleEffect(effectiveScale, anchor: .center)
         .contentShape(Rectangle())
         .gesture(
             SimultaneousGesture(
@@ -137,15 +141,18 @@ struct OnThisDayFreeformCanvasView: View {
                         state = value
                     }
                     .onEnded { value in
-                        zoomScale = max(0.6, min(2.2, zoomScale * value))
+                        zoomScale = max(0.55, min(2.3, zoomScale * value))
                     },
                 DragGesture(minimumDistance: 8)
                     .updating($gesturePan) { value, state, _ in
-                        state = value.translation
+                        state = CGSize(
+                            width: value.translation.width / effectiveScale,
+                            height: value.translation.height / effectiveScale
+                        )
                     }
                     .onEnded { value in
-                        panOffset.width += value.translation.width
-                        panOffset.height += value.translation.height
+                        panOffset.width += value.translation.width / effectiveScale
+                        panOffset.height += value.translation.height / effectiveScale
                     }
             )
         )
@@ -267,7 +274,7 @@ struct OnThisDayFreeformCanvasView: View {
         HStack(spacing: 6) {
             Image(systemName: "hand.tap")
                 .font(.system(size: 13, weight: .semibold))
-            Text(String(localized: "Pan & pinch to explore · Tap photo to stage for deletion"))
+            Text(String(localized: "Pan & pinch to explore · Tap photo to delete"))
                 .font(.system(size: 12, weight: .medium, design: .rounded))
         }
         .foregroundColor(Color(.secondaryLabel))
@@ -275,6 +282,50 @@ struct OnThisDayFreeformCanvasView: View {
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 3)
+    }
+
+    // MARK: - 画布中心回忆聚焦点卡片
+    private var centerMemoryHeaderCard: some View {
+        VStack(spacing: 4) {
+            Text(formattedDateText)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+
+            HStack(spacing: 4) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.orange)
+                Text(String(format: String(localized: "Memories · %lld photos"), visibleLayouts.count))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.75))
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.06), radius: 12, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(colorScheme == .dark ? Color.white.opacity(0.12) : Color.primary.opacity(0.06), lineWidth: 1)
+        )
+        .allowsHitTesting(false)
+    }
+
+    private var formattedDateText: String {
+        let date = group.photos.first?.asset.creationDate ?? Date()
+        if group.isMonthFallback {
+            return date.formatted(.dateTime.month())
+        } else {
+            return date.formatted(.dateTime.month().day())
+        }
     }
 
     // MARK: - 底部撤销 Toast 浮条

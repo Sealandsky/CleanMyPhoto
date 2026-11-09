@@ -28,8 +28,8 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // 会员卡片（独立展示）
-                    membershipCard
+                    // 会员卡片与下挂式免费额度一体化卡片
+                    membershipWithQuotaSection
 
                     // 清理成果与存储看板
                     cleanupDashboardCard
@@ -82,55 +82,103 @@ struct SettingsView: View {
         }
     }
 
-    private var membershipCard: some View {
-        Button {
-            showMembership = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(.title, design: .rounded))
-                    .foregroundColor(.white)
-                    .opacity(0.85)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Photato Pro"))
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.bold)
+    // MARK: - 会员卡片与下挂式免费额度副卡一体容器
+    private var membershipWithQuotaSection: some View {
+        VStack(spacing: 0) {
+            // 1. 主卡：Photato Pro 会员订阅卡片
+            Button {
+                showMembership = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(.title, design: .rounded))
                         .foregroundColor(.white)
+                        .opacity(0.85)
 
-                    Text(membershipCardSubtitle)
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundColor(.white.opacity(0.85))
-                }
-
-                Spacer()
-
-                if membershipManager.membershipStatus.currentTier != .lifetime {
-                    HStack(spacing: 2) {
-                        Image(systemName: "arrow.up.circle.fill")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(localized: "Photato Pro"))
                             .font(.system(.title3, design: .rounded))
-                            .fontWeight(.semibold)
-                        Text(String(localized: "Upgrade"))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+
+                        Text(membershipCardSubtitle)
                             .font(.system(.subheadline, design: .rounded))
-                            .fontWeight(.semibold)
+                            .foregroundColor(.white.opacity(0.85))
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
-                    )
-                    .background(Color.white.opacity(0.1))
-                    .clipShape(Capsule())
+
+                    Spacer()
+
+                    if membershipManager.membershipStatus.currentTier != .lifetime {
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(.title3, design: .rounded))
+                                .fontWeight(.semibold)
+                            Text(String(localized: "Upgrade"))
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.4), lineWidth: 1))
+                    }
                 }
+                .padding(.vertical, 24)
+                .padding(.horizontal, 16)
+                .background(.accentGradient)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 20, style: .continuous))
             }
-            .padding(.vertical, 28)
-            .padding(.horizontal, 16)
-            .background(.accentGradient)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .buttonStyle(.plain)
+
+            // 2. 下挂副卡：免费额度横条 (仅非终身/非订阅会员展示，或展示 Pro 无限状态)
+            Button {
+                showMembership = true
+            } label: {
+                HStack(spacing: 8) {
+                    if membershipManager.isPremiumMember {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.yellow)
+                        Text(String(localized: "Pro Member: Unlimited Deletion"))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary)
+
+                        Spacer()
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.orange)
+                        Text(String(format: String(localized: "Daily Free Quota: %lld/%lld remaining"), Int64(membershipManager.freeDeletionQuotaRemaining), Int64(membershipManager.freeDeletionQuotaTotal)))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(.primary)
+
+                        Spacer()
+
+                        HStack(spacing: 2) {
+                            Text(String(localized: "Unlimited"))
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(.accentColor)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.cardBackground)
+                .overlay(
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.05))
+                        .frame(height: 0.8),
+                    alignment: .top
+                )
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 0, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
     }
 
     private var cleanupDashboardCard: some View {
