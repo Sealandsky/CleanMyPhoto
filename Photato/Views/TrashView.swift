@@ -54,11 +54,10 @@ struct TrashView: View {
                             dismiss()
                         }
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .regular, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(Color(.secondaryLabel))
+                            .font(.system(size: 28))
                     }
                 }
 
@@ -155,25 +154,19 @@ struct TrashView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            // 原位 18×18pt 槽位，避免图标有无引发高度与文字排版抖动
-                            ZStack {
-                                if isDeleting {
-                                    ProgressView()
-                                        .progressViewStyle(.circular)
-                                        .tint(.white)
-                                        .frame(width: 18, height: 18)
-                                } else {
-                                    if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
-                                        Image(systemName: "lock.fill")
-                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                            .frame(width: 18, height: 18)
-                                    }
-                                }
+                            if isDeleting {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                                    .frame(width: 16, height: 16)
+                            } else if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .frame(width: 16, height: 16)
                             }
-                            .frame(width: 18, height: 18)
 
                             Text(isDeleting ? String(localized: "Emptying...") : String(localized: "Empty Trash"))
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
                         }
                     }
                     .disabled(isDeleting)
@@ -186,7 +179,7 @@ struct TrashView: View {
         }
     }
 
-    /// 系统 Liquid Glass 胶囊按钮：锁定 50pt 恒定高度
+    /// 系统 Liquid Glass 胶囊按钮：锁定 44pt 恒定高度
     @ViewBuilder
     private func liquidGlassCapsule(tint: Color,
                                     prominent: Bool = false,
@@ -198,9 +191,9 @@ struct TrashView: View {
         } label: {
             label()
                 .frame(maxWidth: .infinity)
-                .frame(height: 50) // 锁定胶囊高度 50pt
+                .frame(height: 44) // 锁定胶囊高度 44pt
         }
-        .controlSize(.large)
+        .controlSize(.regular)
         if #available(iOS 26.0, *) {
             if prominent {
                 button.buttonStyle(.glassProminent)
@@ -340,21 +333,30 @@ struct TrashView: View {
     private var membershipHintBar: some View {
         if !membershipManager.isPremiumMember {
             if membershipManager.freeDeletionsRemaining > 0 {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    Text(String(localized: "Free Deletion Quota Bar \(membershipManager.freeDeletionsRemaining)"))
-                        .font(.system(size: 14, design: .rounded))
-                        .multilineTextAlignment(.leading)
-                    Spacer()
+                Button {
+                    showMembershipPaywall = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        Text(String(localized: "Free Deletion Quota Bar \(membershipManager.freeDeletionsRemaining)"))
+                            .font(.system(size: 13.5, weight: .medium, design: .rounded))
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .opacity(0.7)
+                    }
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.blue.opacity(0.08))
+                    )
+                    .contentShape(Rectangle())
                 }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.blue.opacity(0.08))
-                )
+                .buttonStyle(.plain)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 4)

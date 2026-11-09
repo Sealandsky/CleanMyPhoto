@@ -69,19 +69,11 @@ struct PhotoStreamView: View {
             }
 
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(navigationBarTitle)
-                        .font(.system(.headline, design: .rounded).weight(.semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    if !selectionManager.isSelectMode && !displayedPhotos.isEmpty {
-                        Text(String(localized: "\(displayedPhotos.count) Photos"))
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
+                Text(navigationBarTitle)
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -166,6 +158,7 @@ struct PhotoStreamView: View {
     }
 
     // MARK: - Continuous Adaptive Waterfall Grid
+    @ViewBuilder
     private var photoStreamContent: some View {
         AdaptivePhotoGrid(photos: displayedPhotos) { photo, index in
             let cell = PhotoCell(
@@ -212,7 +205,21 @@ struct PhotoStreamView: View {
             )
         }
         .padding(.horizontal, 4)
-        .padding(.bottom, 24)
+        .padding(.bottom, 12)
+
+        if !displayedPhotos.isEmpty {
+            VStack(spacing: 4) {
+                Text(String(localized: "\(displayedPhotos.count) Photos"))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary)
+                Text(String(localized: "Updated Just Now"))
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(Color(.tertiaryLabel))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
+        }
     }
 
     // MARK: - Data Loading

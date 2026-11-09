@@ -13,7 +13,6 @@ struct PendingPhotosEntryButton: View {
     var body: some View {
         if isLiquidGlass {
             Button {
-                SoundManager.playAction()
                 photoManager.showTrash = true
             } label: {
                 buttonContent
@@ -30,7 +29,6 @@ struct PendingPhotosEntryButton: View {
             .accessibilityLabel(String(localized: "Pending Photos"))
         } else {
             Button {
-                SoundManager.playAction()
                 photoManager.showTrash = true
             } label: {
                 buttonContent

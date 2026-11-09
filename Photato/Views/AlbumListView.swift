@@ -108,7 +108,6 @@ struct AlbumListView: View {
             Spacer()
 
             Button {
-                SoundManager.playAction()
                 newAlbumName = ""
                 showNewAlbumAlert = true
             } label: {

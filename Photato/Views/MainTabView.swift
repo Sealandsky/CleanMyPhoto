@@ -87,7 +87,7 @@ struct MainTabView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
 
-        let unselectedColor = UIColor.systemGray // #8E8E93 中灰
+        let unselectedColor = UITabBar.unselectedTabColor
         let selectedColor = UIColor.label        // 浅色纯黑 #000000，深色纯白 #FFFFFF
 
         for layout in [
@@ -188,8 +188,9 @@ struct MainTabView: View {
             }
         }) {
             TrashView(photoManager: photoManager)
-                // 默认半屏（medium）呈现，用户上滑展开为全屏（large）
-                .presentationDetents([.medium, .large])
+                // 默认 0.72 黄金比例高度呈现，展示更多照片行数，用户上滑可展开为全屏（large）
+                .presentationDetents([.fraction(0.72), .large])
+                .presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $photoManager.lastCleanupResult) { result in
             CleanupResultView(result: result) {
@@ -434,7 +435,7 @@ extension UITabBarItem {
             return
         }
 
-        let unselectedColor = UIColor.systemGray
+        let unselectedColor = UITabBar.unselectedTabColor
         let selectedColor = UIColor.label
 
         let grayImage = image.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
@@ -457,6 +458,13 @@ extension UITabBarItem {
 extension UITabBar {
     private static var hasSwizzled = false
 
+    /// 整体加深的未选中深炭灰（浅色 #545458 对比度 5.8:1，深色 #98989D 银炭灰）
+    static let unselectedTabColor = UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.60, green: 0.60, blue: 0.64, alpha: 1.0)
+            : UIColor(red: 0.33, green: 0.33, blue: 0.35, alpha: 1.0)
+    }
+
     static func swizzleLayoutSubviewsOnce() {
         guard !hasSwizzled else { return }
         hasSwizzled = true
@@ -473,25 +481,51 @@ extension UITabBar {
     @objc func photato_layoutSubviews() {
         photato_layoutSubviews()
 
-        guard let items = self.items else { return }
-        let unselectedColor = UIColor.systemGray
+        let unselectedColor = UITabBar.unselectedTabColor
         let selectedColor = UIColor.label
 
-        for item in items {
-            if let base = item.image, base.renderingMode != .alwaysOriginal {
-                let gray = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
-                let black = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
-                item.image = gray
-                item.selectedImage = black
-                item.setTitleTextAttributes([
-                    .foregroundColor: unselectedColor,
-                    .font: UIFont.systemFont(ofSize: 10, weight: .regular)
-                ], for: .normal)
-                item.setTitleTextAttributes([
-                    .foregroundColor: selectedColor,
-                    .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
-                ], for: .selected)
+        if let items = self.items {
+            for item in items {
+                if let base = item.image, base.renderingMode != .alwaysOriginal {
+                    let gray = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
+                    let black = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
+                    item.image = gray
+                    item.selectedImage = black
+                    item.setTitleTextAttributes([
+                        .foregroundColor: unselectedColor,
+                        .font: UIFont.systemFont(ofSize: 10, weight: .regular)
+                    ], for: .normal)
+                    item.setTitleTextAttributes([
+                        .foregroundColor: selectedColor,
+                        .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+                    ], for: .selected)
+                }
             }
+        }
+
+        // 递归设置 UITabBarButton 中文字与图标的深灰色
+        for subview in self.subviews {
+            if String(describing: type(of: subview)).contains("UITabBarButton") {
+                let isSelected: Bool
+                if let control = subview as? UIControl {
+                    isSelected = control.isSelected
+                } else {
+                    isSelected = false
+                }
+                updateTabBarButtonViews(subview, isSelected: isSelected, unselectedColor: unselectedColor, selectedColor: selectedColor)
+            }
+        }
+    }
+
+    private func updateTabBarButtonViews(_ view: UIView, isSelected: Bool, unselectedColor: UIColor, selectedColor: UIColor) {
+        if let label = view as? UILabel {
+            label.textColor = isSelected ? selectedColor : unselectedColor
+        }
+        if let imageView = view as? UIImageView, !isSelected {
+            imageView.tintColor = unselectedColor
+        }
+        for child in view.subviews {
+            updateTabBarButtonViews(child, isSelected: isSelected, unselectedColor: unselectedColor, selectedColor: selectedColor)
         }
     }
 }

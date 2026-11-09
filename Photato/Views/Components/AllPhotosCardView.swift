@@ -24,7 +24,6 @@ struct AllPhotosCardView: View {
 
     var body: some View {
         Button {
-            SoundManager.playAction()
             onTap()
         } label: {
             VStack(spacing: 0) {

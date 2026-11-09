@@ -46,7 +46,6 @@ struct TimelineArchiveSectionView: View {
 
             if let onViewAllYears {
                 Button {
-                    SoundManager.playAction()
                     onViewAllYears()
                 } label: {
                     HStack(spacing: 2) {
@@ -70,7 +69,6 @@ struct TimelineArchiveSectionView: View {
                 ForEach(manager.availableYears, id: \.self) { year in
                     let isSelected = (manager.selectedYear == year)
                     Button {
-                        SoundManager.playAction()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task {
                             await manager.selectYear(year)
@@ -125,7 +123,6 @@ struct TimelineArchiveSectionView: View {
                 ForEach(manager.currentMonths) { item in
                     TimelineMonthCard(item: item)
                         .onTapGesture {
-                            SoundManager.playAction()
                             onMonthSelect(item)
                         }
                 }

@@ -61,7 +61,6 @@ struct AllYearsArchiveView: View {
                     ForEach(months) { item in
                         monthCard(item: item)
                             .onTapGesture {
-                                SoundManager.playAction()
                                 onMonthSelect(item)
                             }
                     }
