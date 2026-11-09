@@ -1,6 +1,13 @@
 import SwiftUI
 import StoreKit
+import Photos
 
+// MARK: - Trash View (待处理照片页面)
+/// 1. 3 列标准 1:1 正方形紧凑网格（间距 3pt，圆角 4pt）；
+/// 2. 底部操作栏锁定 50pt 恒定高度，加载圈原位槽位替换，杜绝高度跳动；
+/// 3. 右上角显式「选择」多选按钮；
+/// 4. 点击单张呼起全屏大图复核面板；
+/// 5. 顶部释放空间与张数概览摘要条。
 struct TrashView: View {
     @ObservedObject var photoManager: PhotoManager
     @EnvironmentObject var membershipManager: MembershipManager
@@ -10,10 +17,17 @@ struct TrashView: View {
     @State private var showingRestoreConfirmation = false
     @State private var showMembershipPaywall = false
     @State private var isDeleting = false
-    @Environment(GridSettings.self) private var gridSettings
     @State private var selectionManager = SelectionManager()
+    @State private var previewingPhoto: PhotoAsset? = nil
 
     private var trashedPhotos: [PhotoAsset] { photoManager.getTrashedAssets() }
+
+    // 3 列标准 1:1 正方形紧凑网格
+    private let trashColumns = [
+        GridItem(.flexible(), spacing: 3),
+        GridItem(.flexible(), spacing: 3),
+        GridItem(.flexible(), spacing: 3)
+    ]
 
     var body: some View {
         NavigationStack {
@@ -29,8 +43,8 @@ struct TrashView: View {
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .onAppear { AppAnalytics.screen("Pending Photos") }
             .toolbar {
+                // 左侧：关闭 / 退出多选
                 ToolbarItem(placement: .cancellationAction) {
-                    // 顶部栏仅保留关闭图标：多选模式下先退出多选，否则关闭页面
                     Button {
                         if selectionManager.isSelectMode {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -45,6 +59,26 @@ struct TrashView: View {
                             .foregroundColor(.primary)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
+                    }
+                }
+
+                // 右侧：显式多选切换按钮
+                ToolbarItem(placement: .primaryAction) {
+                    if photoManager.trashCount > 0 {
+                        Button {
+                            SoundManager.playAction()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                if selectionManager.isSelectMode {
+                                    selectionManager.clearSelection()
+                                } else {
+                                    selectionManager.enterSelectMode()
+                                }
+                            }
+                        } label: {
+                            Text(selectionManager.isSelectMode ? String(localized: "Done") : String(localized: "Select"))
+                                .font(.system(size: 16, weight: selectionManager.isSelectMode ? .semibold : .regular, design: .rounded))
+                                .foregroundColor(.accentColor)
+                        }
                     }
                 }
             }
@@ -64,6 +98,13 @@ struct TrashView: View {
             } message: {
                 Text(String(localized: "Restore \(photoManager.trashCount) photos to your library?"))
             }
+            .sheet(item: $previewingPhoto) { photo in
+                TrashPhotoPreviewSheet(photo: photo) {
+                    withAnimation {
+                        photoManager.restoreFromTrash(photo.id)
+                    }
+                }
+            }
             .sheet(isPresented: $showMembershipPaywall) {
                 MembershipView(isMandatory: true)
             }
@@ -71,9 +112,7 @@ struct TrashView: View {
         }
     }
 
-    // MARK: - 底部悬浮操作栏（固定于底部，不随内容滚动）
-    /// 常规模式：全部恢复 + 全部删除 等宽横向铺满；多选模式：恢复所选。
-    /// 按钮为系统 Liquid Glass 原生风格（iOS 26+），旧系统回退实色胶囊
+    // MARK: - 底部悬浮操作栏（锁定 50pt 恒定高度，原位 Loading 槽位）
     @ViewBuilder
     private var bottomFloatingBar: some View {
         if photoManager.trashCount > 0 {
@@ -101,7 +140,6 @@ struct TrashView: View {
                     .disabled(isDeleting)
 
                     liquidGlassCapsule(tint: .red, prominent: true) {
-                        // 门槛：会员或仍有免费额度即可清空；两者皆无才弹会员墙
                         guard membershipManager.isPremiumMember || membershipManager.hasFreeDeletionQuota else {
                             showMembershipPaywall = true
                             return
@@ -117,19 +155,24 @@ struct TrashView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            if isDeleting {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .tint(.white)
-                                    .scaleEffect(0.85)
-                            } else {
-                                // 非会员且免费额度用尽时按钮带锁标预告知：点击后才弹付费墙不显突兀
-                                if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
-                                    Image(systemName: "lock.fill")
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            // 原位 18×18pt 槽位，避免图标有无引发高度与文字排版抖动
+                            ZStack {
+                                if isDeleting {
+                                    ProgressView()
+                                        .progressViewStyle(.circular)
+                                        .tint(.white)
+                                        .frame(width: 18, height: 18)
+                                } else {
+                                    if !membershipManager.isPremiumMember && !membershipManager.hasFreeDeletionQuota {
+                                        Image(systemName: "lock.fill")
+                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                            .frame(width: 18, height: 18)
+                                    }
                                 }
                             }
-                            Text(String(localized: "Empty Trash"))
+                            .frame(width: 18, height: 18)
+
+                            Text(isDeleting ? String(localized: "Emptying...") : String(localized: "Empty Trash"))
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                         }
                     }
@@ -143,9 +186,7 @@ struct TrashView: View {
         }
     }
 
-    /// 系统 Liquid Glass 胶囊按钮：iOS 26+ 走原生 glass 风格
-    /// （prominent 为着色玻璃，用于删除等强调操作），iOS 18 回退实色胶囊。
-    /// frame 加在 label 内部使胶囊本体撑满可用宽度（加在外部只会居中）
+    /// 系统 Liquid Glass 胶囊按钮：锁定 50pt 恒定高度
     @ViewBuilder
     private func liquidGlassCapsule(tint: Color,
                                     prominent: Bool = false,
@@ -157,6 +198,7 @@ struct TrashView: View {
         } label: {
             label()
                 .frame(maxWidth: .infinity)
+                .frame(height: 50) // 锁定胶囊高度 50pt
         }
         .controlSize(.large)
         if #available(iOS 26.0, *) {
@@ -189,7 +231,6 @@ struct TrashView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
-            // 空态同样展示额度信息（免费用户），保持额度感知贯穿回收站
             if !membershipManager.isPremiumMember {
                 Text(membershipManager.quotaDisplayText)
                     .font(.system(.subheadline, design: .rounded))
@@ -200,54 +241,101 @@ struct TrashView: View {
     }
 
     // MARK: - Trash Content
-    /// 排列方式与图片列表保持一致：跟随设置页的网格设置
-    /// （原比例 → 瀑布流；1:1 / 3:4 → 固定列网格），由 AdaptivePhotoGrid + PhotoCell 统一处理
     private var trashContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 membershipHintBar
-                AdaptivePhotoGrid(photos: trashedPhotos) { photo in
-                PhotoCell(
-                    photo: photo,
-                    isSelected: selectionManager.isSelected(photo.id),
-                    isSelectMode: selectionManager.isSelectMode
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if selectionManager.isSelectMode {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectionManager.toggle(photo.id)
+
+                // 优化点：体积与张数预估摘要条
+                trashSummaryBar
+
+                // 3 列标准 1:1 正方形相片网格
+                LazyVGrid(columns: trashColumns, spacing: 3) {
+                    ForEach(trashedPhotos) { photo in
+                        PhotoCell(
+                            photo: photo,
+                            isSelected: selectionManager.isSelected(photo.id),
+                            isSelectMode: selectionManager.isSelectMode,
+                            usesSquareRatio: true,
+                            cornerRadius: 4
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if selectionManager.isSelectMode {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    selectionManager.toggle(photo.id)
+                                }
+                            } else {
+                                previewingPhoto = photo
+                            }
+                        }
+                        .onLongPressGesture(minimumDuration: 0.3) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectionManager.toggle(photo.id)
+                            }
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                withAnimation {
+                                    photoManager.restoreFromTrash(photo.id)
+                                }
+                            } label: {
+                                Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
+                            }
                         }
                     }
                 }
-                .onLongPressGesture(minimumDuration: 0.3) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectionManager.toggle(photo.id)
-                    }
-                }
-                .contextMenu {
-                    Button(role: .destructive) {
-                        withAnimation {
-                            photoManager.restoreFromTrash(photo.id)
-                        }
-                    } label: {
-                        Label(String(localized: "Restore"), systemImage: "arrow.uturn.backward")
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
         }
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
-    /// 回收站顶部提示条（会员感知三态）：
-    /// · 会员（含试用期）：不显示——会员不受额度约束
-    /// · 免费有额度：蓝色额度条「剩余 X/100 张免费删除额度」
-    /// · 免费已用尽：可点击的升级引导条 → 弹会员墙
+    // MARK: - 摘要概览条
+    private var trashSummaryBar: some View {
+        HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(.accentColor)
+                Text(String(localized: "\(photoManager.trashCount) Photos Pending"))
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(.primary)
+            }
+
+            Spacer()
+
+            Text(estimatedSizeText)
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .foregroundColor(.accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.cardBackground)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+    }
+
+    private var estimatedSizeText: String {
+        let bytes = Int64(photoManager.trashCount) * 4_200_000
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .file
+        let formatted = formatter.string(fromByteCount: bytes)
+        return String(localized: "Est. \(formatted)")
+    }
+
+    // MARK: - 会员提示条
     @ViewBuilder
     private var membershipHintBar: some View {
         if !membershipManager.isPremiumMember {
@@ -302,7 +390,65 @@ struct TrashView: View {
     }
 }
 
+// MARK: - Trash Photo Preview Sheet (待处理照片大图复核面板)
+private struct TrashPhotoPreviewSheet: View {
+    let photo: PhotoAsset
+    let onRestore: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                AssetImage(
+                    asset: photo.asset,
+                    targetSize: CGSize(width: 1200, height: 1200),
+                    contentMode: .fit,
+                    highQuality: true
+                )
+                .ignoresSafeArea(edges: .horizontal)
+            }
+            .navigationTitle(photo.asset.creationDate?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: "Photo"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    SoundManager.playAction()
+                    onRestore()
+                    dismiss()
+                } label: {
+                    Label(String(localized: "Restore This Photo"), systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+}
+
 #Preview {
     TrashView(photoManager: PhotoManager())
         .environment(GridSettings())
+        .environmentObject(MembershipManager())
 }
