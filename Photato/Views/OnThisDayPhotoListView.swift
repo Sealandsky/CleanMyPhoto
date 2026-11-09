@@ -28,6 +28,7 @@ struct OnThisDayPhotoListView: View {
     @State private var showFavoriteDeleteAlert = false
     @State private var localPhotos: [PhotoAsset]
     @State private var coverImage: UIImage?
+    @AppStorage("onThisDay_isCanvasMode") private var isCanvasMode: Bool = false
     @Namespace private var photoTransitionNamespace
 
     init(
@@ -57,44 +58,57 @@ struct OnThisDayPhotoListView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    // 1. 顶部日期与信息展示
-                    if !selectionManager.isSelectMode {
-                        headerInfoView
+        Group {
+            if isCanvasMode {
+                OnThisDayFreeformCanvasView(
+                    group: group,
+                    photoManager: photoManager,
+                    onBlocked: {
+                        showFavoriteDeleteAlert = true
                     }
+                )
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // 1. 顶部日期与信息展示
+                            if !selectionManager.isSelectMode {
+                                headerInfoView
+                            }
 
-                    // 2. 照片内容区
-                    if displayedPhotos.isEmpty {
-                        emptyStateView
-                    } else {
-                        photoGridView
-                            .padding(.top, 4)
+                            // 2. 照片内容区
+                            if displayedPhotos.isEmpty {
+                                emptyStateView
+                            } else {
+                                photoGridView
+                                    .padding(.top, 4)
+                            }
+                        }
                     }
+                    .background(Color.pageBackground)
+                    .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
+                    .onChange(of: scrollToPhotoID) { _, newValue in
+                        handleScrollToPhotoID(newValue, proxy: proxy)
+                    }
+                    .onAppear {
+                        handleOnAppear(proxy: proxy)
+                    }
+                    .onChange(of: targetScrollPhotoID) { _, newValue in
+                        if let photoID = newValue {
+                            withTransaction(Transaction(animation: nil)) {
+                                proxy.scrollTo(photoID, anchor: .center)
+                            }
+                        }
+                    }
+                    .onChange(of: isFullscreenMode) { oldValue, newValue in
+                        handleFullscreenChange(oldValue: oldValue, newValue: newValue, proxy: proxy)
+                    }
+                    .scrollIndicators(.hidden)
+                    .scrollEdgeEffectStyle(.soft, for: .bottom)
                 }
             }
-            .background(Color.pageBackground)
-            .allowsHitTesting(canSelectPhoto && !isFullscreenMode)
-            .onChange(of: scrollToPhotoID) { _, newValue in
-                handleScrollToPhotoID(newValue, proxy: proxy)
-            }
-            .onAppear {
-                handleOnAppear(proxy: proxy)
-            }
-            .onChange(of: targetScrollPhotoID) { _, newValue in
-                if let photoID = newValue {
-                    withTransaction(Transaction(animation: nil)) {
-                        proxy.scrollTo(photoID, anchor: .center)
-                    }
-                }
-            }
-            .onChange(of: isFullscreenMode) { oldValue, newValue in
-                handleFullscreenChange(oldValue: oldValue, newValue: newValue, proxy: proxy)
-            }
-            .scrollIndicators(.hidden)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
+        .animation(.easeInOut(duration: 0.22), value: isCanvasMode)
         .onChange(of: selectionManager.isSelectMode) { _, newValue in
             photoManager.isSelectMode = newValue
         }
@@ -122,8 +136,8 @@ struct OnThisDayPhotoListView: View {
                         .foregroundColor(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                    if !selectionManager.isSelectMode && !photoCountAndSizeText.isEmpty {
-                        Text(photoCountAndSizeText)
+                    if !selectionManager.isSelectMode {
+                        Text(isCanvasMode ? String(localized: "Freeform Canvas") : photoCountAndSizeText)
                             .font(.system(size: 11, design: .rounded))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
@@ -153,16 +167,24 @@ struct OnThisDayPhotoListView: View {
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
                 } else {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectionManager.enterSelectMode()
+                    HStack(spacing: 6) {
+                        ViewModeSwitcher(isCanvasMode: $isCanvasMode)
+
+                        if !isCanvasMode {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectionManager.enterSelectMode()
+                                }
+                            } label: {
+                                Text(String(localized: "Select"))
+                                    .font(.system(.body, design: .rounded))
+                                    .foregroundColor(.primary)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                        } else {
+                            PendingPhotosEntryButton(isLiquidGlass: false)
                         }
-                    } label: {
-                        Text(String(localized: "Select"))
-                            .font(.system(.body, design: .rounded))
-                            .foregroundColor(.primary)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
                     }
                 }
             }
