@@ -65,10 +65,10 @@ struct OnThisDayFreeformCanvasView: View {
                 if !hasDismissedCanvasGuide && !visibleLayouts.isEmpty {
                     VStack {
                         floatingGuidePill
-                            .padding(.top, 12)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .safeAreaPadding(.top, 12)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
@@ -78,9 +78,9 @@ struct OnThisDayFreeformCanvasView: View {
                         Spacer()
                         undoToastView
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 76)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .safeAreaPadding(.bottom, 76)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }

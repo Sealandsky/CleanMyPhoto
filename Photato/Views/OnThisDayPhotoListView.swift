@@ -69,6 +69,8 @@ struct OnThisDayPhotoListView: View {
                         showFavoriteDeleteAlert = true
                     }
                 )
+                // 全屏沉浸：照片可穿透顶栏与底栏（安全区），不被裁掉
+                .ignoresSafeArea()
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -235,13 +237,11 @@ struct OnThisDayPhotoListView: View {
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.primary)
                                 .frame(width: 40, height: 40)
-                                .background(Circle().fill(.regularMaterial))
-                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8))
+                                .headerLiquidGlass()
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .frame(minWidth: 44, minHeight: 44)
-                        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 4)
                         .accessibilityLabel(String(localized: "Recenter"))
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
