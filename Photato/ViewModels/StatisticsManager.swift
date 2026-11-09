@@ -8,10 +8,12 @@ class StatisticsManager: ObservableObject {
     private let totalDeletedPhotosKey = "totalDeletedPhotos"
     private let storageSpaceSavedBytesKey = "storageSpaceSavedBytes"
     private let lastPhotoCountKey = "lastPhotoCount"
+    private let cleanupTimesKey = "cleanupTimes"
 
     // 持久化数据
     @Published private(set) var totalDeletedPhotos: Int = 0
     @Published private(set) var storageSpaceSavedBytes: Int = 0
+    @Published private(set) var cleanupTimes: Int = 0
 
     // 实时数据（支持本地历史缓存快速呈现）
     @Published var currentPhotoCount: Int = 0
@@ -24,6 +26,7 @@ class StatisticsManager: ObservableObject {
         self.totalDeletedPhotos = userDefaults.integer(forKey: totalDeletedPhotosKey)
         self.storageSpaceSavedBytes = userDefaults.integer(forKey: storageSpaceSavedBytesKey)
         self.currentPhotoCount = userDefaults.integer(forKey: lastPhotoCountKey)
+        self.cleanupTimes = userDefaults.integer(forKey: cleanupTimesKey)
     }
 
     // MARK: - 格式化的统计信息
@@ -48,6 +51,11 @@ class StatisticsManager: ObservableObject {
         formatBytes(storageSpaceSavedBytes)
     }
 
+    /// 便捷访问属性（与清理成就看板规范保持一致）
+    var totalPhotosDeleted: Int { totalDeletedPhotos }
+    var totalSpaceSaved: Int { storageSpaceSavedBytes }
+    var cleanupCount: Int { max(cleanupTimes, totalDeletedPhotos > 0 ? 1 : 0) }
+
     // MARK: - 更新统计
 
     /// 更新实时统计（从 PhotoManager 获取）
@@ -64,6 +72,7 @@ class StatisticsManager: ObservableObject {
     func recordDeletions(count: Int, totalSize: Int64) {
         totalDeletedPhotos += count
         storageSpaceSavedBytes += Int(totalSize)
+        cleanupTimes += 1
         saveToDefaults()
     }
 
@@ -71,6 +80,7 @@ class StatisticsManager: ObservableObject {
     private func saveToDefaults() {
         userDefaults.set(totalDeletedPhotos, forKey: totalDeletedPhotosKey)
         userDefaults.set(storageSpaceSavedBytes, forKey: storageSpaceSavedBytesKey)
+        userDefaults.set(cleanupTimes, forKey: cleanupTimesKey)
     }
 
     // MARK: - 格式化辅助

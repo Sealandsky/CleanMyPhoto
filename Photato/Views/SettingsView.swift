@@ -31,8 +31,8 @@ struct SettingsView: View {
                     // 会员卡片（独立展示）
                     membershipCard
 
-                    // 使用统计
-                    statisticsSection
+                    // 清理成果与存储看板
+                    cleanupDashboardCard
 
                     // 排列方式设置
                     layoutSection(gridSettings: gridSettings)
@@ -133,30 +133,15 @@ struct SettingsView: View {
         .buttonStyle(.plain)
     }
 
-    private var statisticsSection: some View {
-        sectionCard(title: String(localized: "Statistics")) {
-            StatRow(icon: "checkmark.seal.fill",
-                    iconColor: .orange,
-                    title: String(localized: "Free Deletion Quota"),
-                    value: quotaDisplayText)
-
-            StatRow(icon: "photo.stack.fill",
-                    iconColor: .blue,
-                    title: String(localized: "Total Photos"),
-                    value: totalPhotosDisplayText)
-
-            cleanablePhotosRow
-
-            StatRow(icon: "trash.fill",
-                    iconColor: .red,
-                    title: String(localized: "Deleted Photos"),
-                    value: statisticsManager.deletedPhotosText)
-
-            StatRow(icon: "internaldrive.fill",
-                    iconColor: .green,
-                    title: String(localized: "Space Saved"),
-                    value: statisticsManager.storageSpaceSavedText)
-        }
+    private var cleanupDashboardCard: some View {
+        MinimalCleanupStatCard(
+            statisticsManager: statisticsManager,
+            membershipManager: membershipManager,
+            totalLibraryCount: max(totalLibraryCount, photoManager.totalPhotoCount, statisticsManager.currentPhotoCount),
+            onUpgradePro: {
+                showMembership = true
+            }
+        )
     }
 
     private func layoutSection(gridSettings: GridSettings) -> some View {

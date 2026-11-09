@@ -17874,6 +17874,40 @@
           }
         }
       }
+    },
+    "Total Photos: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total Photos: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图库共 %@ 张照片"
+          }
+        }
+      }
+    },
+    "Pro Unlimited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro Unlimited"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro 无限额度"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

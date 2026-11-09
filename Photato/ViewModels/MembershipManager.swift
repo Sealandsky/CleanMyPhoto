@@ -72,6 +72,10 @@ class MembershipManager: ObservableObject {
         max(0, Self.freeDeletionQuota - freeDeletionsUsed)
     }
 
+    /// 便捷访问属性（与清理成就看板规范保持一致）
+    var freeDeletionQuotaRemaining: Int { freeDeletionsRemaining }
+    var freeDeletionQuotaTotal: Int { Self.freeDeletionQuota }
+
     /// 是否还有免费额度可用于永久删除
     var hasFreeDeletionQuota: Bool {
         freeDeletionsRemaining > 0
