@@ -4,6 +4,7 @@ import UIKit
 import CoreData
 import Vision
 import Observation
+import CoreML
 
 // MARK: - Core Data Object
 
@@ -490,6 +491,11 @@ final class PhotoQualityAnalyzer {
     /// Returns -1 when no face is found — such photos are never flagged as poor-face.
     nonisolated private static func faceCaptureQuality(_ cgImage: CGImage) -> Double {
         let request = VNDetectFaceCaptureQualityRequest()
+        #if targetEnvironment(simulator)
+        if let cpu = MLComputeDevice.allComputeDevices.first(where: { if case .cpu = $0 { return true }; return false }) {
+            request.setComputeDevice(cpu, for: .main)
+        }
+        #endif
         let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
         do {
             try handler.perform([request])

@@ -8,4 +8,6 @@ enum AlbumsDestination: Hashable {
     case allPhotos // 全局「所有照片」现代图片流
     case monthArchive(TimelineMonthItem) // 「时光归档」单月图片流
     case allYearsArchive // 「时光归档」全部年份展开列表
+    case personDetail(String) // PersonEntity.id: 二级人物专属照片流
+    case allPeople // 「全部人物」总览列表
 }

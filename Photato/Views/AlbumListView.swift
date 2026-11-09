@@ -6,6 +6,7 @@ struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     @ObservedObject var onThisDayManager: OnThisDayManager
     @ObservedObject var timelineArchiveManager: TimelineArchiveManager
+    @ObservedObject var peopleRecognitionManager: PeopleRecognitionManager = PeopleRecognitionManager.shared
     var organizeManager: PhotoOrganizeManager? = nil
     var onAlbumSelect: ((AlbumModel) -> Void)? = nil
     var onYearGroupSelect: ((OnThisDayYearGroup) -> Void)? = nil
@@ -13,6 +14,8 @@ struct AlbumListView: View {
     var onAllPhotosSelect: (() -> Void)? = nil
     var onMonthArchiveSelect: ((TimelineMonthItem) -> Void)? = nil
     var onAllYearsSelect: (() -> Void)? = nil
+    var onPersonSelect: ((PersonEntity) -> Void)? = nil
+    var onAllPeopleSelect: (() -> Void)? = nil
 
     @State private var showNewAlbumAlert = false
     @State private var newAlbumName = ""
@@ -39,7 +42,18 @@ struct AlbumListView: View {
                     albumsScrollRow
                 }
 
-                // 4. 时光归档模块
+                // 4. 人物与面孔横滑合辑模块
+                PeopleAndFacesSectionView(
+                    manager: peopleRecognitionManager,
+                    onPersonSelect: { person in
+                        onPersonSelect?(person)
+                    },
+                    onViewAllPeople: {
+                        onAllPeopleSelect?()
+                    }
+                )
+
+                // 5. 时光归档模块
                 TimelineArchiveSectionView(
                     manager: timelineArchiveManager,
                     onMonthSelect: { item in
@@ -66,7 +80,13 @@ struct AlbumListView: View {
                     await organizeManager.quickAnalysis()
                 }
             }()
+            peopleRecognitionManager.scanPhotoLibrary()
             _ = await (refreshAlbums, refreshOnThisDay, refreshTimeline, refreshOrganize)
+        }
+        .task {
+            if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
+                peopleRecognitionManager.scanPhotoLibrary()
+            }
         }
         .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
             TextField(String(localized: "Album Name"), text: $newAlbumName)

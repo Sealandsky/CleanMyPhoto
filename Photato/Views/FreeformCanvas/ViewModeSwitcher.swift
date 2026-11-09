@@ -1,52 +1,44 @@
 import SwiftUI
 
 // MARK: - 模式切换悬浮胶囊 (Floating View Mode Switcher)
+/// 左下角网格/画布切换悬浮控件：
+/// 胶囊整体 48pt 高（内边距 4pt），按钮 40×40pt、图标 15pt semibold，
+/// 触控热区 44×44pt；.regularMaterial 毛玻璃 + 加强投影，对齐系统原生悬浮控件质感。
 struct ViewModeSwitcher: View {
     @Binding var isCanvasMode: Bool
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 3) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    isCanvasMode = false
-                }
-            } label: {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(!isCanvasMode ? .primary : .secondary)
-                    .frame(width: 38, height: 32)
-                    .background(
-                        Capsule()
-                            .fill(!isCanvasMode ? (colorScheme == .dark ? Color(white: 0.25) : Color.white) : Color.clear)
-                            .shadow(color: Color.black.opacity(!isCanvasMode ? (colorScheme == .dark ? 0.3 : 0.12) : 0), radius: 4, y: 1.5)
-                    )
+        HStack(spacing: 2) {
+            switcherButton(icon: "square.grid.2x2.fill", active: !isCanvasMode) {
+                withAnimation(.easeInOut(duration: 0.22)) { isCanvasMode = false }
             }
             .accessibilityLabel(String(localized: "Switch to Grid View"))
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    isCanvasMode = true
-                }
-            } label: {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(isCanvasMode ? .primary : .secondary)
-                    .frame(width: 38, height: 32)
-                    .background(
-                        Capsule()
-                            .fill(isCanvasMode ? (colorScheme == .dark ? Color(white: 0.25) : Color.white) : Color.clear)
-                            .shadow(color: Color.black.opacity(isCanvasMode ? (colorScheme == .dark ? 0.3 : 0.12) : 0), radius: 4, y: 1.5)
-                    )
+            switcherButton(icon: "photo.on.rectangle.angled", active: isCanvasMode) {
+                withAnimation(.easeInOut(duration: 0.22)) { isCanvasMode = true }
             }
             .accessibilityLabel(String(localized: "Switch to Canvas View"))
         }
-        .padding(3)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(colorScheme == .dark ? Color.white.opacity(0.12) : Color.primary.opacity(0.06), lineWidth: 0.8)
-        )
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 10, y: 4)
+        .padding(4)
+        .background(Capsule().fill(.regularMaterial))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8))
+        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 4)
+    }
+
+    private func switcherButton(icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(active ? .primary : .secondary)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(active ? Color.cardBackground : .clear)
+                        .shadow(color: Color.black.opacity(active ? 0.12 : 0), radius: 4, y: 1)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
     }
 }

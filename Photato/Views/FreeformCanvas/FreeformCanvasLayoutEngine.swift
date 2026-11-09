@@ -58,7 +58,7 @@ final class FreeformCanvasLayoutEngine {
             // 保持原本宽高比（限制在 0.75 ~ 1.35 之间避免极度狭长）
             let rawRatio = CGFloat(photo.asset.pixelHeight) / CGFloat(max(1, photo.asset.pixelWidth))
             let ratio = max(0.75, min(1.35, rawRatio.isNaN || rawRatio.isZero ? 1.0 : rawRatio))
-            let cardSize = CGSize(width: baseWidth, height: baseWidth * ratio + 32) // +32 为拍立得底部白色留白区
+            let cardSize = CGSize(width: baseWidth, height: baseWidth * ratio) // 全幅等比，无底部留白
 
             // 随机倾斜角：-6.5° 到 +6.5°
             let angleDeg = Double((hashVal % 130) - 65) / 10.0

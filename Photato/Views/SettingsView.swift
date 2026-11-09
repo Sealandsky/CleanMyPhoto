@@ -82,10 +82,13 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 会员卡片与下挂式免费额度副卡一体容器
+    // MARK: - 会员卡片与下挂式免费额度底托一体容器
+    /// 底托抽屉形态：主卡保留完整四角 20pt 连续圆角浮于上层，
+    /// 下挂底托垫在主卡下方并向左右内缩 16pt，露出肩部与底部条带（参考 AI 输入框底托）。
+    /// 底托为纯展示状态条：不可点击、无跳转、无箭头，升级入口回归主卡本身。
     private var membershipWithQuotaSection: some View {
-        VStack(spacing: 0) {
-            // 1. 主卡：Photato Pro 会员订阅卡片
+        VStack(spacing: -14) {
+            // 1. 主卡：Photato Pro 会员订阅卡片（完整四角圆角 + 投影）
             Button {
                 showMembership = true
             } label: {
@@ -128,57 +131,30 @@ struct SettingsView: View {
                 .padding(.vertical, 24)
                 .padding(.horizontal, 16)
                 .background(.accentGradient)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 20, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
             .buttonStyle(.plain)
+            .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 4)
+            .zIndex(1)
 
-            // 2. 下挂副卡：免费额度横条 (仅非终身/非订阅会员展示，或展示 Pro 无限状态)
-            Button {
-                showMembership = true
-            } label: {
-                HStack(spacing: 8) {
-                    if membershipManager.isPremiumMember {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.yellow)
-                        Text(String(localized: "Pro Member: Unlimited Deletion"))
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundColor(.primary)
-
-                        Spacer()
-                    } else {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.orange)
-                        Text(String(format: String(localized: "Daily Free Quota: %lld/%lld remaining"), Int64(membershipManager.freeDeletionQuotaRemaining), Int64(membershipManager.freeDeletionQuotaTotal)))
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundColor(.primary)
-
-                        Spacer()
-
-                        HStack(spacing: 2) {
-                            Text(String(localized: "Unlimited"))
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(.accentColor)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.cardBackground)
-                .overlay(
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.05))
-                        .frame(height: 0.8),
-                    alignment: .top
+            // 2. 下挂底托：免费额度状态条（左右内收 16pt 垫在主卡下，纯文案无图标无箭头，不可点击）
+            Text(String(format: String(localized: "Free Quota: %lld/%lld remaining"), Int64(membershipManager.freeDeletionQuotaRemaining), Int64(membershipManager.freeDeletionQuotaTotal)))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(UIColor { trait in
+                            trait.userInterfaceStyle == .dark
+                                ? UIColor(red: 0.137, green: 0.137, blue: 0.145, alpha: 1) // #232325
+                                : UIColor(red: 0.949, green: 0.945, blue: 0.933, alpha: 1) // #F2F1EE
+                        }))
                 )
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 20, bottomTrailingRadius: 20, topTrailingRadius: 0, style: .continuous))
-            }
-            .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .zIndex(0)
         }
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
     }
 
     private var cleanupDashboardCard: some View {

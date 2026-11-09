@@ -27,6 +27,7 @@ struct OnThisDayPhotoListView: View {
     @State private var targetScrollPhotoID: String? = nil
     @State private var showFavoriteDeleteAlert = false
     @State private var localPhotos: [PhotoAsset]
+    @State private var canvasResetToken: Int = 0
     @State private var coverImage: UIImage?
     @AppStorage("onThisDay_isCanvasMode") private var isCanvasMode: Bool = false
     @Namespace private var photoTransitionNamespace
@@ -63,6 +64,7 @@ struct OnThisDayPhotoListView: View {
                 OnThisDayFreeformCanvasView(
                     group: group,
                     photoManager: photoManager,
+                    resetToken: canvasResetToken,
                     onBlocked: {
                         showFavoriteDeleteAlert = true
                     }
@@ -169,7 +171,7 @@ struct OnThisDayPhotoListView: View {
                     .tint(.red)
                     .disabled(selectionManager.isEmpty)
                 } else if isCanvasMode {
-                    PendingPhotosEntryButton(isLiquidGlass: true)
+                    PendingPhotosEntryButton()
                 } else {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -220,9 +222,33 @@ struct OnThisDayPhotoListView: View {
         }
         .overlay(alignment: .bottomLeading) {
             if !selectionManager.isSelectMode {
-                ViewModeSwitcher(isCanvasMode: $isCanvasMode)
-                    .padding(.leading, 18)
-                    .padding(.bottom, 20)
+                HStack(spacing: 8) {
+                    ViewModeSwitcher(isCanvasMode: $isCanvasMode)
+
+                    // 画布模式专属：定位按钮，点击后视野回到中心标题
+                    if isCanvasMode {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            canvasResetToken += 1
+                        } label: {
+                            Image(systemName: "scope")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .frame(width: 40, height: 40)
+                                .background(Circle().fill(.regularMaterial))
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8))
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 4)
+                        .accessibilityLabel(String(localized: "Recenter"))
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: isCanvasMode)
+                .padding(.leading, 18)
+                .padding(.bottom, 20)
             }
         }
     }

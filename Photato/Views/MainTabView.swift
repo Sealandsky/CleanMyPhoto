@@ -74,6 +74,7 @@ struct MainTabView: View {
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @StateObject private var onThisDayManager = OnThisDayManager()
     @StateObject private var timelineArchiveManager = TimelineArchiveManager()
+    @StateObject private var peopleRecognitionManager = PeopleRecognitionManager.shared
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
 
@@ -154,6 +155,11 @@ struct MainTabView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
+            if newTab == .albums {
+                if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
+                    peopleRecognitionManager.scanPhotoLibrary()
+                }
+            }
         }
         .task {
             AppAnalytics.screen(selectedTab.analyticsName)
@@ -177,6 +183,12 @@ struct MainTabView: View {
             // 4. 梯次延迟（3s）启动后台全相册 AI 特征静默建库，零卡顿、不抢占前台算力
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
+
+            // 5. 梯次延迟（3.5s）启动端侧人脸识别与聚类流水线
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
+                peopleRecognitionManager.scanPhotoLibrary()
+            }
         }
         .sheet(isPresented: $photoManager.showTrash, onDismiss: {
             if let pending = photoManager.pendingCleanupResult {
@@ -212,6 +224,7 @@ struct MainTabView: View {
                         albumManager: albumMgr,
                         onThisDayManager: onThisDayManager,
                         timelineArchiveManager: timelineArchiveManager,
+                        peopleRecognitionManager: peopleRecognitionManager,
                         organizeManager: organizeManager,
                         onAlbumSelect: { album in
                             selectedAlbum = album
@@ -235,6 +248,12 @@ struct MainTabView: View {
                         },
                         onAllYearsSelect: {
                             albumsPath.append(AlbumsDestination.allYearsArchive)
+                        },
+                        onPersonSelect: { person in
+                            albumsPath.append(AlbumsDestination.personDetail(person.id))
+                        },
+                        onAllPeopleSelect: {
+                            albumsPath.append(AlbumsDestination.allPeople)
                         }
                     )
                 } else {
@@ -263,6 +282,9 @@ struct MainTabView: View {
                 }
                 if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
                     Task { await organizeManager.quickAnalysis() }
+                }
+                if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
+                    peopleRecognitionManager.scanPhotoLibrary()
                 }
                 await albumMgr.fetchUserAlbums()
             }
@@ -346,6 +368,20 @@ struct MainTabView: View {
                         manager: timelineArchiveManager,
                         onMonthSelect: { item in
                             albumsPath.append(AlbumsDestination.monthArchive(item))
+                        }
+                    )
+                case .personDetail(let personId):
+                    PersonPhotoListView(
+                        personID: personId,
+                        peopleManager: peopleRecognitionManager,
+                        photoManager: photoManager
+                    )
+                case .allPeople:
+                    AllPeopleView(
+                        peopleManager: peopleRecognitionManager,
+                        photoManager: photoManager,
+                        onPersonSelect: { person in
+                            albumsPath.append(AlbumsDestination.personDetail(person.id))
                         }
                     )
                 }

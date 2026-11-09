@@ -5,6 +5,7 @@ import Photos
 struct OnThisDayFreeformCanvasView: View {
     let group: OnThisDayYearGroup
     @ObservedObject var photoManager: PhotoManager
+    var resetToken: Int = 0
     let onBlocked: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -15,8 +16,12 @@ struct OnThisDayFreeformCanvasView: View {
     @GestureState private var gestureZoom: CGFloat = 1.0
     @GestureState private var gesturePan: CGSize = .zero
 
-    // 确定性布局缓存
+    // 自由画布顶部引导条持久化隐藏状态
+    @AppStorage("hasDismissedCanvasGuide") private var hasDismissedCanvasGuide: Bool = false
+
+    // 确定性布局缓存与容量统计
     @State private var cachedLayouts: [CanvasPhotoLayout] = []
+    @State private var totalSizeText: String = ""
 
     // 抛入待处理动画与撤销状态
     @State private var tossingPhotoIDs: Set<String> = []
@@ -56,15 +61,15 @@ struct OnThisDayFreeformCanvasView: View {
                     canvasContent(viewportSize: geo.size)
                 }
 
-                // 3. 悬浮顶部操作引导微胶囊
-                if !visibleLayouts.isEmpty {
+                // 3. 悬浮顶部操作引导微胶囊（右侧支持关闭且持久化不再提醒）
+                if !hasDismissedCanvasGuide && !visibleLayouts.isEmpty {
                     VStack {
                         floatingGuidePill
                             .padding(.top, 12)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
                 // 4. 底部可撤销操作浮条 (Undo Toast)
@@ -83,9 +88,15 @@ struct OnThisDayFreeformCanvasView: View {
             .clipped()
             .onAppear {
                 setupLayoutIfNeeded()
+                calculateSize()
             }
             .onChange(of: group.photos.count) { _, _ in
                 setupLayoutIfNeeded()
+                calculateSize()
+            }
+            .onChange(of: resetToken) { _, _ in
+                // 定位按钮：视野平滑回到中心标题
+                resetToCenter()
             }
         }
     }
@@ -158,57 +169,49 @@ struct OnThisDayFreeformCanvasView: View {
         )
         .onTapGesture(count: 2) {
             // 双击空白处平滑复位居中视野
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                zoomScale = 1.0
-                panOffset = .zero
-            }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            resetToCenter()
         }
     }
 
-    // MARK: - 单张拍立得拟物卡片
-    private func polaroidCard(layout: CanvasPhotoLayout) -> some View {
-        VStack(spacing: 0) {
-            // 真实照片区
-            AssetImage(
-                asset: layout.photo.asset,
-                targetSize: CGSize(width: layout.size.width * 2, height: (layout.size.height - 32) * 2),
-                contentMode: .fill,
-                placeholderColor: Color(UIColor.secondarySystemFill)
-            )
-            .frame(width: layout.size.width - 6, height: layout.size.height - 36)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-            .padding(.top, 3)
-            .padding(.horizontal, 3)
-
-            // 拍立得底部经典宽白边留白区
-            Spacer(minLength: 0)
+    // MARK: - 复位居中视野（定位按钮与双击共用）
+    private func resetToCenter() {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+            zoomScale = 1.0
+            panOffset = .zero
         }
-        .frame(width: layout.size.width, height: layout.size.height)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(colorScheme == .dark ? Color(white: 0.16) : Color.white)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    // MARK: - 单张相纸拟物卡片（全幅等比铺满，彻底去除拍立得底部白色留白）
+    private func polaroidCard(layout: CanvasPhotoLayout) -> some View {
+        AssetImage(
+            asset: layout.photo.asset,
+            targetSize: CGSize(width: layout.size.width * 2, height: layout.size.height * 2),
+            contentMode: .fill,
+            placeholderColor: Color(UIColor.secondarySystemFill)
         )
+        .frame(width: layout.size.width, height: layout.size.height)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(
-                    colorScheme == .dark ? Color.white.opacity(0.18) : Color.white,
-                    lineWidth: 2.5
+                    colorScheme == .dark ? Color.white.opacity(0.22) : Color.white,
+                    lineWidth: 3.0
                 )
         )
         // 双层拟物阴影：贴合接触阴影 + 发散立体悬浮阴影
         .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.08),
-            radius: 3,
+            color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.1),
+            radius: 6,
             x: 0,
-            y: 2
+            y: 3
         )
         .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.45 : 0.12),
-            radius: 16,
+            color: Color.black.opacity(colorScheme == .dark ? 0.5 : 0.16),
+            radius: 24,
             x: 0,
-            y: 10
+            y: 14
         )
     }
 
@@ -269,54 +272,84 @@ struct OnThisDayFreeformCanvasView: View {
         }
     }
 
-    // MARK: - 悬浮顶部引导胶囊
+    // MARK: - 悬浮顶部引导胶囊（带关闭按钮，关闭后持久化不再弹出）
     private var floatingGuidePill: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "hand.tap")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.secondary)
+
             Text(String(localized: "Pan & pinch to explore · Tap photo to delete"))
                 .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.primary)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    hasDismissedCanvasGuide = true
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(4)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
         }
-        .foregroundColor(Color(.secondaryLabel))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .shadow(color: Color.black.opacity(0.06), radius: 8, y: 3)
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 7)
+        .background(
+            Capsule()
+                .fill(Color(UIColor.secondarySystemBackground).opacity(0.88))
+                .background(.ultraThinMaterial, in: Capsule())
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 3)
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
+        )
     }
 
-    // MARK: - 画布中心回忆聚焦点卡片
+    // MARK: - 画布中心回忆聚焦点（纯文本裸排，去除背景托底与外框）
     private var centerMemoryHeaderCard: some View {
         VStack(spacing: 4) {
             Text(formattedDateText)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
 
-            HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.orange)
-                Text(String(format: String(localized: "Memories · %lld photos"), visibleLayouts.count))
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.secondary)
+            Text(memorySubtitleText)
+                .font(.system(size: 13.5, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var memorySubtitleText: String {
+        let count = visibleLayouts.count
+        let countText = String(format: String(localized: "%lld photos"), count)
+        if totalSizeText.isEmpty {
+            return countText
+        } else {
+            return "\(countText) · \(totalSizeText)"
+        }
+    }
+
+    private func calculateSize() {
+        totalSizeText = SizeCache.load("onthisday_\(group.id)") ?? ""
+        let assets = group.photos.map(\.asset)
+        Task {
+            let totalSize = await Task.detached(priority: .utility) {
+                await PHAssetSizeHelper.calculateTotalSize(for: assets)
+            }.value
+            SizeCache.save("onthisday_\(group.id)", size: totalSize)
+            let newText = ByteFormatter.format(totalSize)
+            if newText != totalSizeText {
+                await MainActor.run {
+                    totalSizeText = newText
+                }
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.75))
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.06), radius: 12, x: 0, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(colorScheme == .dark ? Color.white.opacity(0.12) : Color.primary.opacity(0.06), lineWidth: 1)
-        )
-        .allowsHitTesting(false)
     }
 
     private var formattedDateText: String {
