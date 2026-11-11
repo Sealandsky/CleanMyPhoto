@@ -4,8 +4,8 @@ extension ShapeStyle where Self == LinearGradient {
     static var accentGradient: LinearGradient {
         LinearGradient(
             colors: [Color(red: 0, green: 0x70 / 255.0, blue: 0xE0 / 255.0), Color(red: 0, green: 0.72, blue: 1.0)],
-            startPoint: .leading,
-            endPoint: .trailing
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 }

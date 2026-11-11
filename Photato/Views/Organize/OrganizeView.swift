@@ -206,7 +206,7 @@ private struct OrganizeScanCard: View {
 
                 Spacer()
 
-                scanPillButton(title: String(localized: "Start Scan"), icon: "sparkles") {
+                scanPillButton(title: String(localized: "Start Scan"), icon: "line.3.crossed.swirl.circle.fill") {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeInOut(duration: 0.3)) {
                         organizeManager.startFullAnalysis()

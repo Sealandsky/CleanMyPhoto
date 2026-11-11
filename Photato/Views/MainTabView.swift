@@ -74,14 +74,15 @@ struct MainTabView: View {
     // 相簿页状态（复用原相簿组件与数据加载，随相簿 Tab 从图库迁出）
     @StateObject private var onThisDayManager = OnThisDayManager()
     @StateObject private var timelineArchiveManager = TimelineArchiveManager()
-    @StateObject private var peopleRecognitionManager = PeopleRecognitionManager.shared
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
 
     init() {
         Self.configureTabBarAppearance()
-        UITabBarItem.swizzleItemSettersOnce()
-        UITabBar.swizzleLayoutSubviewsOnce()
+        // iOS 26 液态玻璃修复（Bryan 真机反馈：按住 tab 无液态玻璃形变）：
+        // 原先用 swizzle 把 item.image 强制替换为 .alwaysOriginal 位图，
+        // 这会让 tab 项退出系统的液态玻璃渲染，且每次 layoutSubviews 重设
+        // 图片会打断按住时的形变状态。现在只用标准 appearance 着色。
     }
 
     static func configureTabBarAppearance() {
@@ -155,11 +156,6 @@ struct MainTabView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
-            if newTab == .albums {
-                if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
-                    peopleRecognitionManager.scanPhotoLibrary()
-                }
-            }
         }
         .task {
             AppAnalytics.screen(selectedTab.analyticsName)
@@ -183,12 +179,6 @@ struct MainTabView: View {
             // 4. 梯次延迟（3s）启动后台全相册 AI 特征静默建库，零卡顿、不抢占前台算力
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             PhotoSimilarityMatcher.shared.startBackgroundIndexingIfNeeded()
-
-            // 5. 梯次延迟（3.5s）启动端侧人脸识别与聚类流水线
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
-                peopleRecognitionManager.scanPhotoLibrary()
-            }
         }
         .sheet(isPresented: $photoManager.showTrash, onDismiss: {
             if let pending = photoManager.pendingCleanupResult {
@@ -224,7 +214,6 @@ struct MainTabView: View {
                         albumManager: albumMgr,
                         onThisDayManager: onThisDayManager,
                         timelineArchiveManager: timelineArchiveManager,
-                        peopleRecognitionManager: peopleRecognitionManager,
                         organizeManager: organizeManager,
                         onAlbumSelect: { album in
                             selectedAlbum = album
@@ -248,12 +237,6 @@ struct MainTabView: View {
                         },
                         onAllYearsSelect: {
                             albumsPath.append(AlbumsDestination.allYearsArchive)
-                        },
-                        onPersonSelect: { person in
-                            albumsPath.append(AlbumsDestination.personDetail(person.id))
-                        },
-                        onAllPeopleSelect: {
-                            albumsPath.append(AlbumsDestination.allPeople)
                         }
                     )
                 } else {
@@ -282,9 +265,6 @@ struct MainTabView: View {
                 }
                 if organizeManager.stat(for: .videos) == 0 && !organizeManager.isAnalyzing {
                     Task { await organizeManager.quickAnalysis() }
-                }
-                if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
-                    peopleRecognitionManager.scanPhotoLibrary()
                 }
                 await albumMgr.fetchUserAlbums()
             }
@@ -370,20 +350,6 @@ struct MainTabView: View {
                             albumsPath.append(AlbumsDestination.monthArchive(item))
                         }
                     )
-                case .personDetail(let personId):
-                    PersonPhotoListView(
-                        personID: personId,
-                        peopleManager: peopleRecognitionManager,
-                        photoManager: photoManager
-                    )
-                case .allPeople:
-                    AllPeopleView(
-                        peopleManager: peopleRecognitionManager,
-                        photoManager: photoManager,
-                        onPersonSelect: { person in
-                            albumsPath.append(AlbumsDestination.personDetail(person.id))
-                        }
-                    )
                 }
             }
         }
@@ -443,54 +409,7 @@ struct MainTabView: View {
         .environment(GridSettings())
 }
 
-// MARK: - Native TabBar Item Appearance Swizzling
-extension UITabBarItem {
-    private static var hasSwizzledItem = false
-
-    static func swizzleItemSettersOnce() {
-        guard !hasSwizzledItem else { return }
-        hasSwizzledItem = true
-
-        let origSel = #selector(setter: UITabBarItem.image)
-        let swizSel = #selector(photato_setImage(_:))
-
-        if let orig = class_getInstanceMethod(UITabBarItem.self, origSel),
-           let swiz = class_getInstanceMethod(UITabBarItem.self, swizSel) {
-            method_exchangeImplementations(orig, swiz)
-        }
-    }
-
-    @objc private func photato_setImage(_ image: UIImage?) {
-        guard let image else {
-            photato_setImage(nil)
-            return
-        }
-
-        if image.renderingMode == .alwaysOriginal {
-            photato_setImage(image)
-            return
-        }
-
-        let unselectedColor = UITabBar.unselectedTabColor
-        let selectedColor = UIColor.label
-
-        let grayImage = image.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
-        let blackImage = image.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
-
-        photato_setImage(grayImage)
-        self.selectedImage = blackImage
-
-        setTitleTextAttributes([
-            .foregroundColor: unselectedColor,
-            .font: UIFont.systemFont(ofSize: 10, weight: .regular)
-        ], for: .normal)
-        setTitleTextAttributes([
-            .foregroundColor: selectedColor,
-            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
-        ], for: .selected)
-    }
-}
-
+// MARK: - TabBar 未选中色（标准 appearance 着色，不再 swizzle）
 extension UITabBar {
     private static var hasSwizzled = false
 
@@ -499,70 +418,6 @@ extension UITabBar {
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0.60, green: 0.60, blue: 0.64, alpha: 1.0)
             : UIColor(red: 0.33, green: 0.33, blue: 0.35, alpha: 1.0)
-    }
-
-    static func swizzleLayoutSubviewsOnce() {
-        guard !hasSwizzled else { return }
-        hasSwizzled = true
-
-        let originalSelector = #selector(layoutSubviews)
-        let swizzledSelector = #selector(photato_layoutSubviews)
-
-        guard let originalMethod = class_getInstanceMethod(UITabBar.self, originalSelector),
-              let swizzledMethod = class_getInstanceMethod(UITabBar.self, swizzledSelector) else { return }
-
-        method_exchangeImplementations(originalMethod, swizzledMethod)
-    }
-
-    @objc func photato_layoutSubviews() {
-        photato_layoutSubviews()
-
-        let unselectedColor = UITabBar.unselectedTabColor
-        let selectedColor = UIColor.label
-
-        if let items = self.items {
-            for item in items {
-                if let base = item.image, base.renderingMode != .alwaysOriginal {
-                    let gray = base.withTintColor(unselectedColor, renderingMode: .alwaysOriginal)
-                    let black = base.withTintColor(selectedColor, renderingMode: .alwaysOriginal)
-                    item.image = gray
-                    item.selectedImage = black
-                    item.setTitleTextAttributes([
-                        .foregroundColor: unselectedColor,
-                        .font: UIFont.systemFont(ofSize: 10, weight: .regular)
-                    ], for: .normal)
-                    item.setTitleTextAttributes([
-                        .foregroundColor: selectedColor,
-                        .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
-                    ], for: .selected)
-                }
-            }
-        }
-
-        // 递归设置 UITabBarButton 中文字与图标的深灰色
-        for subview in self.subviews {
-            if String(describing: type(of: subview)).contains("UITabBarButton") {
-                let isSelected: Bool
-                if let control = subview as? UIControl {
-                    isSelected = control.isSelected
-                } else {
-                    isSelected = false
-                }
-                updateTabBarButtonViews(subview, isSelected: isSelected, unselectedColor: unselectedColor, selectedColor: selectedColor)
-            }
-        }
-    }
-
-    private func updateTabBarButtonViews(_ view: UIView, isSelected: Bool, unselectedColor: UIColor, selectedColor: UIColor) {
-        if let label = view as? UILabel {
-            label.textColor = isSelected ? selectedColor : unselectedColor
-        }
-        if let imageView = view as? UIImageView, !isSelected {
-            imageView.tintColor = unselectedColor
-        }
-        for child in view.subviews {
-            updateTabBarButtonViews(child, isSelected: isSelected, unselectedColor: unselectedColor, selectedColor: selectedColor)
-        }
     }
 }
 

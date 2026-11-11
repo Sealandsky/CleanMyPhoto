@@ -218,7 +218,7 @@ struct AlbumDetailView: View {
                         HStack(spacing: 4) {
                             Text(String(localized: "Your Photos"))
                                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundColor(Color(.secondaryLabel))
+                                .foregroundColor(.primary)
 
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .medium))
@@ -412,7 +412,7 @@ struct AlbumDetailView: View {
             HStack(spacing: 6) {
                 Text(String(localized: "More Photos for This Album"))
                     .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundColor(Color(.secondaryLabel))
+                    .foregroundColor(.primary)
 
                 if !isLoadingRecommendations && !recommendedPhotos.isEmpty {
                     Text("\(recommendedPhotos.count)")

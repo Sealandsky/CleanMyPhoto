@@ -1,0 +1,7 @@
+【Novidades da versão 1.7.0】
+- Mural livre de memórias: "Neste dia" ganha modo de mural livre, com fotos em tela cheia sem cortes, zoom com os dedos e navegação livre, além de alternância rápida entre grade e mural
+- Arquivo cronológico: Novo arquivo mensal na aba Álbuns para revisitar sua jornada fotográfica, com visão geral de todos os anos e saltos rápidos
+- Página de Álbuns renovada: Novo cartão rápido "Todas as fotos" e álbuns empilhados; Vídeos, Live Photos e Capturas de tela agora ficam nos Álbuns
+- Design de memórias repensado: "Neste dia" estreia banner panorâmico com paralaxe e um layout orgânico mais acolhedor e imersivo
+- Ajustes reformulados: Novo cartão de conquistas de limpeza com cota gratuita, fotos pendentes em grade de 3 colunas e ícones mais limpos
+- Desempenho e estabilidade: Motor de análise de fotos totalmente reconstruído para eliminar travamentos e interrupções em análises longas, além de corrigir o salto na primeira tela e outros problemas conhecidos

@@ -17,8 +17,7 @@ struct CleanMyPhotoApp: App {
         PurchaseReporter.start()
         SoundManager.shared.preloadSounds()
         MainTabView.configureTabBarAppearance()
-        UITabBarItem.swizzleItemSettersOnce()
-        UITabBar.swizzleLayoutSubviewsOnce()
+        // iOS 26 液态玻璃修复：移除 swizzle（详见 MainTabView.swift 顶部注释）
         let stats = StatisticsManager()
         let membership = MembershipManager()
         let photoManager = PhotoManager(statisticsManager: stats)

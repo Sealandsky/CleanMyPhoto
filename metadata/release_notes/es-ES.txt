@@ -1,0 +1,7 @@
+【Novedades de la versión 1.7.0】
+- Lienzo libre para tus recuerdos: "En este día" estrena modo de lienzo libre, con fotos a pantalla completa sin recortes, zoom con los dedos y desplazamiento libre, además de cambio instantáneo entre cuadrícula y lienzo
+- Archivo cronológico: Nueva sección de archivo por meses en la pestaña Álbumes para revivir tu recorrido fotográfico, con vista general de todos los años y saltos rápidos
+- Página de Álbumes renovada: Nueva tarjeta rápida "Todas las fotos" y álbumes apilados; Vídeos, Live Photos y Capturas se integran ahora en Álbumes
+- Rediseño de Recuerdos: "En este día" adopta un banner panorámico con efecto parallax y una composición orgánica más cálida e inmersiva
+- Ajustes renovados: Nueva tarjeta de logros de limpieza con cuota gratuita, fotos pendientes en cuadrícula de 3 columnas e iconografía más limpia
+- Rendimiento y estabilidad: Motor de análisis de fotos reconstruido por completo para eliminar cuelgues e interrupciones en análisis largos, y corrección de saltos en la primera pantalla y otros errores conocidos

@@ -1,0 +1,7 @@
+【What's New in 1.7.0】
+- Freeform Canvas Roaming: "On This Day" introduces a freeform canvas mode — full-bleed photos scattered naturally without cropping, roam freely with pinch-zoom and pan, and switch between grid and canvas in one tap
+- Timeline Archive: A new month-by-month archive in the Albums tab to revisit your photo journey, with an all-years overview and quick jumps
+- Redesigned Albums Page: Added an "All Photos" quick-access card and stacked album cards; Videos, Live Photos, and Screenshots sections now live in Albums
+- Refreshed Memories Design: "On This Day" features a cinematic banner with parallax swiping and an organic scattered layout for a warmer, more immersive feel
+- Revamped Settings: New cleanup achievement card with free quota status, pending photos upgraded to a 3-column grid, and cleaner icons throughout
+- Performance & Stability: Rebuilt the photo scanning engine to eliminate stalls and interruptions during long analyses, and fixed first-screen jumping and other known issues

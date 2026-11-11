@@ -54,10 +54,11 @@ struct TrashView: View {
                             dismiss()
                         }
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
+                        // 一层玻璃原则（Colo msg 469）：工具栏自带玻璃胶囊，符号必须裸放；
+                        // xmark.circle.fill 自带圆形底，会与胶囊叠成双层。
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color(.secondaryLabel))
-                            .font(.system(size: 28))
                     }
                 }
 
@@ -419,11 +420,10 @@ private struct TrashPhotoPreviewSheet: View {
                     Button {
                         dismiss()
                     } label: {
+                        // 一层玻璃原则：深色工具栏自带玻璃圆底，去掉自备的 ultraThinMaterial 圆片
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
                     }
                 }
             }

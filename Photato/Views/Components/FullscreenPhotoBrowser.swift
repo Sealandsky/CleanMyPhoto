@@ -562,13 +562,28 @@ struct FullscreenPhotoBrowser: View {
     }
 
     // 删除：沿用 deleteTrigger 触发既有删除流转（收藏拦截提示不变）；
-    // 红色 tint 玻璃 + 白色图标（对齐待处理照片页「全部删除」），尺寸与收藏/分享一致
+    // 红色 tint 玻璃胶囊 + 白色 xmark.circle.fill 图标与「删除」文案
+    // （对齐待处理照片页「全部删除」的白字红底语言），高度与收藏/分享圆形按钮一致 50pt
     private var deleteButton: some View {
-        glassActionButton(tint: .red) {
-            Image(systemName: "trash")
-                .foregroundColor(.white)
-        } action: {
+        Button {
+            SoundManager.playAction()
             deleteTrigger += 1
+        } label: {
+            let label = HStack(spacing: 5) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                Text(String(localized: "Delete"))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 18)
+            .frame(height: 50)
+
+            if #available(iOS 26.0, *) {
+                label.glassEffect(.regular.tint(.red).interactive(), in: Capsule())
+            } else {
+                label.background(Color.red, in: Capsule())
+            }
         }
     }
 

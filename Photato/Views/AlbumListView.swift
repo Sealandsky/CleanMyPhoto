@@ -6,7 +6,6 @@ struct AlbumListView: View {
     @ObservedObject var albumManager: AlbumManager
     @ObservedObject var onThisDayManager: OnThisDayManager
     @ObservedObject var timelineArchiveManager: TimelineArchiveManager
-    @ObservedObject var peopleRecognitionManager: PeopleRecognitionManager = PeopleRecognitionManager.shared
     var organizeManager: PhotoOrganizeManager? = nil
     var onAlbumSelect: ((AlbumModel) -> Void)? = nil
     var onYearGroupSelect: ((OnThisDayYearGroup) -> Void)? = nil
@@ -14,8 +13,6 @@ struct AlbumListView: View {
     var onAllPhotosSelect: (() -> Void)? = nil
     var onMonthArchiveSelect: ((TimelineMonthItem) -> Void)? = nil
     var onAllYearsSelect: (() -> Void)? = nil
-    var onPersonSelect: ((PersonEntity) -> Void)? = nil
-    var onAllPeopleSelect: (() -> Void)? = nil
 
     @State private var showNewAlbumAlert = false
     @State private var newAlbumName = ""
@@ -26,34 +23,28 @@ struct AlbumListView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            // 模块之间统一留 8pt 间距；顶部再补 10pt，让首屏内容不与导航栏贴得太紧。
+            // 各模块内部仍保留自身 padding，此处只做模块级的额外呼吸感。
+            VStack(spacing: 8) {
                 // 1. 顶部「往年今日」年份卡片区
                 OnThisDaySectionView(manager: onThisDayManager) { group in
                     onYearGroupSelect?(group)
                 }
 
-                // 2. 个人相簿分区小标题与新建入口
-                albumsSectionHeader
+                // 2 + 3. 个人相簿：分区标题与横滑列表属于同一模块，
+                // 合并为一组（内部 spacing 0），避免被外层模块间距把标题和卡片拉开。
+                VStack(spacing: 0) {
+                    albumsSectionHeader
 
-                // 3. 相簿横滑列表（首位常驻「所有照片」卡片）
-                if !albumManager.hasLoadedOnce || albumManager.isLoadingAlbums {
-                    skeletonRow
-                } else {
-                    albumsScrollRow
+                    // 相簿横滑列表（首位常驻「所有照片」卡片）
+                    if !albumManager.hasLoadedOnce || albumManager.isLoadingAlbums {
+                        skeletonRow
+                    } else {
+                        albumsScrollRow
+                    }
                 }
 
-                // 4. 人物与面孔横滑合辑模块
-                PeopleAndFacesSectionView(
-                    manager: peopleRecognitionManager,
-                    onPersonSelect: { person in
-                        onPersonSelect?(person)
-                    },
-                    onViewAllPeople: {
-                        onAllPeopleSelect?()
-                    }
-                )
-
-                // 5. 时光归档模块
+                // 4. 时光归档模块
                 TimelineArchiveSectionView(
                     manager: timelineArchiveManager,
                     onMonthSelect: { item in
@@ -67,6 +58,7 @@ struct AlbumListView: View {
                 // 5. 媒体类型板块（从清理页迁移至此）
                 mediaTypesSection
             }
+            .padding(.top, 10)
         }
         .background(Color.pageBackground)
         .scrollIndicators(.hidden)  // 隐藏滚动条
@@ -80,13 +72,7 @@ struct AlbumListView: View {
                     await organizeManager.quickAnalysis()
                 }
             }()
-            peopleRecognitionManager.scanPhotoLibrary()
             _ = await (refreshAlbums, refreshOnThisDay, refreshTimeline, refreshOrganize)
-        }
-        .task {
-            if !peopleRecognitionManager.hasScannedOnce && !peopleRecognitionManager.isScanning {
-                peopleRecognitionManager.scanPhotoLibrary()
-            }
         }
         .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
             TextField(String(localized: "Album Name"), text: $newAlbumName)

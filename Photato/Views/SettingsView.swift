@@ -84,10 +84,13 @@ struct SettingsView: View {
 
     // MARK: - 会员卡片与下挂式免费额度底托一体容器
     /// 底托抽屉形态：主卡保留完整四角 20pt 连续圆角浮于上层，
-    /// 下挂底托垫在主卡下方并向左右内缩 16pt，露出肩部与底部条带（参考 AI 输入框底托）。
+    /// 下挂底托与主卡同宽垫在其正下方，仅露出底部条带（参考 AI 输入框底托）。
     /// 底托为纯展示状态条：不可点击、无跳转、无箭头，升级入口回归主卡本身。
+    /// 主卡向下压住底托 quotaTrayOverlap pt，底托文案顶边按此补偿垫高，保证在可视条带内居中。
+    private static let quotaTrayOverlap: CGFloat = 14
+
     private var membershipWithQuotaSection: some View {
-        VStack(spacing: -14) {
+        VStack(spacing: -Self.quotaTrayOverlap) {
             // 1. 主卡：Photato Pro 会员订阅卡片（完整四角圆角 + 投影）
             Button {
                 showMembership = true
@@ -137,22 +140,30 @@ struct SettingsView: View {
             .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 4)
             .zIndex(1)
 
-            // 2. 下挂底托：免费额度状态条（左右内收 16pt 垫在主卡下，纯文案无图标无箭头，不可点击）
+            // 2. 下挂底托：免费额度状态条（与主卡同宽垫在正下方，纯文案无图标无箭头，不可点击）
+            // 填色复用 cardBackground：与页面其他卡片同材质，浅色白卡浮于灰底、深色 #1C1C1E 浮于纯黑，
+            // 避免「底托与页面背景同亮度融为一体」；圆角对齐主卡的 20pt，同宽后肩部曲线完全被主卡盖住。
+            // 顶边垫高 12 + quotaTrayOverlap 补偿主卡压住的部分，文案在露出的白色条带内水平/垂直居中；
+            // 上两角取直角（底托是垫在主卡下的整张纸，肩部以方角露出），仅下两角随卡片 20pt 圆角；
+            // 轻投影强化「主卡下垫了一张纸」的分层。
             Text(String(format: String(localized: "Free Quota: %lld/%lld remaining"), Int64(membershipManager.freeDeletionQuotaRemaining), Int64(membershipManager.freeDeletionQuotaTotal)))
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
-                .padding(.vertical, 13)
+                .padding(.top, 12 + Self.quotaTrayOverlap)
+                .padding(.bottom, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color(UIColor { trait in
-                            trait.userInterfaceStyle == .dark
-                                ? UIColor(red: 0.137, green: 0.137, blue: 0.145, alpha: 1) // #232325
-                                : UIColor(red: 0.949, green: 0.945, blue: 0.933, alpha: 1) // #F2F1EE
-                        }))
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 0,
+                        bottomLeadingRadius: 20,
+                        bottomTrailingRadius: 20,
+                        topTrailingRadius: 0,
+                        style: .continuous
+                    )
+                    .fill(Color.cardBackground)
                 )
-                .padding(.horizontal, 16)
+                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
                 .zIndex(0)
         }
     }
@@ -171,7 +182,7 @@ struct SettingsView: View {
     private func layoutSection(gridSettings: GridSettings) -> some View {
         sectionCard(title: String(localized: "Layout")) {
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "square.grid.2x2.fill", color: .cyan)
+                    SettingsIconView(systemName: "square.grid.2x2", color: .cyan)
 
                 Text(String(localized: "Grid Layout"))
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -204,7 +215,7 @@ struct SettingsView: View {
             .frame(minHeight: 60)
 
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "aspectratio.fill", color: .orange)
+                    SettingsIconView(systemName: "aspectratio", color: .orange)
 
                 Text(String(localized: "Photo Ratio"))
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -250,7 +261,7 @@ struct SettingsView: View {
                 showFeedback = true
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "envelope.fill", color: .pink)
+                    SettingsIconView(systemName: "envelope", color: .pink)
 
                     Text(String(localized: "Send Feedback"))
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -264,7 +275,7 @@ struct SettingsView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: 12) {
-                SettingsIconView(systemName: "info.circle.fill", color: .gray)
+                    SettingsIconView(systemName: "info.circle", color: .gray)
 
                 Text(String(localized: "Version"))
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -279,7 +290,7 @@ struct SettingsView: View {
 
             Link(destination: ReviewPromptManager.appStoreReviewURL) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "star.fill", color: .yellow)
+                    SettingsIconView(systemName: "star", color: .yellow)
 
                     Text(String(localized: "Rate Photato"))
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -297,7 +308,7 @@ struct SettingsView: View {
 
             Link(destination: privacyPolicyURL) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "hand.raised.fill", color: .green)
+                    SettingsIconView(systemName: "hand.raised", color: .green)
 
                     Text(String(localized: "Privacy Policy"))
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -315,7 +326,7 @@ struct SettingsView: View {
 
             Link(destination: URL(string: "https://sealandsky.github.io/privacy/terms-of-use.html")!) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "doc.text.fill", color: .blue)
+                    SettingsIconView(systemName: "doc.text", color: .blue)
 
                     Text(String(localized: "Terms of Use"))
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -338,7 +349,7 @@ struct SettingsView: View {
         sectionCard(title: "Debug") {
             Toggle(isOn: $membershipManager.isDebugPremium) {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "crown.fill", color: .yellow)
+                    SettingsIconView(systemName: "crown", color: .yellow)
                     Text("Simulate Pro Member")
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
@@ -351,7 +362,7 @@ struct SettingsView: View {
                 membershipManager.resetFreeQuotaForTesting()
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "arrow.counterclockwise.circle.fill", color: .blue)
+                    SettingsIconView(systemName: "arrow.counterclockwise.circle", color: .blue)
                     Text("Reset Free Quota (100 left)")
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.blue)
@@ -365,7 +376,7 @@ struct SettingsView: View {
                 membershipManager.exhaustFreeQuotaForTesting()
             } label: {
                 HStack(spacing: 12) {
-                    SettingsIconView(systemName: "xmark.circle.fill", color: .red)
+                    SettingsIconView(systemName: "xmark.circle", color: .red)
                     Text("Exhaust Free Quota (0 left)")
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundColor(.red)
@@ -550,30 +561,24 @@ struct SettingsIconView: View {
     let systemName: String
     let color: Color
 
-    /// 针对不同外形、宽高比与实心度的 SF Symbol 进行光学尺寸微调，
+    /// 针对不同外形与宽高比的 SF Symbol 进行光学尺寸微调，
     /// 确保视觉面积、高度与密度在 28x28 槽位中完全均衡统一。
+    /// 列表图标统一线性（非 fill）+ 中粗字重。
     private var opticalPointSize: CGFloat {
         switch systemName {
         case "sparkles":
-            return 25 // 镂空细线条符号：提升字阶增加视觉占比
-        case "internaldrive.fill":
+            return 25 // 镂空稀疏符号：提升字阶增加视觉占比
+        case "internaldrive":
             return 23.5 // 扁平横向符号：增大字阶拉高视觉纵深
-        case "hand.raised.fill", "doc.text.fill":
+        case "hand.raised", "doc.text":
             return 22.5 // 纵向偏窄符号：微调放大增强视觉体量
-        case "checkmark.seal.fill", "info.circle.fill", "square.grid.2x2.fill":
-            return 20 // 密集圆/方实心饱满符号：微降字阶避免压迫感
         default:
-            return 21 // 标准平衡符号（photo.stack.fill, trash.fill, star.fill, aspectratio.fill, envelope.fill 等）
+            return 21 // 标准平衡符号（star, aspectratio, info.circle, envelope 等）
         }
     }
 
     private var opticalWeight: Font.Weight {
-        switch systemName {
-        case "sparkles":
-            return .bold // 细线符号加粗线宽，匹配实心 fill 的质感与墨量
-        default:
-            return .semibold
-        }
+        return .semibold // 全表统一中粗线宽
     }
 
     var body: some View {
