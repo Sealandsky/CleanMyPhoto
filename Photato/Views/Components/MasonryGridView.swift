@@ -140,6 +140,15 @@ struct AdaptivePhotoGrid<Content: View, Footer: View>: View {
     @ViewBuilder var footer: Footer
 
     @Environment(GridSettings.self) private var gridSettings
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var effectiveColumnCount: Int {
+        if horizontalSizeClass == .regular {
+            // 在 iPhone Duo 展开屏等宽屏设备上强制使用偶数列（2 或 4 列），避开中央折痕
+            return gridSettings.columnCount % 2 == 0 ? gridSettings.columnCount : 4
+        }
+        return gridSettings.columnCount
+    }
 
     /// 带全局序号初始化：无 footer
     init(photos: [PhotoAsset], @ViewBuilder cell: @escaping (PhotoAsset, Int) -> Content) where Footer == EmptyView {
@@ -173,7 +182,7 @@ struct AdaptivePhotoGrid<Content: View, Footer: View>: View {
         VStack(spacing: 0) {
             MasonryGridContent(
                 photos: photos,
-                columnCount: gridSettings.columnCount,
+                columnCount: effectiveColumnCount,
                 fixedAspectRatio: gridSettings.isOriginalRatio ? nil : gridSettings.aspectRatio,
                 cell: cell
             )
@@ -182,8 +191,15 @@ struct AdaptivePhotoGrid<Content: View, Footer: View>: View {
     }
 }
 
-#Preview("Masonry") {
-    MasonryGridContent(photos: [], columnCount: 3) { _ in
-        Color.red.frame(height: 100)
+#if DEBUG
+#Preview("Masonry Waterfall") {
+    ScrollView {
+        MasonryGridContent(photos: PhotoAsset.mockAllPhotos, columnCount: 2) { photo in
+            PhotoCell(photo: photo, forceOriginalRatio: true)
+        }
+        .padding(.horizontal, 12)
     }
+    .background(Color.pageBackground)
+    .environment(GridSettings())
 }
+#endif

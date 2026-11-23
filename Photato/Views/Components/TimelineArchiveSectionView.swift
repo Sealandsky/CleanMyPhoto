@@ -241,6 +241,14 @@ private struct TimelineMonthCard: View {
             return
         }
 
+#if DEBUG
+        if let preview = PreviewAssetLoader.image(named: asset.localIdentifier) {
+            PhotoImageCache.shared.set(for: key, targetSize: targetSize, isHighQuality: false, image: preview)
+            self.coverImage = preview
+            return
+        }
+#endif
+
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true

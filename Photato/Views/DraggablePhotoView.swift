@@ -1320,17 +1320,19 @@ struct DraggablePhotoView: View {
 }
 
 // MARK: - Preview
+#if DEBUG
 #Preview {
     @Previewable @State var deleteTrigger = 0
     DraggablePhotoView(
-        photos: [],
-        currentPhotoID: "",
+        photos: PhotoAsset.mockAllPhotos,
+        currentPhotoID: PhotoAsset.mockCat.id,
         deleteTrigger: $deleteTrigger,
         onPhotoChange: { _, _ in },
         onDismiss: {},
         screenSize: CGSize(width: 393, height: 852)
     )
 }
+#endif
 
 // MARK: - Zoom Pan Gesture
 /// 放大态平移 / 全屏态下拉收拢共用的双轴手势：

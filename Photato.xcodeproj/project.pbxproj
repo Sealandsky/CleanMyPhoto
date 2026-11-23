@@ -7,10 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1A2B3C4D000000000000000D /* PhotatoWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D0000000000000002 /* PhotatoWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D8A1B2C30000000000000001 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = D8A1B2C30000000000000002 /* PostHog */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		1A2B3C4D000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D8E4F3D52F3785780010E310 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A2B3C4D0000000000000001;
+			remoteInfo = PhotatoWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1A2B3C4D0000000000000006 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstSubfolderSpec = 13;
+			files = (
+				1A2B3C4D000000000000000D /* PhotatoWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		1A2B3C4D0000000000000002 /* PhotatoWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PhotatoWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D858B8CF305B5B660016F27E /* Photato.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Photato.storekit; sourceTree = "<group>"; };
 		D858B8D0305B78B20016F27E /* Photato.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Photato.storekit; sourceTree = "<group>"; };
 		D8E4F3DD2F3785780010E310 /* Photato.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photato.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -21,12 +46,23 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				"Preview Content/Preview Assets.xcassets",
 			);
 			target = D8E4F3DC2F3785780010E310 /* Photato */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		1A2B3C4D000000000000000B /* PhotatoWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotatoWidget;
+			sourceTree = "<group>";
+		};
+		1A2B3C4D000000000000000C /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		D8E4F3DF2F3785780010E310 /* Photato */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -55,6 +91,8 @@
 				D858B8CF305B5B660016F27E /* Photato.storekit */,
 				D858B8D0305B78B20016F27E /* Photato.storekit */,
 				D8E4F3DF2F3785780010E310 /* Photato */,
+				1A2B3C4D000000000000000B /* PhotatoWidget */,
+				1A2B3C4D000000000000000C /* Shared */,
 				D8E4F3DE2F3785780010E310 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				D8E4F3DD2F3785780010E310 /* Photato.app */,
+				1A2B3C4D0000000000000002 /* PhotatoWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +109,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1A2B3C4D0000000000000001 /* PhotatoWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A2B3C4D000000000000000A /* Build configuration list for PBXNativeTarget "PhotatoWidget" */;
+			buildPhases = (
+				1A2B3C4D0000000000000003 /* Sources */,
+				1A2B3C4D0000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1A2B3C4D000000000000000B /* PhotatoWidget */,
+				1A2B3C4D000000000000000C /* Shared */,
+			);
+			name = PhotatoWidget;
+			packageProductDependencies = (
+			);
+			productName = PhotatoWidget;
+			productReference = 1A2B3C4D0000000000000002 /* PhotatoWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		D8E4F3DC2F3785780010E310 /* Photato */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D8E4F3E82F37857A0010E310 /* Build configuration list for PBXNativeTarget "Photato" */;
@@ -77,12 +138,15 @@
 				D8E4F3D92F3785780010E310 /* Sources */,
 				D8E4F3DA2F3785780010E310 /* Frameworks */,
 				D8E4F3DB2F3785780010E310 /* Resources */,
+				1A2B3C4D0000000000000006 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1A2B3C4D0000000000000007 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				1A2B3C4D000000000000000C /* Shared */,
 				D8E4F3DF2F3785780010E310 /* Photato */,
 			);
 			name = Photato;
@@ -101,8 +165,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
+					1A2B3C4D0000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					D8E4F3DC2F3785780010E310 = {
 						CreatedOnToolsVersion = 26.0;
 					};
@@ -132,11 +199,19 @@
 			projectRoot = "";
 			targets = (
 				D8E4F3DC2F3785780010E310 /* Photato */,
+				1A2B3C4D0000000000000001 /* PhotatoWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1A2B3C4D0000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D8E4F3DB2F3785780010E310 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -147,6 +222,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1A2B3C4D0000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D8E4F3D92F3785780010E310 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -156,7 +238,73 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		1A2B3C4D0000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A2B3C4D0000000000000001 /* PhotatoWidget */;
+			targetProxy = 1A2B3C4D000000000000000E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		1A2B3C4D0000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = PhotatoWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7686JA7SFY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PhotatoWidget-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "On This Day";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.7.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.bryan.photato.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		1A2B3C4D0000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = PhotatoWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7686JA7SFY;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PhotatoWidget-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "On This Day";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.7.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.bryan.photato.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		D8E4F3E62F37857A0010E310 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -287,14 +435,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Photato.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Photato/Preview Content\"";
 				DEVELOPMENT_TEAM = 7686JA7SFY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Photato/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photato;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"cn.bryan.photato.onthisday\";\n    CFBundleURLSchemes =     (\n        photato\n    );\n}";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";
@@ -329,6 +480,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Photato.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -337,6 +489,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Photato/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photato;
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"cn.bryan.photato.onthisday\";\n    CFBundleURLSchemes =     (\n        photato\n    );\n}";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app needs permission to save photos to your library.";
@@ -369,6 +522,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1A2B3C4D000000000000000A /* Build configuration list for PBXNativeTarget "PhotatoWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A2B3C4D0000000000000008 /* Debug */,
+				1A2B3C4D0000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D8E4F3D82F3785780010E310 /* Build configuration list for PBXProject "Photato" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

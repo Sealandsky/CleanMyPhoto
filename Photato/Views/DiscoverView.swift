@@ -17,6 +17,15 @@ struct DiscoverView: View {
     var transitionNamespace: Namespace.ID? = nil
     @EnvironmentObject var photoManager: PhotoManager
     @Environment(GridSettings.self) private var gridSettings
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var effectiveColumnCount: Int {
+        if horizontalSizeClass == .regular {
+            // 在 iPhone Duo 展开屏等宽屏设备上强制偶数列（2 或 4 列），避开中央折痕
+            return gridSettings.columnCount % 2 == 0 ? gridSettings.columnCount : 4
+        }
+        return gridSettings.columnCount
+    }
 
     // MARK: - 自绘下拉刷新（DragGesture 驱动，替代系统 refreshable）
     /// 方案说明：系统 refreshable 的转圈会"扣住"滚动偏移，其弹簧归位在
@@ -331,7 +340,7 @@ struct DiscoverView: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .frame(minHeight: UIScreen.main.bounds.height * 0.7)
+            .frame(minHeight: ScreenSizeHelper.screenSize.height * 0.7)
         }
         // 空状态下拉刷新：同一套手势与指示器（内容不满屏，哨兵恒可见=恒在顶部）
         .simultaneousGesture(pullGesture)
@@ -346,7 +355,7 @@ struct DiscoverView: View {
     private var skeletonGridView: some View {
         ScrollView {
             LazyVGrid(
-                columns: GridColumnHelper.columns(count: gridSettings.columnCount),
+                columns: GridColumnHelper.columns(count: effectiveColumnCount),
                 spacing: GridColumnHelper.spacing
             ) {
                 ForEach(0..<12, id: \.self) { _ in
@@ -387,11 +396,13 @@ struct DiscoverView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     DiscoverView(
         manager: DiscoverManager(),
         onPhotoSelect: { _ in }
     )
     .environment(GridSettings())
-    .environmentObject(PhotoManager())
+    .environmentObject(PhotoManager.mock)
 }
+#endif

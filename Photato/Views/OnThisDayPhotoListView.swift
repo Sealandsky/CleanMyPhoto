@@ -199,6 +199,7 @@ struct OnThisDayPhotoListView: View {
                 .overlay(alignment: .bottom) {
                     if showCanvasGuideCard {
                         canvasGuideCard
+                            .frame(maxWidth: 440)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 44)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -413,3 +414,14 @@ private struct TrashEntryFramePreferenceKey: PreferenceKey {
         if next != .zero { value = next }
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        OnThisDayPhotoListView(
+            group: .mock,
+            photoManager: .mock
+        )
+    }
+}
+#endif

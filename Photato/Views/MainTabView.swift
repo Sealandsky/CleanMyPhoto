@@ -60,8 +60,22 @@ struct MainTabView: View {
     @EnvironmentObject var membershipManager: MembershipManager
     @EnvironmentObject var statisticsManager: StatisticsManager
     @Environment(\.requestReview) private var requestReview
+    @Environment(\.scenePhase) private var scenePhase
 
-    @State private var selectedTab: AppTab = .photos
+    /// widget deep link 待消费年份（-1 表示仅切 Tab 不带年份）
+    @Binding var pendingDeepLinkYear: Int?
+
+    /// 底部 tab 图标尺寸：系统默认约 24pt，缩小一档到 20pt。改这一个常量即可全 tab 生效。
+    private let tabIconSize: CGFloat = 20
+
+    @State private var selectedTab: AppTab = {
+        #if DEBUG
+        if CommandLine.arguments.contains("-tab_albums") { return .albums }
+        if CommandLine.arguments.contains("-tab_organize") { return .organize }
+        if CommandLine.arguments.contains("-tab_settings") { return .settings }
+        #endif
+        return .photos
+    }()
     @State private var organizeManager = PhotoOrganizeManager()
     @State private var organizePath = NavigationPath()
 
@@ -77,7 +91,8 @@ struct MainTabView: View {
     @State private var albumManager: AlbumManager?
     @State private var selectedAlbum: AlbumModel?
 
-    init() {
+    init(pendingDeepLinkYear: Binding<Int?>) {
+        self._pendingDeepLinkYear = pendingDeepLinkYear
         Self.configureTabBarAppearance()
         // iOS 26 液态玻璃修复（Bryan 真机反馈：按住 tab 无液态玻璃形变）：
         // 原先用 swizzle 把 item.image 强制替换为 .alwaysOriginal 位图，
@@ -123,21 +138,36 @@ struct MainTabView: View {
             .tint(Color.accentColor)
             .toolbar(isFullscreenMode ? .hidden : .visible, for: .tabBar)
             .tabItem {
-                Label(AppTab.photos.localizedText, systemImage: AppTab.photos.systemImage)
+                Label {
+                    Text(AppTab.photos.localizedText)
+                } icon: {
+                    Image(systemName: AppTab.photos.systemImage)
+                        .font(.system(size: tabIconSize, weight: .medium))
+                }
             }
             .tag(AppTab.photos)
 
             albumsTabContent
                 .tint(Color.accentColor)
                 .tabItem {
-                    Label(AppTab.albums.localizedText, systemImage: AppTab.albums.systemImage)
+                    Label {
+                        Text(AppTab.albums.localizedText)
+                    } icon: {
+                        Image(systemName: AppTab.albums.systemImage)
+                            .font(.system(size: tabIconSize, weight: .medium))
+                    }
                 }
                 .tag(AppTab.albums)
 
             organizeTabContent
                 .tint(Color.accentColor)
                 .tabItem {
-                    Label(AppTab.organize.localizedText, systemImage: AppTab.organize.systemImage)
+                    Label {
+                        Text(AppTab.organize.localizedText)
+                    } icon: {
+                        Image(systemName: AppTab.organize.systemImage)
+                            .font(.system(size: tabIconSize, weight: .medium))
+                    }
                 }
                 .tag(AppTab.organize)
 
@@ -149,16 +179,71 @@ struct MainTabView: View {
             .environment(organizeManager)
             .tint(Color.accentColor)
             .tabItem {
-                Label(AppTab.settings.localizedText, systemImage: AppTab.settings.systemImage)
+                Label {
+                    Text(AppTab.settings.localizedText)
+                } icon: {
+                    Image(systemName: AppTab.settings.systemImage)
+                        .font(.system(size: tabIconSize, weight: .medium))
+                }
             }
             .tag(AppTab.settings)
         }
         .scrollEdgeEffectStyle(.soft, for: .bottom)
+        .modifier(DefaultTabBarPlacementModifier())
         .onChange(of: selectedTab) { _, newTab in
             AppAnalytics.screen(newTab.analyticsName)
         }
+        .onChange(of: pendingDeepLinkYear) { _, year in
+            guard let year else { return }
+            Task { await resolveAndNavigateIfNeeded(year: year) }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // 进入后台再写一次快照，补齐未回填的地名 / 当天变更，并向系统预约夜间静默刷新
+            if phase == .background {
+                Task { await writeWidgetSnapshot(force: false) }
+                OnThisDayBackgroundScheduler.shared.scheduleNextRefresh()
+            }
+        }
         .task {
+            // widget 快照写入钩子：manager 数据（含地名回填）变化时重建
+            onThisDayManager.onDataChanged = { [weak manager = onThisDayManager] in
+                Task { @MainActor in
+                    guard let manager else { return }
+                    await OnThisDayWidgetSnapshotWriter.shared.rebuild(
+                        using: manager.yearGroups,
+                        isMonthFallback: manager.isMonthFallback,
+                        permissionGranted: Self.hasPhotoPermission()
+                    )
+                }
+            }
+
+            // 图库真删除监听：触发强制刷新 + 重建快照
+            OnThisDayLibraryObserver.shared.onLibraryChanged = { [weak manager = onThisDayManager] in
+                guard let manager else { return }
+                await manager.fetchOnThisDay(forceRefresh: true)
+                await OnThisDayWidgetSnapshotWriter.shared.rebuild(
+                    using: manager.yearGroups,
+                    isMonthFallback: manager.isMonthFallback,
+                    permissionGranted: Self.hasPhotoPermission(),
+                    force: true
+                )
+            }
+            OnThisDayLibraryObserver.shared.start()
+
+            // 若 deep link 在本视图创建前已到达（welcome/会员阶段），消费初始值
+            if let initialYear = pendingDeepLinkYear {
+                Task { await resolveAndNavigateIfNeeded(year: initialYear) }
+            }
+
             AppAnalytics.screen(selectedTab.analyticsName)
+            #if DEBUG
+            if CommandLine.arguments.contains("-view_trash") {
+                photoManager.showTrash = true
+            }
+            if CommandLine.arguments.contains("-view_cleanup_result") {
+                photoManager.lastCleanupResult = CleanupResult(deletedCount: 12, freedBytes: 154_000_000)
+            }
+            #endif
             // 1. 首屏渲染完成即刻轻量预热特征内存库（~20ms），确保用户点进详情页秒出相似照片
             try? await Task.sleep(nanoseconds: 150_000_000)
             PhotoSimilarityMatcher.shared.prewarm()
@@ -194,12 +279,63 @@ struct MainTabView: View {
                 .presentationDetents([.fraction(0.72), .large])
                 .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(item: $photoManager.lastCleanupResult) { result in
-            CleanupResultView(result: result) {
-                photoManager.lastCleanupResult = nil
-                ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: result.deletedCount, requestReview: requestReview)
+        // 清理完成面板：贴底悬浮卡（非全屏），背景透出并变暗，样式对齐自由画布引导卡
+        .overlay {
+            if let result = photoManager.lastCleanupResult {
+                CleanupResultView(result: result) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        photoManager.lastCleanupResult = nil
+                    }
+                    ReviewPromptManager.shared.requestReviewIfAppropriate(deletedCount: result.deletedCount, requestReview: requestReview)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+    }
+
+    // MARK: - Widget Deep Link & Snapshot
+
+    private static func hasPhotoPermission() -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
+    private func writeWidgetSnapshot(force: Bool) async {
+        await OnThisDayWidgetSnapshotWriter.shared.rebuild(
+            using: onThisDayManager.yearGroups,
+            isMonthFallback: onThisDayManager.isMonthFallback,
+            permissionGranted: Self.hasPhotoPermission(),
+            force: force
+        )
+    }
+
+    /// 消费 widget deep link：等数据就绪后按年份跳进对应「往年今日」详情页
+    private func resolveAndNavigateIfNeeded(year: Int) async {
+        selectedTab = .albums
+
+        // 确保管理器数据已加载（冷启动时 await 在途预热任务）
+        await onThisDayManager.ensureLoaded()
+        if onThisDayManager.yearGroups.isEmpty && Self.hasPhotoPermission() {
+            await onThisDayManager.fetchOnThisDay(forceRefresh: true)
+        }
+
+        // year == -1：空态跳转，只切到回忆 Tab，不 push 详情
+        guard year >= 0 else {
+            pendingDeepLinkYear = nil
+            return
+        }
+
+        // 目标年份不存在（可能被真删）时回退最新一组
+        let group = onThisDayManager.yearGroups.first { $0.year == year }
+            ?? onThisDayManager.yearGroups.first
+        guard let group else {
+            pendingDeepLinkYear = nil
+            return
+        }
+
+        albumsPath = NavigationPath()   // 清掉旧栈，避免 deep link 反复叠加
+        albumsPath.append(AlbumsDestination.onThisDay(group))
+        pendingDeepLinkYear = nil
     }
 
     // MARK: - Albums Tab
@@ -237,6 +373,9 @@ struct MainTabView: View {
                         },
                         onAllYearsSelect: {
                             albumsPath.append(AlbumsDestination.allYearsArchive)
+                        },
+                        onMyAlbumsList: {
+                            albumsPath.append(AlbumsDestination.albumList)
                         }
                     )
                 } else {
@@ -270,6 +409,20 @@ struct MainTabView: View {
             }
             .navigationDestination(for: AlbumsDestination.self) { destination in
                 switch destination {
+                case .albumList:
+                    if let albumMgr = albumManager {
+                        MyAlbumsListView(
+                            albumManager: albumMgr,
+                            onAlbumSelect: { album in
+                                selectedAlbum = album
+                                Task { [album] in
+                                    await albumMgr.fetchPhotos(in: album)
+                                    guard selectedAlbum?.id == album.id else { return }
+                                    albumsPath.append(AlbumsDestination.albumDetail(album.id))
+                                }
+                            }
+                        )
+                    }
                 case .albumDetail(let albumId):
                     if let album = albumManager?.albums.first(where: { $0.id == albumId }),
                        let albumMgr = albumManager {
@@ -401,13 +554,15 @@ struct MainTabView: View {
     }
 }
 
+#if DEBUG
 #Preview {
-    MainTabView()
-        .environmentObject(PhotoManager())
+    MainTabView(pendingDeepLinkYear: .constant(nil))
+        .environmentObject(PhotoManager.mock)
         .environmentObject(MembershipManager())
         .environmentObject(StatisticsManager())
         .environment(GridSettings())
 }
+#endif
 
 // MARK: - TabBar 未选中色（标准 appearance 着色，不再 swizzle）
 extension UITabBar {
@@ -418,6 +573,17 @@ extension UITabBar {
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0.60, green: 0.60, blue: 0.64, alpha: 1.0)
             : UIColor(red: 0.33, green: 0.33, blue: 0.35, alpha: 1.0)
+    }
+}
+
+// MARK: - iOS 27+ / iPhone Duo 标签栏底置修饰器
+private struct DefaultTabBarPlacementModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 27.0, *) {
+            content.defaultTabBarPlacement(.tabBar)
+        } else {
+            content
+        }
     }
 }
 

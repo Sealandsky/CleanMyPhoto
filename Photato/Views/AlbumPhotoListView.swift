@@ -8,6 +8,15 @@ struct AlbumPhotoListView: View {
     let onPhotoSelect: (PhotoAsset) -> Void
     var scrollToPhotoID: String? = nil
     @Environment(GridSettings.self) private var gridSettings
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var effectiveColumnCount: Int {
+        if horizontalSizeClass == .regular {
+            // 在 iPhone Duo 展开屏等宽屏设备上强制偶数列（2 或 4 列），避开中央折痕
+            return gridSettings.columnCount % 2 == 0 ? gridSettings.columnCount : 4
+        }
+        return gridSettings.columnCount
+    }
     @State private var selectionManager = SelectionManager()
     @State private var albumSizeText: String = ""
     @State private var isFullscreenMode = false
@@ -66,7 +75,7 @@ struct AlbumPhotoListView: View {
                             }
                         }
                         .onAppear {
-                            photoManager.preheatAssets(around: index, in: photos, columnCount: gridSettings.columnCount)
+                            photoManager.preheatAssets(around: index, in: photos, columnCount: effectiveColumnCount)
                         }
 
                         cell.swipeToTrash(
@@ -98,7 +107,7 @@ struct AlbumPhotoListView: View {
                 }
             }
             .onAppear {
-                photoManager.preloadInitialAssets(columnCount: gridSettings.columnCount)
+                photoManager.preloadInitialAssets(columnCount: effectiveColumnCount)
                 albumSizeText = SizeCache.load("album_\(album.id)") ?? ""
                 if let photoID = scrollToPhotoID {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

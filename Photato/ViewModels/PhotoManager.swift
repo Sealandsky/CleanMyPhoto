@@ -25,15 +25,85 @@ class PhotoManager: NSObject, ObservableObject {
     private(set) var totalPhotoCount: Int = 0
 
     var trashCount: Int {
-        trashedAssets.count
+        trashedAssets.isEmpty ? pendingDeletionIDs.count : trashedAssets.count
+    }
+
+    // MARK: - Persistence
+    private static let pendingIDsStorageKey = "photato_pending_deletion_identifiers"
+
+    /// 保存当前的待整理/待处理照片 ID 列表（保持加入先后顺序）
+    private func savePendingIDsToDisk() {
+        let ids: [String]
+        if !trashedAssets.isEmpty {
+            ids = trashedAssets.map(\.id)
+        } else if !pendingDeletionIDs.isEmpty {
+            ids = Array(pendingDeletionIDs)
+        } else {
+            ids = []
+        }
+
+        if ids.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.pendingIDsStorageKey)
+        } else {
+            UserDefaults.standard.set(ids, forKey: Self.pendingIDsStorageKey)
+        }
+    }
+
+    /// 从本地磁盘加载已持久化的 ID 列表
+    private func loadPendingIDsFromDisk() -> [String] {
+        UserDefaults.standard.stringArray(forKey: Self.pendingIDsStorageKey) ?? []
+    }
+
+    /// 依据系统相册实际存在性还原 trashedAssets，并自动清洗外部已被删除的失效 ID
+    private func restorePendingAssetsFromSystem(savedIDs: [String]) {
+        guard !savedIDs.isEmpty else { return }
+
+        let currentExistingIDs = Set(trashedAssets.map(\.id))
+        let idsToFetch = savedIDs.filter { !currentExistingIDs.contains($0) }
+        guard !idsToFetch.isEmpty else { return }
+
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: idsToFetch, options: nil)
+        var assetMap: [String: PHAsset] = [:]
+        assetMap.reserveCapacity(fetchResult.count)
+        fetchResult.enumerateObjects { asset, _, _ in
+            assetMap[asset.localIdentifier] = asset
+        }
+
+        var newTrash = trashedAssets
+        for id in idsToFetch {
+            if let asset = assetMap[id] {
+                newTrash.append(PhotoAsset(asset: asset))
+            }
+        }
+        self.trashedAssets = newTrash
+
+        let validIDs = Set(newTrash.map(\.id))
+        self.pendingDeletionIDs = validIDs
+
+        // 若有外部已删除的照片（失效 ID），立即同步更新磁盘持久化
+        if validIDs.count != savedIDs.count {
+            savePendingIDsToDisk()
+        }
+
+        updateStatistics()
     }
 
     init(statisticsManager: StatisticsManager? = nil) {
         super.init()
         self.statisticsManager = statisticsManager
-        // 初始化时从 statisticsManager 继承历史缓存（如有），主线程 0 延迟
+
+        // 1. 初始化时优先从磁盘读取历史待处理 ID，首屏立即生效过滤并反映计数
+        let savedIDs = loadPendingIDsFromDisk()
+        if !savedIDs.isEmpty {
+            self.pendingDeletionIDs = Set(savedIDs)
+        }
+
+        // 从 statisticsManager 继承历史缓存（如有），主线程 0 延迟
         if let cachedCount = statisticsManager?.currentPhotoCount, cachedCount > 0 {
             self.totalPhotoCount = cachedCount
+        }
+        if !savedIDs.isEmpty {
+            updateStatistics()
         }
 
         // 初始化时检查当前的权限状态
@@ -41,8 +111,9 @@ class PhotoManager: NSObject, ObservableObject {
         // 监听系统相册变更（外部增删改、iCloud 下载完成等），保持数据与相册一致
         PHPhotoLibrary.shared().register(self)
 
-        // 若已有权限，异步校验刷新系统照片总数，绝不阻塞主线程启动
+        // 若已有权限，还原待处理素材并刷新系统照片总数
         if authorizationStatus == .authorized || authorizationStatus == .limited {
+            restorePendingAssetsFromSystem(savedIDs: savedIDs)
             Task(priority: .utility) { [weak self] in
                 self?.updateTotalPhotoCountFromSystem()
             }
@@ -56,6 +127,8 @@ class PhotoManager: NSObject, ObservableObject {
         authorizationStatus = status
 
         if status == .authorized || status == .limited {
+            let savedIDs = loadPendingIDsFromDisk()
+            restorePendingAssetsFromSystem(savedIDs: savedIDs)
             updateTotalPhotoCountFromSystem()
         } else {
             errorMessage = String(localized: "Photo library access is required to use this app.")
@@ -192,6 +265,7 @@ class PhotoManager: NSObject, ObservableObject {
         newTrash.append(contentsOf: photos.filter { !existingIDs.contains($0.id) })
         trashedAssets = newTrash
 
+        savePendingIDsToDisk()
         updateStatistics()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
@@ -235,6 +309,7 @@ class PhotoManager: NSObject, ObservableObject {
         newTrash.removeAll { idSet.contains($0.id) }
         trashedAssets = newTrash
 
+        savePendingIDsToDisk()
         updateStatistics()
     }
 
@@ -245,6 +320,7 @@ class PhotoManager: NSObject, ObservableObject {
     func restoreAllFromTrash() {
         pendingDeletionIDs.removeAll()
         trashedAssets.removeAll()
+        savePendingIDsToDisk()
         updateStatistics()
     }
 
@@ -285,6 +361,7 @@ class PhotoManager: NSObject, ObservableObject {
             // Clear trashed assets and pending deletions
             trashedAssets.removeAll()
             pendingDeletionIDs.removeAll()
+            savePendingIDsToDisk()
             updateTotalPhotoCountFromSystem()
 
             let result = CleanupResult(deletedCount: count, freedBytes: totalSize)
@@ -352,6 +429,7 @@ private extension PhotoManager {
         if !removedIDs.isEmpty {
             pendingDeletionIDs.subtract(removedIDs)
             trashedAssets.removeAll { removedIDs.contains($0.id) }
+            savePendingIDsToDisk()
         }
 
         if !details.changedObjects.isEmpty {

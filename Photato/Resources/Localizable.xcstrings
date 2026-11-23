@@ -4,9 +4,6 @@
     "" : {
 
     },
-    "·" : {
-
-    },
     "/" : {
 
     },
@@ -4109,6 +4106,7 @@
       }
     },
     "Blinking & Poor Expressions" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4362,6 +4360,7 @@
       }
     },
     "Burst & Similar · Keep the Best" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6527,6 +6526,7 @@
       }
     },
     "Exact Copies · Free Space" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7817,6 +7817,7 @@
       }
     },
     "Heavy Files · Videos & Live" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8180,6 +8181,7 @@
       }
     },
     "Large Videos · Quick Trim" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8590,6 +8592,7 @@
       }
     },
     "Live Moments · Filter & Keep" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8934,6 +8937,7 @@
       }
     },
     "Low Light · Cluttered Shots" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9829,6 +9833,7 @@
       }
     },
     "Moved to Pending Photos" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11397,6 +11402,7 @@
       }
     },
     "Out of Focus · Smart Detection" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14820,6 +14826,7 @@
       }
     },
     "Screenshots · Easy Cleanup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17712,6 +17719,7 @@
       }
     },
     "Undo" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

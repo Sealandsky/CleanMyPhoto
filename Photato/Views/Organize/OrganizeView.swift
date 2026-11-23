@@ -27,6 +27,14 @@ struct OrganizeView: View {
     private static let cardShadowX: CGFloat = 0
     private static let cardShadowY: CGFloat = 3
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    // 在 iPhone Duo 展开屏等宽屏设备上使用 4 列偶数网格，避开中央折痕
+    private var smartCleanupColumns: [GridItem] {
+        let count = horizontalSizeClass == .regular ? 4 : 2
+        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -38,15 +46,12 @@ struct OrganizeView: View {
                     junkPercentage: junkPercentage
                 )
 
-                // 2. 智能清理分类 (2列网格纯白卡片)
+                // 2. 智能清理分类 (自适应网格纯白卡片)
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeader(title: String(localized: "Smart Cleanup"))
 
                     LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ],
+                        columns: smartCleanupColumns,
                         spacing: 12
                     ) {
                         ForEach(Self.functionCategories) { category in

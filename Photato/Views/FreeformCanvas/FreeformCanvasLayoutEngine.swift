@@ -21,7 +21,7 @@ final class FreeformCanvasLayoutEngine {
     static func generateLayout(
         photos: [PhotoAsset],
         canvasSize: CGSize = .zero,
-        centerExclusionSize: CGSize = CGSize(width: 250, height: 160)
+        centerExclusionSize: CGSize = CGSize(width: 300, height: 190)
     ) -> [CanvasPhotoLayout] {
         var placedRects: [CGRect] = []
         var results: [CanvasPhotoLayout] = []
@@ -64,43 +64,75 @@ final class FreeformCanvasLayoutEngine {
             let angleDeg = Double((hashVal % 130) - 65) / 10.0
             let angle = Angle(degrees: angleDeg)
 
+            // 计算卡片带倾斜角的外接几何尺寸，确保旋转后的尖角也不与标题区及邻近卡片冲突
+            let rad = abs(angle.radians)
+            let cosA = CGFloat(cos(rad))
+            let sinA = CGFloat(sin(rad))
+            let boundingWidth = cardSize.width * cosA + cardSize.height * sinA
+            let boundingHeight = cardSize.width * sinA + cardSize.height * cosA
+
             // 2. 阿基米德螺旋搜索碰撞：围绕中心外围展开
             // 利用黄金分割角 2.39996 (137.5°) 使相邻照片在空间上均匀散射分布
-            var theta: CGFloat = CGFloat(index) * 2.39996
-            var foundPos = center
-            var collision = true
+            let baseTheta: CGFloat = CGFloat(index) * 2.39996
+            var foundPos: CGPoint? = nil
             var attempts = 0
-            let minRadius: CGFloat = (centerExclusionSize.width > 0) ? 120.0 : 0.0
+            let maxAttempts = 1500
+            let minRadius: CGFloat = (centerExclusionSize.width > 0 && centerExclusionSize.height > 0)
+                ? max(190.0, max(centerExclusionSize.width, centerExclusionSize.height) * 0.65)
+                : 0.0
 
-            while collision && attempts < 400 {
-                let r: CGFloat = minRadius + 26.0 * sqrt(CGFloat(attempts) + 1.0)
+            while attempts < maxAttempts {
+                // 阿基米德螺旋线：r 匀速平滑向外扩散，角度持续步进
+                let theta = baseTheta + CGFloat(attempts) * 0.38
+                let r = minRadius + CGFloat(attempts) * 4.5
                 let x = center.x + r * cos(theta)
                 let y = center.y + r * sin(theta)
 
-                // 碰撞检测外接矩形（带安全边距）
+                // 碰撞检测外接矩形（包含旋转外接框与安全边距）
                 let candidateRect = CGRect(
-                    x: x - (cardSize.width + safetyPadding) / 2,
-                    y: y - (cardSize.height + safetyPadding) / 2,
-                    width: cardSize.width + safetyPadding,
-                    height: cardSize.height + safetyPadding
+                    x: x - (boundingWidth + safetyPadding) / 2,
+                    y: y - (boundingHeight + safetyPadding) / 2,
+                    width: boundingWidth + safetyPadding,
+                    height: boundingHeight + safetyPadding
                 )
 
                 // 检查是否与所有已放置卡片（含中心标题保留区）发生几何相交
-                collision = placedRects.contains { $0.intersects(candidateRect) }
-                if !collision {
+                if !placedRects.contains(where: { $0.intersects(candidateRect) }) {
                     foundPos = CGPoint(x: x, y: y)
                     placedRects.append(candidateRect)
-                } else {
-                    theta += 0.35
-                    attempts += 1
+                    break
                 }
+                attempts += 1
+            }
+
+            // 确定最终位置：若极端情况下耗尽步数，绝对禁止回退到 (0, 0) 标题区，
+            // 而是沿该照片的发散方向推到已有所有元素的外包圆外。
+            let finalPos: CGPoint
+            if let pos = foundPos {
+                finalPos = pos
+            } else {
+                let maxDistance = placedRects.reduce(CGFloat(300)) { maxR, rect in
+                    let dist = sqrt(rect.midX * rect.midX + rect.midY * rect.midY) + max(rect.width, rect.height)
+                    return max(maxR, dist)
+                }
+                let safeRadius = maxDistance + max(boundingWidth, boundingHeight) + safetyPadding
+                let safeX = safeRadius * cos(baseTheta)
+                let safeY = safeRadius * sin(baseTheta)
+                finalPos = CGPoint(x: safeX, y: safeY)
+                let fallbackRect = CGRect(
+                    x: safeX - (boundingWidth + safetyPadding) / 2,
+                    y: safeY - (boundingHeight + safetyPadding) / 2,
+                    width: boundingWidth + safetyPadding,
+                    height: boundingHeight + safetyPadding
+                )
+                placedRects.append(fallbackRect)
             }
 
             results.append(
                 CanvasPhotoLayout(
                     id: photo.id,
                     photo: photo,
-                    position: foundPos,
+                    position: finalPos,
                     size: cardSize,
                     rotationAngle: angle,
                     seed: hashVal

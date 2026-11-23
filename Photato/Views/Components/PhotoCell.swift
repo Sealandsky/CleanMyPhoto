@@ -24,6 +24,7 @@ struct PhotoCell: View {
 
     @Environment(GridSettings.self) private var gridSettings: GridSettings?
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var imageLoaded = false
 
     /// 卡片宽高比：原比例模式下用图片真实宽高比（不裁剪不变形），
@@ -43,7 +44,13 @@ struct PhotoCell: View {
         if let thumbnailSize = thumbnailSize {
             return thumbnailSize
         }
-        let columns = usesSquareRatio ? 3 : (gridSettings?.columnCount ?? 2)
+        let baseColumns = usesSquareRatio ? 3 : (gridSettings?.columnCount ?? 2)
+        let columns: Int
+        if horizontalSizeClass == .regular {
+            columns = (baseColumns % 2 == 0) ? baseColumns : 4
+        } else {
+            columns = baseColumns
+        }
         let scale = displayScale > 0 ? displayScale : ScreenSizeHelper.screenScale
         return GridColumnHelper.thumbnailPixelSize(columnCount: columns, scale: scale)
     }
@@ -266,7 +273,22 @@ struct PhotoCell: View {
     }
 }
 
-#Preview {
-    PhotoCell(photo: PhotoAsset(asset: PHAsset()))
+#if DEBUG
+#Preview("Single Photo") {
+    PhotoCell(photo: .mockCat)
+        .frame(width: 200)
         .environment(GridSettings())
+        .padding()
 }
+
+#Preview("Photo Grid") {
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        PhotoCell(photo: .mockCat)
+        PhotoCell(photo: .mockPortrait1)
+        PhotoCell(photo: .mockMountain)
+        PhotoCell(photo: .mockPizza)
+    }
+    .padding()
+    .environment(GridSettings())
+}
+#endif

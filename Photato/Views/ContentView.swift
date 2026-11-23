@@ -216,7 +216,7 @@ struct ContentView: View {
             if discoverManager.selectedFilter == .all {
                 // 全部分类下：纯图标排版，系统原生菜单颜色与 Liquid Glass 圆形底
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
                     .foregroundColor(.primary)
                     .frame(width: 44, height: 44)
                     .modifier(HeaderLiquidGlassModifier())
@@ -227,7 +227,7 @@ struct ContentView: View {
                     Text(discoverManager.selectedFilter.localizedText)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                     Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: 18, weight: .regular, design: .rounded))
+                        .font(.system(size: 18, weight: .medium, design: .rounded))
                 }
                 .foregroundColor(.primary)
                 .padding(.horizontal, 12)
@@ -244,13 +244,16 @@ struct ContentView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ContentView(
         isFullscreenMode: .constant(false)
     )
-    .environmentObject(PhotoManager())
+    .environmentObject(PhotoManager.mock)
     .environmentObject(StatisticsManager())
+    .environmentObject(MembershipManager())
 }
+#endif
 
 // MARK: - PopCompletionObserver
 /// 监听返回转场确立时机（解决手势侧滑返回松手后底栏滞后 0.3s 才显示的体验问题）：

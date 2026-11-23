@@ -38,6 +38,17 @@ struct OrganizeResultsView: View {
         self._dateSections = State(initialValue: [])
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    // 在 iPhone Duo 展开屏等宽屏设备上使用 4 列偶数网格，避开中央折痕
+    private var gridColumnCount: Int {
+        horizontalSizeClass == .regular ? 4 : 3
+    }
+
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 6), count: gridColumnCount)
+    }
+
     private var isGroupedMode: Bool {
         category == .similar || category == .duplicates
     }
@@ -381,11 +392,7 @@ struct OrganizeResultsView: View {
                 .contentShape(Rectangle())
             }
 
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 6),
-                GridItem(.flexible(), spacing: 6),
-                GridItem(.flexible(), spacing: 6)
-            ], spacing: 6) {
+            LazyVGrid(columns: gridColumns, spacing: 6) {
                 ForEach(section.photos) { photo in
                     organizePhotoCell(photo)
                 }
@@ -457,7 +464,7 @@ struct OrganizeResultsView: View {
             }
             .onAppear {
                 if let globalIndex = photoIndexMap[photo.id] {
-                    photoManager.preheatAssets(around: globalIndex, in: cachedAllPhotos, columnCount: 3)
+                    photoManager.preheatAssets(around: globalIndex, in: cachedAllPhotos, columnCount: gridColumnCount)
                 }
             }
     }

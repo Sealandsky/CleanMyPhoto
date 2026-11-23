@@ -60,7 +60,7 @@ struct PendingPhotosEntryButton: View {
         HStack(spacing: contentSpacing) {
             if photoManager.trashCount == 0 {
                 Image(systemName: "trash")
-                    .font(.system(size: emptyIconSize, weight: .regular, design: .rounded))
+                    .font(.system(size: emptyIconSize, weight: .medium, design: .rounded))
                     .transition(.scale.combined(with: .opacity))
             } else {
                 TrashPhotoStackIcon(
@@ -122,6 +122,11 @@ private struct ThumbnailPolaroidCard: View {
 
     private var targetSize: CGSize { CGSize(width: cardSize * 3, height: cardSize * 3) }
 
+    /// 白色相纸边距：照片四周露出的白边宽度。
+    /// 采用「白色相纸底 + 内缩照片」代替直接描边，确保照片完整落在白边内，
+    /// 不受 scaledToFill 缩放与圆角裁剪影响（浅色照片上描边易显得包不住）。
+    private var paperInset: CGFloat { 1.5 }
+
     init(photo: PhotoAsset, cardSize: CGFloat = 24) {
         self.photo = photo
         self.cardSize = cardSize
@@ -130,28 +135,31 @@ private struct ThumbnailPolaroidCard: View {
     }
 
     var body: some View {
-        Group {
-            if let thumbnail {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Rectangle()
-                    .fill(Color(.systemGray5))
+        // 相纸底：白色圆角矩形作为整张相纸，照片内缩居中放在其上，
+        // 白边由相纸底自然露出，照片始终完整落在白边内。
+        RoundedRectangle(cornerRadius: cardSize * 0.175, style: .continuous)
+            .fill(Color.white)
+            .frame(width: cardSize, height: cardSize)
+            .overlay(
+                Group {
+                    if let thumbnail {
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                    }
+                }
+                .frame(width: cardSize - 2 * paperInset, height: cardSize - 2 * paperInset)
+                .clipShape(RoundedRectangle(cornerRadius: (cardSize - 2 * paperInset) * 0.16, style: .continuous))
+            )
+            .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+            .task(id: photo.id) {
+                if thumbnail == nil {
+                    await loadThumbnail()
+                }
             }
-        }
-        .frame(width: cardSize, height: cardSize)
-        .clipShape(RoundedRectangle(cornerRadius: cardSize * 0.175, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: cardSize * 0.175, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.95), lineWidth: 1.2)
-        )
-        .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
-        .task(id: photo.id) {
-            if thumbnail == nil {
-                await loadThumbnail()
-            }
-        }
     }
 
     private func loadThumbnail() async {

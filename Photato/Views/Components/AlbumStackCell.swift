@@ -42,6 +42,12 @@ struct AlbumStackCell: View {
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Self.cardBackgroundColor)
+                // 浅描边 + 柔和投影：模仿参考图里卡片的轻微浮起质感
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 5)
         )
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
@@ -160,6 +166,14 @@ struct AlbumStackCoverImage: View {
             return
         }
 
+#if DEBUG
+        if let preview = PreviewAssetLoader.image(named: asset.localIdentifier) {
+            Self.cache.setObject(preview, forKey: key)
+            image = preview
+            return
+        }
+#endif
+
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
@@ -179,17 +193,16 @@ struct AlbumStackCoverImage: View {
     }
 }
 
+#if DEBUG
 #Preview("Album Stack Cell") {
     ScrollView {
-        HStack(spacing: 16) {
-            AlbumStackCell(album: AlbumModel(id: "p1", title: "Three", assetCount: 99))
-            AlbumStackCell(album: AlbumModel(id: "p2", title: "Two", assetCount: 2))
-            AlbumStackCell(album: AlbumModel(id: "p3", title: "One", assetCount: 1))
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            ForEach(AlbumModel.mockAlbums) { album in
+                AlbumStackCell(album: album)
+            }
         }
-        HStack(spacing: 16) {
-            AlbumStackCell(album: AlbumModel(id: "p4", title: "Empty", assetCount: 0))
-        }
+        .padding()
     }
-    .padding()
-    .background(Color(.systemBackground))
+    .background(Color.pageBackground)
 }
+#endif

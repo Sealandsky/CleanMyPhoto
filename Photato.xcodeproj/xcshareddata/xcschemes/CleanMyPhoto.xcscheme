@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2700"
+   LastUpgradeVersion = "2720"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -18,6 +18,20 @@
                BlueprintIdentifier = "D8E4F3DC2F3785780010E310"
                BuildableName = "Photato.app"
                BlueprintName = "Photato"
+               ReferencedContainer = "container:Photato.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1A2B3C4D0000000000000001"
+               BuildableName = "PhotatoWidget.appex"
+               BlueprintName = "PhotatoWidget"
                ReferencedContainer = "container:Photato.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>

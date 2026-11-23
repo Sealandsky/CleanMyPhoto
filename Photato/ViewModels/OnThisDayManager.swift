@@ -23,8 +23,26 @@ final class OnThisDayManager: ObservableObject {
     /// 记录最近一次加载的自然日标识（如 "2026-10-29"），防止单日内反复无谓重算
     private var lastFetchDayKey = ""
 
+    /// 进行中的加载任务：供 deep link 在冷启动时 await，避免"加载中直接 return"导致取不到数据
+    private var loadTask: Task<Void, Never>?
+
+    /// 数据变化钩子（含地名异步回填）：MainTabView 借此重建 widget 快照
+    var onDataChanged: (() -> Void)?
+
+    /// 确保数据已加载：已加载直接返回，否则发起拉取；若已有在途任务则等待其完成。
+    /// 供 widget deep link 冷启动跳转使用。
+    func ensureLoaded() async {
+        if hasLoadedOnce { return }
+        await fetchOnThisDay()
+    }
+
     /// 拉取或刷新「过去的今天」
     func fetchOnThisDay(forceRefresh: Bool = false) async {
+        // 若已有在途任务：等待其完成后再决定是否重拉，而不是直接 return
+        if let inFlight = loadTask {
+            await inFlight.value
+            if !forceRefresh && hasLoadedOnce { return }
+        }
         guard !isLoading else { return }
 
         let now = Date()
@@ -44,51 +62,65 @@ final class OnThisDayManager: ObservableObject {
         guard status == .authorized || status == .limited else {
             yearGroups = []
             hasLoadedOnce = true
+            onDataChanged?()   // 让 widget 写入 .noPermission 快照
             return
         }
 
-        isLoading = true
-        defer { isLoading = false }
+        // 把真正耗时的加载包进可等待的 Task：deep link 冷启动时可 await 在途任务
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.isLoading = true
+            defer { self.isLoading = false }
 
-        // 后台异步计算，避免阻塞主线程动画
-        let (rawGroups, isFallback) = await Task.detached(priority: .userInitiated) { () -> ([(year: Int, assets: [PHAsset])], Bool) in
-            return Self.computeRawYearGroups(
-                calendar: calendar,
-                currentYear: currentYear,
-                currentMonth: currentMonth,
-                currentDay: currentDay
-            )
-        }.value
+            // 后台异步计算，避免阻塞主线程动画
+            let (rawGroups, isFallback) = await Task.detached(priority: .userInitiated) { () -> ([(year: Int, assets: [PHAsset])], Bool) in
+                return Self.computeRawYearGroups(
+                    calendar: calendar,
+                    currentYear: currentYear,
+                    currentMonth: currentMonth,
+                    currentDay: currentDay
+                )
+            }.value
 
-        let groups = rawGroups.compactMap { item -> OnThisDayYearGroup? in
-            guard !item.assets.isEmpty else { return nil }
-            let photoAssets = item.assets.map { PhotoAsset(asset: $0) }
-            return OnThisDayYearGroup(
-                id: isFallback ? "fallback-month-\(item.year)" : "year-\(item.year)",
-                year: item.year,
-                relativeYearsAgo: max(1, currentYear - item.year),
-                isMonthFallback: isFallback,
-                coverAsset: photoAssets[0],
-                photoCount: photoAssets.count,
-                photos: photoAssets,
-                locationName: nil
-            )
+            guard !Task.isCancelled else { return }
+
+            let groups = rawGroups.compactMap { item -> OnThisDayYearGroup? in
+                guard !item.assets.isEmpty else { return nil }
+                let photoAssets = item.assets.map { PhotoAsset(asset: $0) }
+                return OnThisDayYearGroup(
+                    id: isFallback ? "fallback-month-\(item.year)" : "year-\(item.year)",
+                    year: item.year,
+                    relativeYearsAgo: max(1, currentYear - item.year),
+                    isMonthFallback: isFallback,
+                    coverAsset: photoAssets[0],
+                    photoCount: photoAssets.count,
+                    photos: photoAssets,
+                    locationName: nil
+                )
+            }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                self.yearGroups = groups
+                self.isMonthFallback = isFallback
+                self.hasLoadedOnce = true
+                self.lastFetchDayKey = dayKey
+            }
+
+            // 数据就绪即通知（widget 首次写入；地名随后回填会再次通知）
+            self.onDataChanged?()
+
+            // 异步解析地名（基于反地理编码缓存与防抖机制）
+            self.resolveLocations()
         }
 
-        withAnimation(.easeInOut(duration: 0.25)) {
-            yearGroups = groups
-            isMonthFallback = isFallback
-            hasLoadedOnce = true
-            lastFetchDayKey = dayKey
-        }
-
-        // 异步解析地名（基于反地理编码缓存与防抖机制）
-        resolveLocations()
+        loadTask = task
+        await task.value
+        loadTask = nil
     }
 
     // MARK: - Core Computation (Background Thread)
 
-    nonisolated private static func computeRawYearGroups(
+    nonisolated static func computeRawYearGroups(
         calendar: Calendar,
         currentYear: Int,
         currentMonth: Int,
@@ -222,8 +254,12 @@ final class OnThisDayManager: ObservableObject {
 
             PhotoCaptionResolver.shared.resolveAddress(of: targetAsset) { [weak self] place in
                 guard let self = self, let place = place, !place.isEmpty else { return }
-                if index < self.yearGroups.count && self.yearGroups[index].id == group.id {
-                    self.yearGroups[index].locationName = place
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if index < self.yearGroups.count && self.yearGroups[index].id == group.id {
+                        self.yearGroups[index].locationName = place
+                        self.onDataChanged?()   // 地名回填后刷新 widget 快照（writer 防抖合并）
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 import Foundation
 
 enum AlbumsDestination: Hashable {
+    case albumList               // 二级「我的相册」完整列表页（右上角可新建相簿）
     case albumDetail(String)     // AlbumModel.id: 二级相簿概览页
     case albumAllPhotos(String)  // AlbumModel.id: 三级全量照片网格
     case onThisDay(OnThisDayYearGroup) // 「往年今日」年份二级列表页

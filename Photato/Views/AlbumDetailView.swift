@@ -833,3 +833,16 @@ struct AlbumDetailView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        AlbumDetailView(
+            albumManager: AlbumManager(photoManager: .mock),
+            photoManager: .mock,
+            album: AlbumModel.mockAlbums[0],
+            onViewAllTapped: {}
+        )
+    }
+}
+#endif

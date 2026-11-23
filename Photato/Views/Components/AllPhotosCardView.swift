@@ -55,6 +55,12 @@ struct AllPhotosCardView: View {
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.cardBackground)
+                    // 浅描边 + 柔和投影：模仿参考图里卡片的轻微浮起质感
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 5)
             )
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }

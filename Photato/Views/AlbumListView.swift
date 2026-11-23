@@ -13,13 +13,7 @@ struct AlbumListView: View {
     var onAllPhotosSelect: (() -> Void)? = nil
     var onMonthArchiveSelect: ((TimelineMonthItem) -> Void)? = nil
     var onAllYearsSelect: (() -> Void)? = nil
-
-    @State private var showNewAlbumAlert = false
-    @State private var newAlbumName = ""
-    @State private var isCreatingAlbum = false
-    @State private var errorMessage: String?
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
+    var onMyAlbumsList: (() -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -74,93 +68,43 @@ struct AlbumListView: View {
             }()
             _ = await (refreshAlbums, refreshOnThisDay, refreshTimeline, refreshOrganize)
         }
-        .alert(String(localized: "New Album"), isPresented: $showNewAlbumAlert) {
-            TextField(String(localized: "Album Name"), text: $newAlbumName)
-                .textInputAutocapitalization(.words)
-
-            Button(String(localized: "Create")) {
-                createNewAlbum()
-            }
-            .disabled(newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            Button(String(localized: "Cancel"), role: .cancel) {
-                newAlbumName = ""
-            }
-        } message: {
-            Text(String(localized: "Enter a name for this album."))
-        }
-        .alert(String(localized: "Failed to create album"), isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button(String(localized: "OK"), role: .cancel) {
-                errorMessage = nil
-            }
-        } message: {
-            if let errorMessage {
-                Text(errorMessage)
-            }
-        }
     }
 
     // MARK: - Section Header
+    /// 「我的相册」标题行：右侧为箭头入口，点击进入完整相册列表页（新建相册在该页右上角）。
     private var albumsSectionHeader: some View {
-        HStack(alignment: .center) {
-            Text(String(localized: "My Albums"))
-                .font(.system(.title3, design: .rounded).weight(.semibold))
-                .foregroundColor(.primary)
-                .accessibilityAddTraits(.isHeader)
+        Button {
+            onMyAlbumsList?()
+        } label: {
+            HStack(alignment: .center, spacing: 4) {
+                Text(String(localized: "My Albums"))
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                    .foregroundColor(.primary)
+                    .accessibilityAddTraits(.isHeader)
 
-            Spacer()
+                Spacer()
 
-            Button {
-                newAlbumName = ""
-                showNewAlbumAlert = true
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus")
-                        .font(.system(.caption, design: .rounded).weight(.bold))
-                    Text(String(localized: "New Album"))
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                }
-                .foregroundColor(.accentColor)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 4)
-                .contentShape(Rectangle())
+                Image(systemName: "chevron.right")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundColor(.accentColor)
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(String(localized: "New Album"))
-            .accessibilityAddTraits(.isButton)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "My Albums"))
+        .accessibilityAddTraits(.isButton)
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 6)
-    }
-
-    private func createNewAlbum() {
-        let title = newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, !isCreatingAlbum else { return }
-        isCreatingAlbum = true
-        Task {
-            do {
-                _ = try await albumManager.createAlbum(title: title)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                AppAnalytics.event("album_created")
-                isCreatingAlbum = false
-                newAlbumName = ""
-            } catch {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-                isCreatingAlbum = false
-                errorMessage = error.localizedDescription
-            }
-        }
+        .padding(.bottom, 0)
     }
 
     // MARK: - Albums Horizontal Scroll Row (首位常驻「所有照片」卡片)
     private var albumsScrollRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 10) {
+            LazyHStack(spacing: 16) {
                 // 1. 首位固定卡片：「所有照片」
                 AllPhotosCardView(
                     totalCount: albumManager.photoManager.totalPhotoCount
@@ -180,8 +124,9 @@ struct AlbumListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 8)
+            // 上下留白需容纳卡片投影（radius 12 + y 5 ≈ 17pt），否则被 ScrollView 裁切
+            .padding(.top, 10)
+            .padding(.bottom, 20)
         }
     }
 
@@ -278,7 +223,7 @@ struct AlbumListView: View {
     // MARK: - Skeleton Horizontal Row
     private var skeletonRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 16) {
                 AllPhotosCardView(
                     totalCount: albumManager.photoManager.totalPhotoCount
                 ) {
@@ -292,8 +237,9 @@ struct AlbumListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 8)
+            // 与真实列表保持相同上下留白，避免骨架屏切换时高度跳动
+            .padding(.top, 10)
+            .padding(.bottom, 20)
         }
     }
 

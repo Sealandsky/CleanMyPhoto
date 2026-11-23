@@ -37,11 +37,8 @@ struct OnThisDayFreeformCanvasView: View {
     @State private var photoLayouts: [CanvasPhotoLayout] = []
     @State private var totalSizeText: String = ""
 
-    // 抛入待处理动画与撤销状态
+    // 抛入待处理动画
     @State private var tossingPhotoIDs: Set<String> = []
-    @State private var lastTrashedPhoto: PhotoAsset? = nil
-    @State private var showUndoToast: Bool = false
-    @State private var undoDismissTimer: Task<Void, Never>? = nil
     /// 惯性动画的会话号：复位 / 切换排版 / 新手势结束时递增，用于丢弃过期的减速动画
     @State private var inertiaSession: Int = 0
     /// 上一次上报给容器的「视野已偏离」状态，避免拖拽每帧都刷新容器
@@ -52,7 +49,8 @@ struct OnThisDayFreeformCanvasView: View {
     private let canvasBaseScale: CGFloat = 1.12
     private let gridPadding: CGFloat = 8
     private let gridSpacing: CGFloat = 4
-    private let gridHeaderHeight: CGFloat = 104
+    /// 标题区预留高度：地址独立成第三行后由 104 增到 126，列表形态卡片网格据此下移，避免压住标题
+    private let gridHeaderHeight: CGFloat = 126
     /// 卡片解码尺寸固定，切换排版时不会因 targetSize 变化重新请求图片
     private let cardImageTargetSize = CGSize(width: 400, height: 400)
     /// 卡片外观常量（两种排版共用，切换时绝不变化）
@@ -126,18 +124,6 @@ struct OnThisDayFreeformCanvasView: View {
                     topInset: resolvedTopInset()
                 )
             }
-
-            // 2. 底部可撤销操作浮条 (Undo Toast)
-            if showUndoToast {
-                VStack {
-                    Spacer()
-                    undoToastView
-                        .padding(.horizontal, 20)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .safeAreaPadding(.bottom, 76)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
         // 画布外框 = 主屏尺寸，且忽略安全区铺满整个屏幕。全屏坐标系的锚点（中心）由此确定，
         // 卡片 .offset 全部相对这个中心，不再受任何 GeometryProxy 的小几何影响。
@@ -184,7 +170,7 @@ struct OnThisDayFreeformCanvasView: View {
     /// 不再读 GeometryProxy：本视图作为导航二级页根，GeometryProxy 在转场期会返回
     /// 居中的小几何（详见 body 注释），是"照片被框在正中一小块"的真正来源。
     private nonisolated func screenViewportSize() -> CGSize {
-        let s = MainActor.assumeIsolated { UIScreen.main.bounds.size }
+        let s = MainActor.assumeIsolated { ScreenSizeHelper.screenSize }
         if s.width.isFinite, s.height.isFinite, s.width > 0, s.height > 0 {
             return s
         }
@@ -206,7 +192,9 @@ struct OnThisDayFreeformCanvasView: View {
         let width = viewportSize.width
         let height = viewportSize.height
         let scale = gridBaseScale
-        let columns = max(2, gridSettings.columnCount)
+        let baseColumns = max(2, gridSettings.columnCount)
+        // 在 iPhone Duo 展开屏等宽屏设备上强制使用偶数列（2 或 4 列），避开中央折痕
+        let columns = (width > 500 && baseColumns % 2 != 0) ? 4 : baseColumns
         let columnWidth = (width - gridPadding * 2 - gridSpacing * CGFloat(columns - 1)) / CGFloat(columns)
         // 最大倾斜 ±6.5°，旋转后外接矩形约膨胀 11%；0.86 系数保证仍落在列内
         let tileSide = columnWidth * 0.86
@@ -269,8 +257,6 @@ struct OnThisDayFreeformCanvasView: View {
         let grid = makeGridPositions(layouts: photoLayouts, viewportSize: viewportSize, topInset: topInset)
 
         return ZStack {
-            memoryHeader(viewportSize: viewportSize, topInset: topInset)
-
             ForEach(visibleLayouts) { layout in
                 let isTossed = tossingPhotoIDs.contains(layout.id)
                 let position = currentPosition(for: layout, in: grid.positions)
@@ -299,6 +285,10 @@ struct OnThisDayFreeformCanvasView: View {
                     // contextMenu 已按 2026-11-11 需求移除（屏蔽长按）：轻点开大图、角标删除已覆盖
                     // 同样的两个操作，长按菜单只会额外扣押触控流、干扰画布拖拽跟手。
             }
+
+            // 标题绘制在卡片之上：自由画布卡片散落会盖住标题，置顶保证标题始终可读。
+            // title 自身 allowsHitTesting(false)，不拦截卡片的点击/拖拽手势。
+            memoryHeader(viewportSize: viewportSize, topInset: topInset)
         }
         .frame(width: viewportSize.width, height: viewportSize.height)
         // 先缩放内容、再整体平移：panOffset 是纯屏幕点位移，不会被 scaleEffect 二次放大
@@ -338,9 +328,6 @@ struct OnThisDayFreeformCanvasView: View {
                     }
             )
         )
-        .onTapGesture(count: 2) {
-            resetToCenter()
-        }
     }
 
     // MARK: - 定位按钮显隐（移动过视图才出现，回正后消失）
@@ -515,9 +502,10 @@ struct OnThisDayFreeformCanvasView: View {
                 }
                 .frame(width: badgeSize, height: badgeSize)
                 .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 2)
-                .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
             // 约 1/3 露出卡片边界之外，形成角标跨压效果（画布不裁剪，允许溢出）
             .offset(x: badgeSize * 0.35, y: -badgeSize * 0.35)
             .accessibilityLabel(String(localized: "Add to Pending Photos"))
@@ -603,22 +591,25 @@ struct OnThisDayFreeformCanvasView: View {
                     .foregroundColor(.secondary)
             }
 
-            HStack(spacing: 4) {
-                Text(memorySubtitleText)
+            // 副标题（照片数 · 大小）单独一行
+            Text(memorySubtitleText)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
 
-                if let location = group.locationName, !location.isEmpty {
-                    Text("·")
-                    HStack(spacing: 3) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(location)
-                    }
+            // 地址另起一行：避免与副标题挤在同一行被过长截断
+            if let location = group.locationName, !location.isEmpty {
+                HStack(spacing: 3) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(location)
                 }
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             }
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundColor(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
         }
         .frame(width: headerWidth, alignment: .center)
         .offset(y: offsetY)
@@ -633,53 +624,22 @@ struct OnThisDayFreeformCanvasView: View {
             return
         }
 
-        // 触觉与音效反馈
-        SoundManager.playSwipeDelete()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-
-        // 触发飞向右上角待处理入口的动效（显式动画，不影响排版切换的弹簧事务）
-        withAnimation(.interpolatingSpring(stiffness: 180, damping: 20)) {
+        // 立即触发飞向右上角待处理入口的动效（0延迟即刻起飞）
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
             _ = tossingPhotoIDs.insert(photo.id)
         }
 
-        // 延迟入站并弹出撤销浮条
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+        // 触觉与音效反馈
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        SoundManager.playSwipeDelete()
+
+        // 延迟入站：卡片飞行到右上角入口时恰好落入待处理
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
             photoManager.addToTrash(photo)
-            lastTrashedPhoto = photo
-
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                showUndoToast = true
-            }
-
-            undoDismissTimer?.cancel()
-            undoDismissTimer = Task {
-                try? await Task.sleep(nanoseconds: 3_500_000_000)
-                if !Task.isCancelled {
-                    await MainActor.run {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showUndoToast = false
-                        }
-                    }
-                }
-            }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) {
             tossingPhotoIDs.remove(photo.id)
-        }
-    }
-
-    // MARK: - 撤销逻辑
-    private func undoLastTrash() {
-        guard let photo = lastTrashedPhoto else { return }
-        undoDismissTimer?.cancel()
-
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        photoManager.restoreFromTrash(photo.id)
-        lastTrashedPhoto = nil
-
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showUndoToast = false
         }
     }
 
@@ -720,43 +680,6 @@ struct OnThisDayFreeformCanvasView: View {
         } else {
             return date.formatted(.dateTime.month().day())
         }
-    }
-
-    // MARK: - 底部撤销 Toast 浮条
-    private var undoToastView: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "trash.circle.fill")
-                .foregroundColor(.secondary)
-                .font(.system(size: 24))
-
-            Text(String(localized: "Moved to Pending Photos"))
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Button {
-                undoLastTrash()
-            } label: {
-                Text(String(localized: "Undo"))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(Color.accentColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.accentColor.opacity(0.12), in: Capsule())
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 16, y: 6)
     }
 
     // MARK: - 今日照片全部移入空态

@@ -59,29 +59,6 @@ extension OrganizeCategory {
         }
     }
 
-    /// 分类功能说明微文案（建立扫描价值预期）
-    var subtitleText: String {
-        switch self {
-        case .similar:
-            return String(localized: "Burst & Similar · Keep the Best")
-        case .duplicates:
-            return String(localized: "Exact Copies · Free Space")
-        case .largeFiles:
-            return String(localized: "Heavy Files · Videos & Live")
-        case .blurry:
-            return String(localized: "Out of Focus · Smart Detection")
-        case .poorFace:
-            return String(localized: "Blinking & Poor Expressions")
-        case .lowQuality:
-            return String(localized: "Low Light · Cluttered Shots")
-        case .screenshots:
-            return String(localized: "Screenshots · Easy Cleanup")
-        case .videos:
-            return String(localized: "Large Videos · Quick Trim")
-        case .livePhotos:
-            return String(localized: "Live Moments · Filter & Keep")
-        }
-    }
 }
 
 // MARK: - 按压弹性按钮样式 (App Store 风格微触感)
@@ -113,8 +90,8 @@ struct OrganizeMetricCard: View {
             action()
         }) {
             VStack(alignment: .leading, spacing: 0) {
-                // 1. 顶部：32×32pt 彩色 Squircle 徽章底托 + 标题 + 说明微文案
-                HStack(alignment: .top, spacing: 10) {
+                // 1. 顶部：32×32pt 彩色 Squircle 徽章底托 + 标题
+                HStack(alignment: .center, spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
                             .fill(themeColor.opacity(0.12))
@@ -129,11 +106,6 @@ struct OrganizeMetricCard: View {
                         Text(category.localizedText)
                             .font(.system(size: 14.5, weight: .semibold, design: .rounded))
                             .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        Text(category.subtitleText)
-                            .font(.system(size: 11, weight: .regular, design: .rounded))
-                            .foregroundColor(Color(.secondaryLabel))
                             .lineLimit(1)
                     }
 

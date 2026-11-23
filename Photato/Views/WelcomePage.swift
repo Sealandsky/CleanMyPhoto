@@ -97,7 +97,7 @@ struct OrbitingPhotoCardsView: View {
     var cardHeight: CGFloat { cardWidth * 3 / 4 }
     var cornerRadius: CGFloat = 16             // 圆角大小
 
-    var radiusX: CGFloat = 215                 // 椭圆长轴半径（超出屏幕两端）
+    var radiusX: CGFloat = min(360, max(215, ScreenSizeHelper.screenSize.width * 0.52)) // 椭圆长轴半径（根据屏幕宽度自适应，超出屏幕两端）
     var radiusY: CGFloat = 72                  // 椭圆短轴半径
     var tiltAngle: Double = -15                // 空间倾斜角（向右下倾斜）
     var autoRotate: Bool = true                // 静止时是否自动慢速巡航

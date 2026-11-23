@@ -16,6 +16,15 @@ struct PhotoStreamView: View {
 
     @ObservedObject var photoManager: PhotoManager
     @Environment(GridSettings.self) private var gridSettings
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var effectiveColumnCount: Int {
+        if horizontalSizeClass == .regular {
+            // 在 iPhone Duo 展开屏等宽屏设备上强制偶数列（2 或 4 列），避开中央折痕
+            return gridSettings.columnCount % 2 == 0 ? gridSettings.columnCount : 4
+        }
+        return gridSettings.columnCount
+    }
 
     @State private var localPhotos: [PhotoAsset] = []
     @State private var isLoading = false
@@ -189,7 +198,7 @@ struct PhotoStreamView: View {
                 }
             }
             .onAppear {
-                photoManager.preheatAssets(around: index, in: displayedPhotos, columnCount: gridSettings.columnCount)
+                photoManager.preheatAssets(around: index, in: displayedPhotos, columnCount: effectiveColumnCount)
             }
 
             cell.swipeToTrash(
@@ -239,7 +248,7 @@ struct PhotoStreamView: View {
 
     // MARK: - Loading & Empty States
     private var loadingGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: gridSettings.columnCount), spacing: 4) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: effectiveColumnCount), spacing: 4) {
             ForEach(0..<18, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(Color(.systemGray5))
@@ -262,3 +271,15 @@ struct PhotoStreamView: View {
         .frame(maxWidth: .infinity, minHeight: 300)
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        PhotoStreamView(
+            streamTitle: String(localized: "All Photos"),
+            initialPhotos: PhotoAsset.mockAllPhotos,
+            photoManager: .mock
+        )
+    }
+}
+#endif

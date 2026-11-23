@@ -13,6 +13,7 @@ struct TrashView: View {
     @EnvironmentObject var membershipManager: MembershipManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showingRestoreConfirmation = false
     @State private var showMembershipPaywall = false
@@ -22,18 +23,23 @@ struct TrashView: View {
 
     private var trashedPhotos: [PhotoAsset] { photoManager.getTrashedAssets() }
 
-    // 3 列标准 1:1 正方形紧凑网格
-    private let trashColumns = [
-        GridItem(.flexible(), spacing: 3),
-        GridItem(.flexible(), spacing: 3),
-        GridItem(.flexible(), spacing: 3)
-    ]
+    // 网格列数：在 iPhone Duo 展开屏等宽屏设备上使用 4 列偶数网格，避开中央折痕
+    private var trashColumnCount: Int {
+        horizontalSizeClass == .regular ? 4 : 3
+    }
+
+    private var trashColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 3), count: trashColumnCount)
+    }
 
     var body: some View {
         NavigationStack {
             Group {
                 if photoManager.trashCount == 0 {
                     emptyTrashView
+                } else if trashedPhotos.isEmpty {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     trashContent
                 }
@@ -173,6 +179,8 @@ struct TrashView: View {
                     .disabled(isDeleting)
                 }
             }
+            .frame(maxWidth: 500)
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 4)
@@ -449,8 +457,10 @@ private struct TrashPhotoPreviewSheet: View {
     }
 }
 
+#if DEBUG
 #Preview {
-    TrashView(photoManager: PhotoManager())
+    TrashView(photoManager: .mock)
         .environment(GridSettings())
         .environmentObject(MembershipManager())
 }
+#endif

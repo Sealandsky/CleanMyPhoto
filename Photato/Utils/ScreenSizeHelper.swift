@@ -3,26 +3,62 @@ import UIKit
 /// 屏幕尺寸辅助工具
 struct ScreenSizeHelper {
 
-    /// 获取当前活跃的 UIScreen
-    @available(iOS, deprecated: 26, message: "Use view environment traits or GeometryReader instead")
-    private static var activeScreen: UIScreen {
-        if #available(iOS 26, *) {
-            let windowScene = UIApplication.shared.connectedScenes
+    /// 获取当前活跃的 UIWindowScene
+    private static var activeWindowScene: UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
-                .first { $0.activationState == .foregroundActive }
-            return windowScene?.screen ?? UIScreen.main
+                .first
+    }
+
+    /// 获取主视窗/活跃视窗
+    private static var activeKeyWindow: UIWindow? {
+        if let scene = activeWindowScene {
+            if let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
+                return keyWindow
+            }
+            return scene.windows.first
         }
-        return UIScreen.main
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
     }
 
-    /// 获取屏幕逻辑尺寸
+    /// 获取屏幕/窗口逻辑尺寸（在 iPhone Duo 等多屏/双屏设备上自适应当前活跃窗口尺寸）
     static var screenSize: CGSize {
-        activeScreen.bounds.size
+        if let window = activeKeyWindow {
+            let size = window.bounds.size
+            if size.width > 0 && size.height > 0 {
+                return size
+            }
+        }
+        if let scene = activeWindowScene {
+            let size = scene.coordinateSpace.bounds.size
+            if size.width > 0 && size.height > 0 {
+                return size
+            }
+        }
+        return CGSize(width: 393, height: 852)
     }
 
-    /// 获取屏幕缩放比例
+    /// 获取屏幕/窗口缩放比例
     static var screenScale: CGFloat {
-        activeScreen.scale
+        if let window = activeKeyWindow {
+            let scale = window.traitCollection.displayScale
+            if scale > 0 {
+                return scale
+            }
+        }
+        if let scene = activeWindowScene {
+            let scale = scene.traitCollection.displayScale
+            if scale > 0 {
+                return scale
+            }
+        }
+        return 3.0
     }
 
     /// 获取屏幕物理像素尺寸（例如 iPhone 14 Pro: 1179×2556）

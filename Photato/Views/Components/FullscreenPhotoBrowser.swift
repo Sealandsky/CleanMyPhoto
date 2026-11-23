@@ -1014,10 +1014,16 @@ struct FullscreenPhotoBrowser: View {
 
 }
 
+#if DEBUG
 #Preview {
-    FullscreenPhotoBrowser(photos: [], initialPhotoID: "", onDismiss: {})
-        .environmentObject(PhotoManager())
+    FullscreenPhotoBrowser(
+        photos: PhotoAsset.mockAllPhotos,
+        initialPhotoID: PhotoAsset.mockCat.id,
+        onDismiss: {}
+    )
+    .environmentObject(PhotoManager.mock)
 }
+#endif
 
 // MARK: - 相关照片模块状态
 /// loading = 匹配中（骨架屏）；loaded = 结果瀑布流；empty = 暂无相似（轻量占位）；

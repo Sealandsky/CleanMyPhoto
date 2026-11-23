@@ -220,6 +220,15 @@ struct AssetImage: View {
         self.placeholderColor = placeholderColor
         self.onLoad = onLoad
 
+#if DEBUG
+        if let previewImage = PreviewAssetLoader.image(named: asset.localIdentifier) {
+            _image = State(initialValue: previewImage)
+            _placeholderImage = State(initialValue: nil)
+            _isLoading = State(initialValue: false)
+            return
+        }
+#endif
+
         // 核心同步初始化：
         // 1. 若目标尺寸已在精确缓存中，第 0 帧直接展示高清图；
         // 2. 若精确尺寸未就绪，但已有清晰过渡缩略图（>=100px），第 0 帧立即呈现该缩略图垫底，彻底消灭灰块；
@@ -304,6 +313,14 @@ struct AssetImage: View {
     }
 
     private func checkCacheAndLoad() {
+#if DEBUG
+        if let preview = PreviewAssetLoader.image(named: asset.localIdentifier) {
+            image = preview
+            isLoading = false
+            onLoad?()
+            return
+        }
+#endif
         guard asset.localIdentifier.contains("-") else {
             isLoading = false
             return
@@ -330,6 +347,14 @@ struct AssetImage: View {
     }
 
     private func loadImage() {
+#if DEBUG
+        if let preview = PreviewAssetLoader.image(named: asset.localIdentifier) {
+            image = preview
+            isLoading = false
+            onLoad?()
+            return
+        }
+#endif
         guard asset.localIdentifier.contains("-") else {
             isLoading = false
             return

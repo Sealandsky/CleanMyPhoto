@@ -140,6 +140,12 @@ private struct MonthCardImage: View {
         }
         .onAppear {
             guard let asset, image == nil else { return }
+#if DEBUG
+            if let preview = PreviewAssetLoader.image(named: asset.localIdentifier) {
+                self.image = preview
+                return
+            }
+#endif
             let options = PHImageRequestOptions()
             options.deliveryMode = .opportunistic
             options.isNetworkAccessAllowed = true
