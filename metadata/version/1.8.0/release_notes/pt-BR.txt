@@ -1,0 +1,6 @@
+【Novidades da versão 1.8.0】
+- Novos widgets de "Neste dia": Leve suas lembranças mais especiais para a Tela de Início e de Bloqueio em elegantes montagens estilo Polaroid (tamanhos médio, grande e tela de bloqueio). Toque para entrar direto nas memórias daquele ano
+- Memórias sempre ativas: Com o pré-cálculo inteligente de vários dias e a atualização em segundo plano, seus widgets continuam sempre atualizados todos os dias, mesmo que você fique sem abrir o app
+- Novo painel de resultados de limpeza: Substituímos o pop-up em tela cheia por um moderno cartão flutuante na parte inferior, exibindo com clareza o espaço liberado e suas conquistas
+- Visualização dedicada "Meus Álbuns": Uma nova lista completa de álbuns para você organizar e navegar pelos seus álbuns personalizados com mais facilidade
+- Desempenho e refinamento: Totalmente adaptado aos padrões visuais mais recentes do iOS, com animações aprimoradas e maior estabilidade

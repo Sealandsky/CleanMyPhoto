@@ -1,0 +1,6 @@
+【Novedades de la versión 1.8.0】
+- Nuevos widgets de "En este día": Disfruta de tus recuerdos favoritos en la pantalla de inicio y de bloqueo con elegantes composiciones estilo Polaroid (tamaños mediano, grande y pantalla de bloqueo). Toca cualquier foto para revivir los recuerdos de ese año al instante
+- Recuerdos siempre al día: Gracias al precálculo inteligente de fotos para varios días y a la actualización en segundo plano, tus widgets se mantienen siempre vivos y actualizados, incluso si pasas varios días sin abrir la app
+- Nueva pantalla de resultados de limpieza: Rediseñada como una elegante tarjeta flotante inferior que muestra claramente el espacio liberado y tus logros con una interacción más ágil y limpia
+- Vista dedicada "Mis álbumes": Nueva pantalla con la lista completa de álbumes para organizar y explorar tus álbumes personalizados con total facilidad
+- Rendimiento y mejoras de diseño: Adaptado a los estándares más recientes de iOS, con animaciones refinadas y mayor estabilidad general

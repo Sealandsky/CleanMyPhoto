@@ -1,0 +1,6 @@
+【What's New in 1.8.0】
+- All-New "On This Day" Widgets: Bring your cherished memories to your Home Screen and Lock Screen with beautifully styled Polaroid-like collages in Medium, Large, and Lock Screen sizes. Tap any photo to jump right into that year's memories
+- Always-On Memory Engine: Powered by multi-day intelligent snapshot precalculation and background refresh, keeping your widgets fresh and lively every day, even when you haven't opened the app
+- Redesigned Cleanup Results: Replaced full-screen popups with an elegant bottom floating sheet that clearly showcases your freed storage and achievements with lighter, fluid interactions
+- Dedicated "My Albums" View: A brand-new full album list destination makes organizing and navigating through your personalized albums effortless
+- Performance & Polish: Aligned with the latest iOS design guidelines, fine-tuned micro-interactions, and enhanced overall smoothness and stability
